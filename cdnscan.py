@@ -17,16 +17,32 @@ import ipaddress
 import urllib.request
 import urllib.error
 import threading
+import time
+import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
+from datetime import datetime
 
-HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+}
 
-# Port yang di-scan untuk deteksi CDN (berdasarkan rentang port Cloudflare & CloudFront)
+# Port yang di-scan untuk deteksi CDN (hanya port umum web)
 SCAN_PORTS = [
-    80, 443, 2052, 2053, 2082, 2083, 2086, 2087,
-    2095, 2096, 8080, 8443, 8880
+    80, 443
 ]
+
+# Batas maksimal IP yang akan di-scan per target
+MAX_IPS_PER_SCAN = 1000
+
+# Konfirmasi otomatis (di-set dari argumen CLI -y)
+AUTO_CONFIRM = False
+
+# Jeda antar IP dalam detik (rate limiting)
+SCAN_DELAY = 0.5
 
 # Provider yang menyediakan IP range secara publik
 PROVIDER_URLS = {
@@ -37,13 +53,12 @@ PROVIDER_URLS = {
 # Folder untuk cache IP range provider dan hasil scan
 IPRANGE_DIR = "output/ipranges"
 SCAN_DIR = "output"
-CACHE_MAX_AGE_SECONDS = 86400  # 1 hari untuk cache IP range provider
-SCAN_CACHE_MAX_AGE_SECONDS = 86400  # 1 hari untuk skip scan ulang
+STATE_DIR = "output/states"
+CACHE_MAX_AGE_SECONDS = 604800  # 7 hari untuk cache IP range provider
+SCAN_CACHE_MAX_AGE_SECONDS = 604800  # 7 hari untuk skip scan ulang
 
 # Lock thread-safe
 print_lock = threading.Lock()
-completed_lock = threading.Lock()
-completed_count = 0
 
 
 def fetch(url, timeout=15):
@@ -60,10 +75,10 @@ def fetch(url, timeout=15):
 
 
 def fetch_headers(host, port=80, scheme="http", timeout=5):
-    """Ambil header response dari host:port"""
+    """Ambil header response dari host:port via GET request."""
     try:
         url = f"{scheme}://{host}:{port}/"
-        req = urllib.request.Request(url, headers=HEADERS, method="HEAD")
+        req = urllib.request.Request(url, headers=HEADERS, method="GET")
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return str(r.headers).lower(), r.status
     except urllib.error.HTTPError as e:
@@ -72,30 +87,37 @@ def fetch_headers(host, port=80, scheme="http", timeout=5):
         return "", None
 
 
-def detect_cdn(ip):
-    """Deteksi apakah IP milik CDN melalui header dan rentang IP"""
+def detect_cdn_and_status(ip):
+    """Deteksi CDN dan status HTTP dalam satu kali request per port."""
     cdn = "-"
+    status = "-"
 
     # Cek header HTTP dan HTTPS pada port umum
     for port in SCAN_PORTS:
-        scheme = "https" if port in (443, 8443) else "http"
+        scheme = "https" if port == 443 else "http"
         try:
-            headers, status = fetch_headers(ip, port, scheme, timeout=5)
-            h = headers.lower()
-            if 'cloudflare' in h:
-                cdn = 'Cloudflare'
-                break
-            if 'cloudfront' in h:
-                cdn = 'CloudFront'
-                break
-            if 'akamai' in h:
-                cdn = 'Akamai'
-                break
-            if 'fastly' in h:
-                cdn = 'Fastly'
-                break
-            if 'sucuri' in h:
-                cdn = 'Sucuri'
+            headers, code = fetch_headers(ip, port, scheme, timeout=5)
+            h = headers
+
+            # Deteksi CDN dari header
+            if cdn == "-":
+                if 'cloudflare' in h:
+                    cdn = 'Cloudflare'
+                elif 'cloudfront' in h:
+                    cdn = 'CloudFront'
+                elif 'akamai' in h:
+                    cdn = 'Akamai'
+                elif 'fastly' in h:
+                    cdn = 'Fastly'
+                elif 'sucuri' in h:
+                    cdn = 'Sucuri'
+
+            # Simpan status code dari respons pertama yang sukses
+            if status == "-" and code is not None:
+                status = str(code)
+
+            # Jika sudah dapat CDN dan status, berhenti
+            if cdn != "-" and status != "-":
                 break
         except Exception:
             continue
@@ -149,7 +171,7 @@ def detect_cdn(ip):
         if ip.startswith(cf_prefixes):
             cdn = 'Cloudflare (IP range)'
 
-    return cdn
+    return cdn, status
 
 
 def scan_open_ports(ip, ports=SCAN_PORTS, timeout=1.5):
@@ -178,16 +200,30 @@ def format_ports(ports_str):
     return f"{','.join(ports[:3])},... ({len(ports)} port)"
 
 
-def parse_ip_range(input_str):
-    """Parse input CIDR atau range (start-end) ke daftar IP string"""
+def parse_ip_range(input_str, offset=0, max_ips=None):
+    """Parse input CIDR atau range (start-end) ke daftar IP string.
+
+    Args:
+        input_str: String CIDR, range, atau IP tunggal.
+        offset: Lewati N IP pertama (untuk resume).
+        max_ips: Batas maksimal jumlah IP yang di-generate (None = tanpa batas).
+    """
     ips = []
     input_str = input_str.strip()
 
     # Coba CIDR
     try:
         network = ipaddress.ip_network(input_str, strict=False)
+        count = 0
+        skipped = 0
         for ip in network.hosts():
+            if skipped < offset:
+                skipped += 1
+                continue
             ips.append(str(ip))
+            count += 1
+            if max_ips is not None and count >= max_ips:
+                break
         return ips
     except ValueError:
         pass
@@ -202,8 +238,17 @@ def parse_ip_range(input_str):
                 if start.version != end.version:
                     return ips
                 current = start
+                count = 0
+                skipped = 0
                 while current <= end:
+                    if skipped < offset:
+                        skipped += 1
+                        current += 1
+                        continue
                     ips.append(str(current))
+                    count += 1
+                    if max_ips is not None and count >= max_ips:
+                        break
                     current += 1
                 return ips
             except ValueError:
@@ -212,13 +257,13 @@ def parse_ip_range(input_str):
     # Coba single IP
     try:
         ipaddress.ip_address(input_str)
-        return [input_str]
+        return [input_str] if offset == 0 else []
     except ValueError:
         return ips
 
 
 def get_provider_ips(provider_name):
-    """Ambil daftar IP dari provider, dengan cache 1 hari"""
+    """Ambil daftar IP dari provider, dengan cache 7 hari"""
     provider_name = provider_name.lower()
     if provider_name not in PROVIDER_URLS:
         return None, f"Provider '{provider_name}' tidak didukung. Tersedia: {', '.join(PROVIDER_URLS.keys())}"
@@ -226,7 +271,7 @@ def get_provider_ips(provider_name):
     os.makedirs(IPRANGE_DIR, exist_ok=True)
     cache_file = f"{IPRANGE_DIR}/{provider_name}.json"
 
-    # Cek apakah cache masih valid (< 1 hari)
+    # Cek apakah cache masih valid (< 7 hari)
     if os.path.exists(cache_file):
         try:
             with open(cache_file, 'r') as f:
@@ -284,16 +329,17 @@ def get_provider_ips(provider_name):
 
 
 def process_ip(ip):
-    """Proses satu IP: scan port + deteksi CDN.
-    
+    """Proses satu IP: scan port + deteksi CDN + status HTTP.
+
     Catatan: Jika ip adalah CIDR (mengandung '/'), hanya network address
     (bagian sebelum '/') yang di-scan dan dicek CDN-nya, bukan semua IP
     dalam rentang tersebut.
     """
     scan_target = ip.split('/')[0] if '/' in ip else ip
     ports = scan_open_ports(scan_target)
-    cdn = detect_cdn(scan_target)
-    return (ip, ports, cdn)
+    cdn, status = detect_cdn_and_status(scan_target)
+    time.sleep(SCAN_DELAY)
+    return (ip, ports, cdn, status)
 
 
 def calc_widths(results):
@@ -301,14 +347,94 @@ def calc_widths(results):
     w_ip = max(len(r[0]) for r in results)
     w_ports = max(len(r[1]) for r in results)
     w_cdn = max(len(r[2]) for r in results)
+    w_status = max(len(r[3]) for r in results)
     w_ip = max(w_ip, len("IP"))
     w_ports = max(w_ports, len("PORTS"))
     w_cdn = max(w_cdn, len("CDN"))
-    return w_ip, w_ports, w_cdn
+    w_status = max(w_status, len("STATUS"))
+    return w_ip, w_ports, w_cdn, w_status
+
+
+def save_state(cidr, scanned_count, completed):
+    """Simpan progres scan per rentang ke file state."""
+    os.makedirs(STATE_DIR, exist_ok=True)
+    safe = cidr.replace("/", "_").replace("-", "_").replace(".", "_")
+    state_file = f"{STATE_DIR}/cdnscan_{safe}.json"
+    state = {
+        "cidr": cidr,
+        "scanned_count": scanned_count,
+        "completed": completed,
+        "updated_at": datetime.now().isoformat()
+    }
+    try:
+        with open(state_file, 'w') as f:
+            json.dump(state, f, indent=2)
+    except Exception as e:
+        print(f"[!] Gagal menyimpan state: {e}")
+
+
+def load_state(cidr):
+    """Baca state progres scan per rentang. Return dict atau None."""
+    safe = cidr.replace("/", "_").replace("-", "_").replace(".", "_")
+    state_file = f"{STATE_DIR}/cdnscan_{safe}.json"
+    if not os.path.exists(state_file):
+        return None
+    try:
+        with open(state_file, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def count_existing_ips(fname):
+    """Hitung jumlah IP yang sudah ada di file output (untuk anti-duplikasi)."""
+    if not os.path.exists(fname):
+        return 0
+    try:
+        count = 0
+        with open(fname, 'r') as f:
+            header = f.readline()  # skip header
+            for line in f:
+                line = line.strip()
+                if line:
+                    count += 1
+        return count
+    except Exception:
+        return 0
+
+
+def select_ranges(ranges):
+    """Tampilkan daftar rentang IP sebagai nomor dan biarkan pengguna memilih."""
+    # Jika mode non-interaktif (-y), pilih semua rentang tanpa prompt
+    if AUTO_CONFIRM:
+        return list(ranges)
+
+    print(f"\nDaftar rentang IP yang tersedia ({len(ranges)} rentang):")
+    for i, r in enumerate(ranges, 1):
+        print(f"  {i}. {r}")
+    print()
+    pilihan = safe_input("Pilih nomor rentang (pisahkan koma, misal 1,3,5): ")
+    selected = []
+    for p in pilihan.split(','):
+        p = p.strip()
+        if p.isdigit():
+            idx = int(p) - 1
+            if 0 <= idx < len(ranges):
+                selected.append(ranges[idx])
+    # Hilangkan duplikat sambil mempertahankan urutan
+    seen = set()
+    uniq = []
+    for r in selected:
+        if r not in seen:
+            seen.add(r)
+            uniq.append(r)
+    return uniq
 
 
 def safe_input(prompt):
     """Wrapper untuk input() dengan penanganan KeyboardInterrupt dan EOFError"""
+    if AUTO_CONFIRM:
+        return 'y'
     try:
         return input(prompt)
     except (KeyboardInterrupt, EOFError):
@@ -317,11 +443,18 @@ def safe_input(prompt):
 
 
 def main():
-    global completed_count
-    if len(sys.argv) < 2:
+    # Argumen CLI untuk mode non-interaktif
+    parser = argparse.ArgumentParser(description='Scan rentang IP untuk deteksi CDN')
+    parser.add_argument('target', nargs='?', help='CIDR, range, IP tunggal, atau nama provider (cloudflare/cloudfront)')
+    parser.add_argument('-l', '--limit', type=int, metavar='N', help='Batas IP per scan (maksimal 1000)')
+    parser.add_argument('-d', '--delay', type=float, metavar='SEC', help='Jeda antar IP dalam detik (default 0.5)')
+    parser.add_argument('-f', '--format', choices=['txt', 'json', 'both'], default='both', help='Format output (default: both)')
+    parser.add_argument('-y', '--yes', action='store_true', help='Konfirmasi otomatis semua prompt (non-interaktif)')
+    args = parser.parse_args()
+
+    if not args.target:
         print("Usage: python3 cdnscan.py <cidr atau range | nama provider>")
         print("Example: python3 cdnscan.py 104.16.0.0/20")
-        print("Example: python3 cdnscan.py 104.16.0.0-104.16.0.255")
         print("Example: python3 cdnscan.py cloudflare")
         print("Example: python3 cdnscan.py cloudfront")
         print()
@@ -330,7 +463,18 @@ def main():
             print(f"  - {name} ({url})")
         sys.exit(1)
 
-    input_str = sys.argv[1].strip()
+    # Override konstanta dari argumen CLI
+    global SCAN_DELAY, MAX_IPS_PER_SCAN, AUTO_CONFIRM
+    if args.delay is not None:
+        SCAN_DELAY = args.delay
+    if args.limit is not None:
+        if args.limit <= 0:
+            print("Limit harus lebih dari 0.")
+            sys.exit(1)
+        MAX_IPS_PER_SCAN = args.limit
+
+    AUTO_CONFIRM = args.yes
+    input_str = args.target.strip()
     print(f"Scan target: {input_str}\n")
 
     # Siapkan direktori output
@@ -341,20 +485,9 @@ def main():
         sys.exit(1)
 
     safe_name = input_str.replace("/", "_").replace("-", "_").replace(".", "_")
-    fname = f"{SCAN_DIR}/cdnscan_{safe_name}.txt"
 
-    # Cek apakah output scan untuk rentang ini sudah ada dan masih baru (< 1 hari)
-    if os.path.exists(fname):
-        try:
-            mtime = datetime.fromtimestamp(os.path.getmtime(fname))
-            age = (datetime.now() - mtime).total_seconds()
-            if age < SCAN_CACHE_MAX_AGE_SECONDS:
-                print(f"[*] Rentang '{input_str}' sudah discan pada {mtime.strftime('%Y-%m-%d %H:%M:%S')} (umur {int(age//3600)} jam).")
-                print(f"    Melewatkan scan. Hasil ada di: {fname}")
-                print(f"    Silakan coba lagi setelah 1 hari atau hapus file secara manual.")
-                sys.exit(0)
-        except Exception:
-            pass  # Gagal cek mtime, lanjut scan
+    # Daftar target scan: setiap item = (label, ips_list, fname, safe_name)
+    targets = []
 
     # Cek apakah input adalah nama provider
     if input_str.lower() in PROVIDER_URLS:
@@ -372,17 +505,78 @@ def main():
         if not ips:
             print(f"[!] Tidak ada IP yang ditemukan untuk provider {provider_name}")
             sys.exit(1)
-        print(f"[*] Dapat {len(ips)} IP dari provider {provider_name}")
+        print(f"[*] Dapat {len(ips)} rentang IP dari provider {provider_name}")
+
+        # Tampilkan daftar dan biarkan pengguna memilih rentang
+        selected = select_ranges(ips)
+        if not selected:
+            print("Tidak ada rentang yang dipilih.")
+            sys.exit(0)
+
+        for cidr in selected:
+            # Cek state resume untuk rentang ini
+            state = load_state(cidr)
+            if state and state.get('completed'):
+                print(f"[*] Rentang '{cidr}' sudah discan sepenuhnya. Dilewati.")
+                continue
+
+            # Tanya berapa IP yang ingin di-scan dalam batch ini (opsional)
+            print(f"Rentang: {cidr}")
+            if AUTO_CONFIRM:
+                user_limit = None
+            else:
+                limit_input = safe_input("    Mau scan berapa IP dalam batch ini? (Enter untuk semua, maksimal 1000): ")
+                user_limit = None
+                if limit_input.strip():
+                    try:
+                        user_limit = int(limit_input.strip())
+                        if user_limit <= 0:
+                            print("    Limit harus lebih dari 0. Menggunakan semua IP.")
+                            user_limit = None
+                        elif user_limit > MAX_IPS_PER_SCAN:
+                            print(f"    Melebihi batas {MAX_IPS_PER_SCAN} IP per batch. Dibatasi menjadi {MAX_IPS_PER_SCAN}.")
+                            user_limit = MAX_IPS_PER_SCAN
+                    except ValueError:
+                        print("    Input tidak valid. Menggunakan semua IP.")
+                        user_limit = None
+
+            range_safe = cidr.replace("/", "_").replace("-", "_").replace(".", "_")
+            tsname = f"{provider_name}_{range_safe}"
+            tfname = f"{SCAN_DIR}/cdnscan_{tsname}.txt"
+            targets.append((cidr, cidr, user_limit, tfname, tsname))
+            print(f"    Target ditambahkan: {cidr} -> {tfname}")
     else:
         # Manual input (CIDR, range, atau IP tunggal)
-        ips = parse_ip_range(input_str)
-        if not ips:
-            print("Tidak ada IP valid yang ditemukan dari input.")
-            sys.exit(1)
-        print(f"Total IP untuk di-scan: {len(ips)}")
+        # Cek state resume untuk rentang ini
+        state = load_state(input_str)
+        if state and state.get('completed'):
+            print(f"[*] Rentang '{input_str}' sudah discan sepenuhnya. Dilewati.")
+            sys.exit(0)
+
+        print(f"Rentang: {input_str}")
+        if AUTO_CONFIRM:
+            user_limit = None
+        else:
+            limit_input = safe_input("    Mau scan berapa IP dalam batch ini? (Enter untuk semua, maksimal 1000): ")
+            user_limit = None
+            if limit_input.strip():
+                try:
+                    user_limit = int(limit_input.strip())
+                    if user_limit <= 0:
+                        print("    Limit harus lebih dari 0. Menggunakan semua IP.")
+                        user_limit = None
+                    elif user_limit > MAX_IPS_PER_SCAN:
+                        print(f"    Melebihi batas {MAX_IPS_PER_SCAN} IP per batch. Dibatasi menjadi {MAX_IPS_PER_SCAN}.")
+                        user_limit = MAX_IPS_PER_SCAN
+                except ValueError:
+                    print("    Input tidak valid. Menggunakan semua IP.")
+                    user_limit = None
+
+        tfname = f"{SCAN_DIR}/cdnscan_{safe_name}.txt"
+        targets.append((input_str, input_str, user_limit, tfname, safe_name))
 
     # Konfirmasi sebelum memulai scan
-    print(f"\n[?] Akan melakukan scan sebanyak {len(ips)} IP.")
+    print(f"\n[?] Akan memproses {len(targets)} target.")
     konfirmasi = safe_input("    Lanjutkan scan? (y/N): ")
     if konfirmasi != 'y':
         print("    Dibatalkan.")
@@ -390,82 +584,142 @@ def main():
 
     print("Memproses dengan threading...\n")
 
-    results = []
-    max_workers = min(30, len(ips))
-    completed_count = 0
+    for label, cidr_str, user_limit, fname, safe_name in targets:
+        # Cek state resume + anti-duplikasi dari file output
+        state = load_state(cidr_str)
+        state_offset = state.get('scanned_count', 0) if state else 0
+        file_offset = count_existing_ips(fname)
+        offset = max(state_offset, file_offset)  # Terbesar adalah ground truth
 
-    try:
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(process_ip, ip): ip for ip in ips}
-            for future in as_completed(futures):
-                ip = futures[future]
-                result = None
-                try:
-                    result = future.result()
-                    results.append(result)
-                except Exception as e:
-                    results.append((ip, "-", "-", "-"))
-                    result = (ip, "-", "-", "-")
+        if state and state.get('completed'):
+            print(f"[*] Semua IP dari '{label}' sudah discan. Hasil ada di: {fname}")
+            continue
 
-                with completed_lock:
-                    completed_count += 1
-                    c = completed_count
+        if offset > 0:
+            print(f"[*] Melanjutkan dari IP ke-{offset + 1} untuk '{label}' (sudah discan: {offset} IP).")
+
+        # Generate IP batch dari offset
+        batch_limit = user_limit if user_limit is not None else MAX_IPS_PER_SCAN
+        ips = parse_ip_range(cidr_str, offset=offset, max_ips=batch_limit)
+        if not ips:
+            print(f"[*] Tidak ada IP baru untuk '{label}'. Rentang mungkin sudah selesai.")
+            save_state(cidr_str, offset, True)
+            continue
+
+        print(f"\n    Memulai scan target: {label} ({len(ips)} IP, offset={offset})")
+        print("    Memproses dengan threading...")
+
+        results = []
+        max_workers = min(30, len(ips))
+        c = 0
+
+        try:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {executor.submit(process_ip, ip): ip for ip in ips}
+                for future in as_completed(futures):
+                    ip = futures[future]
+                    result = None
+                    try:
+                        result = future.result()
+                        results.append(result)
+                    except Exception as e:
+                        results.append((ip, "-", "-", "-"))
+                        result = (ip, "-", "-", "-")
+
                     ip_disp = result[0]
                     ports_disp = format_ports(result[1])
                     cdn_disp = result[2]
-                    line = (f"[{c}/{len(ips)}] {ip_disp} | Ports: {ports_disp} | "
-                            f"CDN: {cdn_disp}")
+                    status_disp = result[3]
+                    line = (f"    [{c}/{len(ips)}] {ip_disp} | Ports: {ports_disp} | "
+                            f"CDN: {cdn_disp} | Status: {status_disp}")
                     with print_lock:
                         print(f"\r{line}", end="")
                         sys.stdout.flush()
-    except KeyboardInterrupt:
-        print("\n\n[!] Scan dibatalkan oleh pengguna (Ctrl+C).")
-        if results:
-            print(f"    Hasil parcial ({len(results)} dari {len(ips)} IP) akan disimpan.")
+                        c += 1
+        except KeyboardInterrupt:
+            print("\n\n    [!] Scan dibatalkan oleh pengguna (Ctrl+C).")
+            if results:
+                print(f"    Hasil parcial ({len(results)} dari {len(ips)} IP) akan disimpan.")
+                new_offset = offset + len(results)
+                save_state(cidr_str, new_offset, False)
+            else:
+                print("    Tidak ada hasil yang dihasilkan.")
+                continue
+
+        # Urutkan hasil berdasarkan IP (handle CIDR dan single IP)
+        def sort_key(item):
+            ip_str = item[0].split('/')[0] if '/' in item[0] else item[0]
+            return ipaddress.ip_address(ip_str)
+
+        results.sort(key=sort_key)
+
+        # Hitung lebar kolom otomatis
+        w_ip, w_ports, w_cdn, w_status = calc_widths(results)
+        total_width = w_ip + w_ports + w_cdn + w_status + 16
+
+        # Cetak tabel akhir
+        print(f"\n    {'=' * total_width}")
+        print(f"    {'IP':<{w_ip}} {'PORTS':<{w_ports}} {'CDN':<{w_cdn}} {'STATUS':<{w_status}}")
+        print(f"    {'-' * total_width}")
+        for ip, ports, cdn, status in results:
+            print(f"    {ip:<{w_ip}} {format_ports(ports):<{w_ports}} {cdn:<{w_cdn}} {status:<{w_status}}")
+
+        # Simpan ke file output sesuai --format
+        save_txt = args.format in ('txt', 'both')
+        save_json = args.format in ('json', 'both')
+
+        if save_txt:
+            file_exists = os.path.exists(fname) and os.path.getsize(fname) > 0
+            try:
+                mode = 'a' if file_exists else 'w'
+                with open(fname, mode) as f:
+                    if not file_exists:
+                        f.write("ip|ports|cdn|status\n")
+                    for ip, ports, cdn, status in results:
+                        f.write(f"{ip}|{format_ports(ports)}|{cdn}|{status}\n")
+            except Exception as e:
+                print(f"    [!] Gagal menyimpan file teks: {e}")
+
+        if save_json:
+            jname = f"{SCAN_DIR}/cdnscan_{safe_name}.json"
+            json_data = []
+            # Baca JSON lama jika ada, untuk menumpuk hasil resume
+            if os.path.exists(jname):
+                try:
+                    with open(jname, 'r') as f:
+                        json_data = json.load(f)
+                except Exception:
+                    json_data = []
+            for ip, ports, cdn, status in results:
+                json_data.append({
+                    "ip": ip,
+                    "ports": ports,
+                    "cdn": cdn,
+                    "status": status
+                })
+            try:
+                with open(jname, 'w') as f:
+                    json.dump(json_data, f, indent=2)
+            except Exception as e:
+                print(f"    [!] Gagal menyimpan file JSON: {e}")
+
+        # Update state
+        new_offset = offset + len(results)
+        # Cek apakah masih ada IP setelah batch ini untuk menentukan completed
+        next_check = parse_ip_range(cidr_str, offset=new_offset, max_ips=1)
+        completed = len(next_check) == 0
+        save_state(cidr_str, new_offset, completed)
+        if completed:
+            print(f"\n    [*] Rentang '{label}' sudah discan sepenuhnya ({new_offset} IP).")
         else:
-            print("    Tidak ada hasil yang dihasilkan.")
-            sys.exit(1)
+            print(f"\n    [*] Progres: {new_offset} IP telah discan dari '{label}'.")
 
-    # Urutkan hasil berdasarkan IP (handle CIDR dan single IP)
-    def sort_key(item):
-        ip_str = item[0].split('/')[0] if '/' in item[0] else item[0]
-        return ipaddress.ip_address(ip_str)
+        if save_txt:
+            print(f"\n    Hasil disimpan ke: {fname}")
+        if save_json:
+            print(f"    JSON disimpan ke: {jname}")
 
-    results.sort(key=sort_key)
-
-    # Hitung lebar kolom otomatis
-    w_ip, w_ports, w_cdn = calc_widths(results)
-    total_width = w_ip + w_ports + w_cdn + 12
-
-    # Cetak tabel akhir
-    print("\n" + "=" * total_width)
-    print(f"{'IP':<{w_ip}} {'PORTS':<{w_ports}} {'CDN':<{w_cdn}}")
-    print("-" * total_width)
-    for ip, ports, cdn in results:
-        print(f"{ip:<{w_ip}} {format_ports(ports):<{w_ports}} {cdn:<{w_cdn}}")
-
-    # Simpan ke file teks di output/
-    os.makedirs(SCAN_DIR, exist_ok=True)
-    fname = f"{SCAN_DIR}/cdnscan_{safe_name}.txt"
-    with open(fname, 'w') as f:
-        f.write("ip|ports|cdn\n")
-        for ip, ports, cdn in results:
-            f.write(f"{ip}|{format_ports(ports)}|{cdn}\n")
-
-    # Simpan ke file JSON di output/
-    jname = f"{SCAN_DIR}/cdnscan_{safe_name}.json"
-    json_data = []
-    for ip, ports, cdn in results:
-        json_data.append({
-            "ip": ip,
-            "ports": ports,
-            "cdn": cdn
-        })
-    with open(jname, 'w') as f:
-        json.dump(json_data, f, indent=2)
-
-    print(f"\nHasil disimpan ke: {fname}")
-    print(f"JSON disimpan ke: {jname}")
+    print("\nScan semua target selesai.")
 
 
 if __name__ == '__main__':
