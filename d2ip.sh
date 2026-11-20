@@ -1,5 +1,6 @@
 #!/bin/bash
-# domain-to-ip.sh - Resolve domain ke IP address
+# d2ip.sh - Resolve domain ke IP address
+# Output disimpan ke output/<domain>.txt (dan juga ditampilkan di layar)
 
 if [ -z "$1" ]; then
     echo "Usage: $0 <domain>"
@@ -8,7 +9,12 @@ if [ -z "$1" ]; then
 fi
 
 DOMAIN=$1
+OUT_DIR="output"
+OUT_FILE="$OUT_DIR/${DOMAIN}.txt"
 
+mkdir -p "$OUT_DIR"
+
+{
 echo "Domain: $DOMAIN"
 echo ""
 
@@ -38,3 +44,6 @@ fi
 
 echo ""
 echo "Selesai."
+} | tee "$OUT_FILE"
+
+echo "Hasil disimpan ke: $OUT_FILE"

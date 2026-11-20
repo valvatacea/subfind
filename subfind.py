@@ -3,6 +3,7 @@
 # Penggunaan: python3 subfind.py <domain>
 
 import sys
+import os
 import socket
 import json
 import urllib.request
@@ -326,15 +327,17 @@ def main():
     for sub, ip, ports, status, cdn in results:
         print(f"{sub:<{w_sub}} {ip:<{w_ip}} {ports:<{w_ports}} {status:<{w_status}} {cdn}")
 
-    # Simpan ke file teks
-    fname = f"/tmp/subfind_{domain}.txt"
+    # Simpan ke file teks di folder output/
+    OUT_DIR = "output"
+    os.makedirs(OUT_DIR, exist_ok=True)
+    fname = f"{OUT_DIR}/subfind_{domain}.txt"
     with open(fname, 'w') as f:
         f.write("subdomain|ip|ports|status|cdn\n")
         for sub, ip, ports, status, cdn in results:
             f.write(f"{sub}|{ip}|{ports}|{status}|{cdn}\n")
 
-    # Simpan ke file JSON
-    jname = f"/tmp/subfind_{domain}.json"
+    # Simpan ke file JSON di folder output/
+    jname = f"{OUT_DIR}/subfind_{domain}.json"
     json_data = []
     for sub, ip, ports, status, cdn in results:
         json_data.append({
