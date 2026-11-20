@@ -32,8 +32,8 @@ print_lock = threading.Lock()
 completed_lock = threading.Lock()
 completed_count = 0
 
-def fetch(url, timeout=15, retries=2):
-    last_err = None
+def fetch(url, timeout=15, retries=2) -> str:
+    last_err = ""
     for attempt in range(retries):
         try:
             req = urllib.request.Request(url, headers=HEADERS)
