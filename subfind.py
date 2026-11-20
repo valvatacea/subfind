@@ -6,6 +6,7 @@ import sys
 import os
 import socket
 import json
+import time
 import urllib.request
 import urllib.error
 import threading
@@ -31,24 +32,38 @@ print_lock = threading.Lock()
 completed_lock = threading.Lock()
 completed_count = 0
 
-def fetch(url, timeout=15):
-    try:
-        req = urllib.request.Request(url, headers=HEADERS)
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.read().decode('utf-8', errors='ignore')
-    except urllib.error.HTTPError as e:
-        return f"HTTP_ERROR_{e.code}"
-    except urllib.error.URLError as e:
-        return f"URL_ERROR_{e.reason}"
-    except Exception as e:
-        return f"ERR_{type(e).__name__}"
+def fetch(url, timeout=15, retries=2):
+    last_err = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers=HEADERS)
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.read().decode('utf-8', errors='ignore')
+        except urllib.error.HTTPError as e:
+            last_err = f"HTTP_ERROR_{e.code}"
+            # 5xx bisa dicoba ulang, 4xx langsung gagal
+            if 500 <= e.code < 600 and attempt < retries - 1:
+                time.sleep(1)
+                continue
+            return last_err
+        except urllib.error.URLError as e:
+            last_err = f"URL_ERROR_{e.reason}"
+            if attempt < retries - 1:
+                time.sleep(1)
+                continue
+            return last_err
+        except Exception as e:
+            last_err = f"ERR_{type(e).__name__}"
+            if attempt < retries - 1:
+                time.sleep(1)
+                continue
+            return last_err
+    return last_err
 
 def crt_sh(domain):
     """Ambil subdomain dari Certificate Transparency logs (crt.sh)"""
     url = f"https://crt.sh/?q=%.{domain}&output=json"
     result = fetch(url)
-    if result is None:
-        return set(), "crt.sh timeout/tidak merespons"
     if result.startswith("HTTP_ERROR_"):
         return set(), f"crt.sh HTTP error: {result.split('_')[-1]}"
     if result.startswith("URL_ERROR_"):
@@ -88,7 +103,7 @@ def hackertarget(domain):
 
 def wordlist_fallback(domain):
     """Fallback terakhir: daftar subdomain umum"""
-    common = "www mail ftp api dev test staging blog shop cdn vpn ssh ns1 ns2 mx app web portal admin blog dev staging vpn2 test2 beta mobile client dashboard"
+    common = "www mail ftp api dev test staging blog shop cdn vpn ssh ns1 ns2 mx app web portal admin vpn2 test2 beta mobile client dashboard"
     subs = set()
     for sub in common.split():
         host = f"{sub}.{domain}"
@@ -146,15 +161,18 @@ def scan_ports_summary(ip, ports=COMMON_PORTS, timeout=1.5):
     """Scan port terbuka pada IP, return daftar angka port saja"""
     open_ports = []
     for port in ports:
+        s = None
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(timeout)
             result = s.connect_ex((ip, port))
             if result == 0:
                 open_ports.append(str(port))
-            s.close()
         except Exception:
             pass
+        finally:
+            if s:
+                s.close()
     return ",".join(open_ports) if open_ports else "-"
 
 def port_name(port):
@@ -173,16 +191,18 @@ def port_name(port):
 
 def get_http_status(host):
     """Cek status HTTP/HTTPS, return kode (200, 301, 403, dst) atau '-'"""
+    statuses = []
     for scheme in ("http", "https"):
         try:
             req = urllib.request.Request(f"{scheme}://{host}", headers=HEADERS, method="HEAD")
             with urllib.request.urlopen(req, timeout=6) as r:
                 return str(r.status)
         except urllib.error.HTTPError as e:
-            return str(e.code)
+            statuses.append(str(e.code))
         except Exception:
             continue
-    return "-"
+    # Kembalikan kode HTTP pertama jika ada, else '-'
+    return statuses[0] if statuses else "-"
 
 def detect_cdn(host, ip):
     # Cek header HTTP dan HTTPS
@@ -356,7 +376,6 @@ def main():
             with completed_lock:
                 completed_count += 1
                 c = completed_count
-                # Tampilkan detail hasil yang baru selesai (update baris yang sama)
                 sub_disp = result[0]
                 ip_disp = result[1]
                 ports_disp = result[2]
@@ -365,8 +384,7 @@ def main():
                 line = (f"[{c}/{total}] {sub_disp} | IP: {ip_disp} | Ports: {ports_disp} | "
                         f"Status: {status_disp} | CDN: {cdn_disp}")
                 with print_lock:
-                    print(f"\r{line}", end="")
-                    sys.stdout.flush()
+                    print(line)
 
     # Urutkan hasil berdasarkan nama subdomain
     results.sort(key=lambda x: x[0])
