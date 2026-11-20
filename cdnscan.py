@@ -17,7 +17,6 @@ import ipaddress
 import urllib.request
 import urllib.error
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 
@@ -35,14 +34,17 @@ PROVIDER_URLS = {
     'cloudfront': 'https://ip-ranges.amazonaws.com/ip-ranges.json',
 }
 
-# Folder untuk cache IP range provider
+# Folder untuk cache IP range provider dan hasil scan
 IPRANGE_DIR = "output/ipranges"
-CACHE_MAX_AGE_SECONDS = 86400  # 1 hari
+SCAN_DIR = "output"
+CACHE_MAX_AGE_SECONDS = 86400  # 1 hari untuk cache IP range provider
+SCAN_CACHE_MAX_AGE_SECONDS = 86400  # 1 hari untuk skip scan ulang
 
 # Lock thread-safe
 print_lock = threading.Lock()
 completed_lock = threading.Lock()
 completed_count = 0
+
 
 def fetch(url, timeout=15):
     try:
@@ -56,6 +58,7 @@ def fetch(url, timeout=15):
     except Exception as e:
         return f"ERR_{type(e).__name__}"
 
+
 def fetch_headers(host, port=80, scheme="http", timeout=5):
     """Ambil header response dari host:port"""
     try:
@@ -67,6 +70,7 @@ def fetch_headers(host, port=80, scheme="http", timeout=5):
         return str(e.headers).lower() if e.headers else "", e.code
     except Exception:
         return "", None
+
 
 def detect_cdn(ip):
     """Deteksi apakah IP milik CDN melalui header dan rentang IP"""
@@ -137,19 +141,6 @@ def detect_cdn(ip):
             '199.82','199.83','199.84','199.85','199.86','199.87','199.88','199.89',
             '199.90','199.91','199.92','199.93','199.94','199.95','199.96','199.97',
             '199.98','199.99','199.100','199.101','199.102','199.103','199.104',
-            '199.105','199.106','199.107','198.108','198.109','198.110','198.111',
-            '198.112','198.113','198.114','198.115','198.116','198.117','198.118',
-            '198.119','198.120','198.121','198.122','198.123','198.124','198.125',
-            '198.126','198.127','199.27','199.28','199.29','199.30','199.31','199.33',
-            '199.34','199.35','199.36','199.37','199.38','199.39','199.40','199.41',
-            '199.42','199.43','199.44','199.45','199.46','199.47','199.48','199.49',
-            '199.50','199.51','199.52','199.53','199.54','199.55','199.56','199.57',
-            '199.58','199.59','199.60','199.61','199.62','199.63','199.64','199.65',
-            '199.66','199.67','199.68','199.69','199.70','199.71','199.72','199.73',
-            '199.74','199.75','199.76','199.77','199.78','199.79','199.80','199.81',
-            '199.82','199.83','199.84','199.85','199.86','199.87','199.88','199.89',
-            '199.90','199.91','199.92','199.93','199.94','199.95','199.96','199.97',
-            '199.98','199.99','199.100','199.101','199.102','199.103','199.104',
             '199.105','199.106','199.107','199.108','199.109','199.110','199.111',
             '199.112','199.113','199.114','199.115','199.116','199.117','199.118',
             '199.119','199.120','199.121','199.122','199.123','199.124','199.125',
@@ -159,6 +150,7 @@ def detect_cdn(ip):
             cdn = 'Cloudflare (IP range)'
 
     return cdn
+
 
 def scan_open_ports(ip, ports=SCAN_PORTS, timeout=1.5):
     """Scan port terbuka pada IP, return daftar angka port saja"""
@@ -175,6 +167,7 @@ def scan_open_ports(ip, ports=SCAN_PORTS, timeout=1.5):
             pass
     return ",".join(open_ports) if open_ports else "-"
 
+
 def format_ports(ports_str):
     """Singkatkan daftar port agar kolom tidak terlalu lebar"""
     if ports_str == "-":
@@ -183,6 +176,7 @@ def format_ports(ports_str):
     if len(ports) <= 3:
         return ports_str
     return f"{','.join(ports[:3])},... ({len(ports)} port)"
+
 
 def parse_ip_range(input_str):
     """Parse input CIDR atau range (start-end) ke daftar IP string"""
@@ -221,6 +215,7 @@ def parse_ip_range(input_str):
         return [input_str]
     except ValueError:
         return ips
+
 
 def get_provider_ips(provider_name):
     """Ambil daftar IP dari provider, dengan cache 1 hari"""
@@ -287,13 +282,19 @@ def get_provider_ips(provider_name):
 
     return ips, None
 
+
 def process_ip(ip):
-    """Proses satu IP: scan port + deteksi CDN"""
-    # Jika ip adalah CIDR (mengandung /), ambil network address saja untuk scanning
+    """Proses satu IP: scan port + deteksi CDN.
+    
+    Catatan: Jika ip adalah CIDR (mengandung '/'), hanya network address
+    (bagian sebelum '/') yang di-scan dan dicek CDN-nya, bukan semua IP
+    dalam rentang tersebut.
+    """
     scan_target = ip.split('/')[0] if '/' in ip else ip
     ports = scan_open_ports(scan_target)
     cdn = detect_cdn(scan_target)
     return (ip, ports, cdn)
+
 
 def calc_widths(results):
     """Hitung lebar kolom otomatis"""
@@ -304,6 +305,16 @@ def calc_widths(results):
     w_ports = max(w_ports, len("PORTS"))
     w_cdn = max(w_cdn, len("CDN"))
     return w_ip, w_ports, w_cdn
+
+
+def safe_input(prompt):
+    """Wrapper untuk input() dengan penanganan KeyboardInterrupt dan EOFError"""
+    try:
+        return input(prompt)
+    except (KeyboardInterrupt, EOFError):
+        print("\n    Dibatalkan oleh pengguna.")
+        sys.exit(0)
+
 
 def main():
     global completed_count
@@ -322,17 +333,22 @@ def main():
     input_str = sys.argv[1].strip()
     print(f"Scan target: {input_str}\n")
 
-    # Cek apakah output scan untuk rentang ini sudah ada dan masih baru (< 1 hari)
-    OUT_DIR = "output"
-    os.makedirs(OUT_DIR, exist_ok=True)
-    safe_name = input_str.replace("/", "_").replace("-", "_").replace(".", "_")
-    fname = f"{OUT_DIR}/cdnscan_{safe_name}.txt"
+    # Siapkan direktori output
+    try:
+        os.makedirs(SCAN_DIR, exist_ok=True)
+    except Exception as e:
+        print(f"[!] Tidak dapat membuat direktori '{SCAN_DIR}': {e}")
+        sys.exit(1)
 
+    safe_name = input_str.replace("/", "_").replace("-", "_").replace(".", "_")
+    fname = f"{SCAN_DIR}/cdnscan_{safe_name}.txt"
+
+    # Cek apakah output scan untuk rentang ini sudah ada dan masih baru (< 1 hari)
     if os.path.exists(fname):
         try:
             mtime = datetime.fromtimestamp(os.path.getmtime(fname))
             age = (datetime.now() - mtime).total_seconds()
-            if age < CACHE_MAX_AGE_SECONDS:
+            if age < SCAN_CACHE_MAX_AGE_SECONDS:
                 print(f"[*] Rentang '{input_str}' sudah discan pada {mtime.strftime('%Y-%m-%d %H:%M:%S')} (umur {int(age//3600)} jam).")
                 print(f"    Melewatkan scan. Hasil ada di: {fname}")
                 print(f"    Silakan coba lagi setelah 1 hari atau hapus file secara manual.")
@@ -345,7 +361,7 @@ def main():
         provider_name = input_str.lower()
         # Konfirmasi sebelum fetch IP range
         print(f"[?] Akan mengambil IP range untuk provider '{provider_name}' dari {PROVIDER_URLS[provider_name]}")
-        konfirmasi = input("    Lanjutkan fetch IP range? (y/N): ").strip().lower()
+        konfirmasi = safe_input("    Lanjutkan fetch IP range? (y/N): ")
         if konfirmasi != 'y':
             print("    Dibatalkan.")
             sys.exit(0)
@@ -367,7 +383,7 @@ def main():
 
     # Konfirmasi sebelum memulai scan
     print(f"\n[?] Akan melakukan scan sebanyak {len(ips)} IP.")
-    konfirmasi = input("    Lanjutkan scan? (y/N): ").strip().lower()
+    konfirmasi = safe_input("    Lanjutkan scan? (y/N): ")
     if konfirmasi != 'y':
         print("    Dibatalkan.")
         sys.exit(0)
@@ -378,29 +394,37 @@ def main():
     max_workers = min(30, len(ips))
     completed_count = 0
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(process_ip, ip): ip for ip in ips}
-        for future in as_completed(futures):
-            ip = futures[future]
-            result = None
-            try:
-                result = future.result()
-                results.append(result)
-            except Exception as e:
-                results.append((ip, "-", "-", "-"))
-                result = (ip, "-", "-", "-")
+    try:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(process_ip, ip): ip for ip in ips}
+            for future in as_completed(futures):
+                ip = futures[future]
+                result = None
+                try:
+                    result = future.result()
+                    results.append(result)
+                except Exception as e:
+                    results.append((ip, "-", "-", "-"))
+                    result = (ip, "-", "-", "-")
 
-            with completed_lock:
-                completed_count += 1
-                c = completed_count
-                ip_disp = result[0]
-                ports_disp = format_ports(result[1])
-                cdn_disp = result[2]
-                line = (f"[{c}/{len(ips)}] {ip_disp} | Ports: {ports_disp} | "
-                        f"CDN: {cdn_disp}")
-                with print_lock:
-                    print(f"\r{line}", end="")
-                    sys.stdout.flush()
+                with completed_lock:
+                    completed_count += 1
+                    c = completed_count
+                    ip_disp = result[0]
+                    ports_disp = format_ports(result[1])
+                    cdn_disp = result[2]
+                    line = (f"[{c}/{len(ips)}] {ip_disp} | Ports: {ports_disp} | "
+                            f"CDN: {cdn_disp}")
+                    with print_lock:
+                        print(f"\r{line}", end="")
+                        sys.stdout.flush()
+    except KeyboardInterrupt:
+        print("\n\n[!] Scan dibatalkan oleh pengguna (Ctrl+C).")
+        if results:
+            print(f"    Hasil parcial ({len(results)} dari {len(ips)} IP) akan disimpan.")
+        else:
+            print("    Tidak ada hasil yang dihasilkan.")
+            sys.exit(1)
 
     # Urutkan hasil berdasarkan IP (handle CIDR dan single IP)
     def sort_key(item):
@@ -421,17 +445,15 @@ def main():
         print(f"{ip:<{w_ip}} {format_ports(ports):<{w_ports}} {cdn:<{w_cdn}}")
 
     # Simpan ke file teks di output/
-    OUT_DIR = "output"
-    os.makedirs(OUT_DIR, exist_ok=True)
-    safe_name = input_str.replace("/", "_").replace("-", "_").replace(".", "_")
-    fname = f"{OUT_DIR}/cdnscan_{safe_name}.txt"
+    os.makedirs(SCAN_DIR, exist_ok=True)
+    fname = f"{SCAN_DIR}/cdnscan_{safe_name}.txt"
     with open(fname, 'w') as f:
         f.write("ip|ports|cdn\n")
         for ip, ports, cdn in results:
             f.write(f"{ip}|{format_ports(ports)}|{cdn}\n")
 
     # Simpan ke file JSON di output/
-    jname = f"{OUT_DIR}/cdnscan_{safe_name}.json"
+    jname = f"{SCAN_DIR}/cdnscan_{safe_name}.json"
     json_data = []
     for ip, ports, cdn in results:
         json_data.append({
@@ -444,6 +466,7 @@ def main():
 
     print(f"\nHasil disimpan ke: {fname}")
     print(f"JSON disimpan ke: {jname}")
+
 
 if __name__ == '__main__':
     main()
