@@ -322,9 +322,33 @@ def main():
     input_str = sys.argv[1].strip()
     print(f"Scan target: {input_str}\n")
 
+    # Cek apakah output scan untuk rentang ini sudah ada dan masih baru (< 1 hari)
+    OUT_DIR = "output"
+    os.makedirs(OUT_DIR, exist_ok=True)
+    safe_name = input_str.replace("/", "_").replace("-", "_").replace(".", "_")
+    fname = f"{OUT_DIR}/cdnscan_{safe_name}.txt"
+
+    if os.path.exists(fname):
+        try:
+            mtime = datetime.fromtimestamp(os.path.getmtime(fname))
+            age = (datetime.now() - mtime).total_seconds()
+            if age < CACHE_MAX_AGE_SECONDS:
+                print(f"[*] Rentang '{input_str}' sudah discan pada {mtime.strftime('%Y-%m-%d %H:%M:%S')} (umur {int(age//3600)} jam).")
+                print(f"    Melewatkan scan. Hasil ada di: {fname}")
+                print(f"    Silakan coba lagi setelah 1 hari atau hapus file secara manual.")
+                sys.exit(0)
+        except Exception:
+            pass  # Gagal cek mtime, lanjut scan
+
     # Cek apakah input adalah nama provider
     if input_str.lower() in PROVIDER_URLS:
         provider_name = input_str.lower()
+        # Konfirmasi sebelum fetch IP range
+        print(f"[?] Akan mengambil IP range untuk provider '{provider_name}' dari {PROVIDER_URLS[provider_name]}")
+        konfirmasi = input("    Lanjutkan fetch IP range? (y/N): ").strip().lower()
+        if konfirmasi != 'y':
+            print("    Dibatalkan.")
+            sys.exit(0)
         ips, err = get_provider_ips(provider_name)
         if err:
             print(f"[!] {err}")
@@ -340,6 +364,13 @@ def main():
             print("Tidak ada IP valid yang ditemukan dari input.")
             sys.exit(1)
         print(f"Total IP untuk di-scan: {len(ips)}")
+
+    # Konfirmasi sebelum memulai scan
+    print(f"\n[?] Akan melakukan scan sebanyak {len(ips)} IP.")
+    konfirmasi = input("    Lanjutkan scan? (y/N): ").strip().lower()
+    if konfirmasi != 'y':
+        print("    Dibatalkan.")
+        sys.exit(0)
 
     print("Memproses dengan threading...\n")
 
