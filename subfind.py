@@ -384,7 +384,7 @@ def main():
                 line = (f"[{c}/{total}] {sub_disp} | IP: {ip_disp} | Ports: {ports_disp} | "
                         f"Status: {status_disp} | CDN: {cdn_disp}")
                 with print_lock:
-                    print(line)
+                    print(line, flush=True)
 
     # Urutkan hasil berdasarkan nama subdomain
     results.sort(key=lambda x: x[0])
