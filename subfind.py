@@ -306,7 +306,7 @@ def main():
 
         # 2. hackertarget (fallback jika crt.sh kosong atau error)
         if not subs:
-            print("[*] crt.sh kosong/gagal. Mengambil sublist dari hackertarget...")
+            print("[*] Mengambil sublist dari hackertarget...")
             s, err = hackertarget(domain)
             if s:
                 subs |= s
@@ -317,7 +317,7 @@ def main():
 
         # 3. wordlist (fallback terakhir)
         if not subs:
-            print("[*] Semua provider online gagal. Mengambil sublist dari wordlist (daftar umum)...")
+            print("[*] Mengambil sublist dari wordlist (daftar umum)...")
             s, err = wordlist_fallback(domain)
             if s:
                 subs |= s
