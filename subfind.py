@@ -19,8 +19,11 @@ HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 # Timeout default untuk semua operasi socket (DNS, connect, vb.)
 socket.setdefaulttimeout(10)
 
+# Folder dasar berdasarkan lokasi file ini (seperti worktree repo)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # Folder khusus cache daftar subdomain per domain
-SUBFIND_CACHE_DIR = "output/subfind_cache"
+SUBFIND_CACHE_DIR = os.path.join(BASE_DIR, "output", "subfind_cache")
 # Regex validasi domain sederhana
 DOMAIN_RE = re.compile(r'^(?!\-)[A-Za-z0-9\-]{1,63}(?<!\-)(\.[A-Za-z0-9\-]{1,63}(?<!\-))*\.[A-Za-z]{2,}$')
 CACHE_MAX_AGE_SECONDS = 2592000  # 30 hari
@@ -472,7 +475,7 @@ def main():
         print(f"{sub:<{w_sub}} {ip:<{w_ip}} {ports:<{w_ports}} {status:<{w_status}} {cdn}")
 
     # Simpan ke file teks di folder output/
-    OUT_DIR = "output"
+    OUT_DIR = os.path.join(BASE_DIR, "output")
     os.makedirs(OUT_DIR, exist_ok=True)
     fname = f"{OUT_DIR}/subfind_{domain}.txt"
     with open(fname, 'w') as f:
