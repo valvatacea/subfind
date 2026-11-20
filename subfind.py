@@ -172,21 +172,6 @@ def scan_ports_summary(ip, ports=COMMON_PORTS, timeout=1.5):
                 s.close()
     return ",".join(open_ports) if open_ports else "-"
 
-def port_name(port):
-    names = {
-        21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP", 53: "DNS",
-        80: "HTTP", 110: "POP3", 143: "IMAP", 443: "HTTPS", 445: "SMB",
-        465: "SMTPS", 587: "SMTP", 993: "IMAPS", 995: "POP3S",
-        1433: "MSSQL", 3306: "MySQL", 3389: "RDP", 5432: "PostgreSQL",
-        5900: "VNC", 6379: "Redis", 8080: "HTTP-Alt", 8443: "HTTPS-Alt",
-        8888: "HTTP-Alt", 10000: "Webmin", 20865: "WS-NatSSH",
-        20885: "WS-NatSSH", 20165: "WS-NatSSH", 20185: "WS-NatSSH",
-        20195: "WS-NatSSH", 20971: "SSH", 20979: "9Router",
-        20128: "Cloudflared"
-    }
-    return names.get(port, "?")
-
-
 CF_PREFIXES = (
     '104.16','104.17','104.18','104.19','104.20','104.21','104.22','104.23',
     '104.24','104.25','104.26','104.27','104.28','104.29','104.30','104.31',
@@ -378,9 +363,9 @@ def main():
             sub = futures[future]
             try:
                 result = future.result()
-                results.append(result)
-            except Exception as e:
-                results.append((sub, '-', '-', '-', '-'))
+            except Exception:
+                result = (sub, '-', '-', '-', '-')
+            results.append(result)
 
             with completed_lock:
                 completed_count += 1
