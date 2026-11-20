@@ -16,8 +16,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 
-# Port yang di-scan untuk deteksi CDN
-SCAN_PORTS = [80, 443, 8080, 8443]
+# Port yang di-scan untuk deteksi CDN (berdasarkan rentang port Cloudflare & CloudFront)
+SCAN_PORTS = [
+    80, 443, 2052, 2053, 2082, 2083, 2086, 2087,
+    2095, 2096, 8080, 8443, 8880
+]
 
 # Lock thread-safe
 print_lock = threading.Lock()
