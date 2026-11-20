@@ -11,16 +11,19 @@ import time
 import urllib.request
 import urllib.error
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from datetime import datetime
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
+
+# Timeout default untuk semua operasi socket (DNS, connect, vb.)
+socket.setdefaulttimeout(10)
 
 # Folder khusus cache daftar subdomain per domain
 SUBFIND_CACHE_DIR = "output/subfind_cache"
 # Regex validasi domain sederhana
 DOMAIN_RE = re.compile(r'^(?!\-)[A-Za-z0-9\-]{1,63}(?<!\-)(\.[A-Za-z0-9\-]{1,63}(?<!\-))*\.[A-Za-z]{2,}$')
-CACHE_MAX_AGE_SECONDS = 604800  # 7 hari
+CACHE_MAX_AGE_SECONDS = 2592000  # 30 hari
 
 # Port umum yang akan di-scan
 COMMON_PORTS = [
@@ -103,7 +106,7 @@ def hackertarget(domain):
 
 def wordlist_fallback(domain):
     """Fallback terakhir: daftar subdomain umum"""
-    common = "www mail ftp api dev test staging blog shop cdn vpn ssh ns1 ns2 mx app web portal admin vpn2 test2 beta mobile client dashboard"
+    common = "www mail ftp api dev test staging blog shop cdn vpn ssh ns1 ns2 mx app web portal admin vpn2 test2 beta mobile client dashboard webmail dev2 test3 demo new old backup store m store2 cdn2 img media static files assets help support docs forum news wiki git svn cvn shop2 store3 blog2 news2 app2 mobile2 vpn3 ns3 mx2 remote vpn1 vpn4 vpn5 ns4 ns5 mx3 mx4 mx5 pop imap smtp autodiscover owa exchange sharepoint teams zoom meet chat talk voice fax print printer nas backup1 backup2 db database mysql postgres redis cache search elastic kibana grafana prometheus alerta monitoring nagios zabbix jenkins ci cd pipeline gitlab github bitbucket jira confluence redmine mantis bugzilla phpmyadmin adminer pgadmin robomongo mongo-express kibana logstash filebeat metricbeat packetbeat audit logs log syslog rsyslog monitor stats status health ping uptime speed speedtest test1 test2 test3 dev dev1 dev3 stage staging1 staging2 prod production live www1 www2 www3 www4 www5 web1 web2 web3 web4 web5 app1 app2 app3 app4 app5 api1 api2 api3 api4 api5 v1 v2 v3 v4 v5 beta1 beta2 alpha gamma delta omega demo1 demo2 demo3 trial trial1 trial2 preview pre preprod uat qa qc quality sandbox sandbox1 sandbox2 devbox devbox1 build build1 ci1 cd1 deploy deploy1 release releases stable unstable nightly weekly monthly yearly annual archive archives old new latest current trunk master main head branch tag version versions update updates patch patches hotfix hotfix1 hotfix2 fix fixes bug bugs issue issues ticket tickets helpdesk support1 support2 care customer clients users user member members account accounts profile profiles login signin signup register registration register2 auth oauth sso saml ldap active directory ad dc dns dns1 dns2 dns3 ns3 ns4 ns5 mx1 mx2 mx3 mx4 mx5 smtp1 smtp2 pop1 pop2 pop3 imap1 imap2 webmail1 webmail2 mail1 mail2 mail3 mail4 mail5 mx imap pop smtp ftp1 ftp2 sftp ssh1 ssh2 git1 git2 svn1 cvs hg bzr docker registry harbor nexus artifactory maven gradle npm yarn pypi cpan rubygems nuget chocolatey brew apt yum dnf repo repos repository mirror mirrors download downloads upload uploads files file docs doc documentation wiki1 wiki2 knowledge kb kb1 kb2 faq faqs blog1 blog2 blog3 news1 news2 press release releases media press pr media1 media2 images image img1 img2 img3 img4 img5 video videos stream streaming live live1 live2 stream1 stream2 radio tv video1 video2 audio music mp3 mp4 podcast podcasts shop store store1 store2 store3 cart checkout pay payment payments billing invoice invoices price pricing prices buy sell order orders basket basket1 basket2 shop1 shop2 shop3 market marketplace deal deals coupon coupons discount sale sales promo promos campaign campaigns affiliate affiliates partner partners reseller resellers wholesale retail b2b b2c enterprise corp corporate business company about contact contactus contact-us contact1 contact2 aboutus about-us about1 about2 team teams staff careers jobs job hr human resources legal privacy terms tos eula cookie cookies gdpr compliance audit security secure ssl tls cert certs certificate certificates ca pkcs key keys vpn vpn1 vpn2 vpn3 vpn4 vpn5 remote remote1 remote2 rdp citrix terminal terminal1 terminal2 citrix1 citrix2 wan lan wan1 wan2 lan1 lan2 gateway gw gw1 gw2 router switch switch1 switch2 firewall fw fw1 fw2 ips ids proxy proxies proxy1 proxy2 squid cache caches cdn1 cdn2 cdn3 cdn4 cdn5 edge edges edge1 edge2 origin origins shield shield1 shield2 balance lb lb1 lb2 haproxy nginx apache httpd iis tomcat jetty jboss wildfly glassfish weblogic websphere node node1 node2 node3 python ruby perl php java dotnet csharp go rust swift kotlin scala clojure haskell erlang elixir lisp scheme prolog forth assembly asm c cpp cplus cplusplus objc objective matlab mathematica maple octave scilab r rstudio shiny tableau powerbi bi businessintelligence analytics analytic stats statistics metrics metric monitor monitoring observability observ trace tracing span spans log logs logging event events alert alerts alarm alarms notification notifications message messages queue queues topic topics exchange exchanges binding bindings channel channels stream streams pubsub pub sub consumer consumers producer producers worker workers job jobs cron crontab schedule scheduler task tasks workflow workflows pipeline pipelines ci cd devops devsecops secops sec security sec1 sec2 sec3 soc soc1 soc2 noca noca1 noca2 helpdesk it it1 it2 it3 ops ops1 ops2 sysadmin admin1 admin2 root superuser sudo su user1 user2 user3 user4 user5 guest guests anonymous anon nobody nobody1 nobody2 test testing tests qa qc qc1 qc2 qa1 qa2 uat uat1 uat2 preprod preprod1 preprod2 staging staging1 staging2 staging3 prod prod1 prod2 prod3 production live live1 live2 canary canary1 canary2 blue green blue1 blue2 green1 green2 primary secondary tertiary master slave node1 node2 node3 node4 node5 master1 master2 replica replicas replica1 replica2 replica3 standby standby1 standby2 failover failover1 failover2 dr dr1 dr2 backup backup1 backup2 backup3 archive archives archived vault safe safe1 safe2 secure secure1 secure2 encrypted encrypt decrypt key keys cert certs ssl tls ca pki pki1 pki2 smime pgp gpg dkim spf dmarc dnssec dns1 dns2 dns3 dns4 dns5 resolver resolvers resolver1 resolver2 nslookup dig host whois ip ip1 ip2 ip3 ipv4 ipv6 subnet subnets vlan vlans vlan1 vlan2 vlan3 vlan4 vlan5 mac mac1 mac2 arp arp1 arp2 dhcp dhcp1 dhcp2 pxe pxe1 pxe2 boot boot1 boot2 network networks net net1 net2 net3 intranet extranet internet web web1 web2 web3 web4 web5 site sites page pages homepage index default welcome start home home1 home2 index1 index2 default1 default2 welcome1 welcome2 landing landing1 landing2 splash splash1 splash2 portal portal1 portal2 dashboard1 dashboard2 dashboard3 control control1 control2 panel panel1 panel2 cp cpanel plesk directadmin webmin usermin virtualmin cockpit ansible puppet chef salt terraform packer vagrant docker1 docker2 k8s kube kubectl minikube openshift rancher swarm mesos marathon consul etcd zookeeper kafka rabbitmq activemq zeromq zmq nats nats1 nats2 pulsar pulsar1 pulsar2 redis1 redis2 redis3 redis4 redis5 memcached memcache memcache1 memcache2 mongodb mongo mongo1 mongo2 mongo3 mysql1 mysql2 mysql3 mysql4 mysql5 mariadb mariadb1 mariadb2 postgres1 postgres2 postgres3 postgres4 postgres5 postgresql oracle oracle1 oracle2 mssql mssql1 mssql2 sql sql1 sql2 sqlserver db1 db2 db3 db4 db5 database1 database2 database3 data datas dataset datasets warehouse warehouses lake lakes mart marts bi1 bi2 bi3 olap olap1 olap2 oltp oltp1 oltp2 etl etl1 etl2 elt elt1 elt2 pipeline1 pipeline2 stream1 stream2 stream3 kafka1 kafka2 kafka3 kafka4 kafka5 rabbit1 rabbit2 activemq1 activemq2 zero1 zero2 nats1 nats2 pulsar1 pulsar2"
     subs = set()
     for sub in common.split():
         host = f"{sub}.{domain}"
@@ -118,16 +121,16 @@ def resolve_ip(host):
         return None
 
 
-def get_cache_path(domain):
-    """Path file cache daftar subdomain per domain di folder khusus."""
+def get_cache_path(domain, provider):
+    """Path file cache subdomain per provider per domain di folder khusus."""
     os.makedirs(SUBFIND_CACHE_DIR, exist_ok=True)
     safe = domain.replace('.', '_').replace('/', '_').replace('\\', '_')
-    return f"{SUBFIND_CACHE_DIR}/subfind_{safe}.json"
+    return f"{SUBFIND_CACHE_DIR}/subfind_{safe}_{provider}.json"
 
 
-def load_cache(domain):
-    """Baca daftar subdomain dari cache jika masih fresh (< 7 hari)."""
-    path = get_cache_path(domain)
+def load_cache(domain, provider):
+    """Baca cache subdomain per provider dari file tersendiri jika masih fresh (< 7 hari)."""
+    path = get_cache_path(domain, provider)
     if not os.path.exists(path):
         return None
     try:
@@ -143,13 +146,14 @@ def load_cache(domain):
         return None
 
 
-def save_cache(domain, subs):
-    """Simpan daftar subdomain ke cache folder khusus."""
-    path = get_cache_path(domain)
+def save_cache(domain, provider, subs):
+    """Simpan cache subdomain per provider ke file tersendiri."""
+    path = get_cache_path(domain, provider)
     try:
         with open(path, 'w') as f:
             json.dump({
                 'domain': domain,
+                'provider': provider,
                 'fetched_at': datetime.now().isoformat(),
                 'subdomains': sorted(list(subs))
             }, f, indent=2)
@@ -296,54 +300,100 @@ def main():
 
     errors = []
 
-    subs = set()
+    # Sublist terpisah per provider
+    provider_subs = {
+        "crt.sh": set(),
+        "hackertarget": set(),
+        "wordlist": set(),
+    }
+    provider_cached = {
+        "crt.sh": set(),
+        "hackertarget": set(),
+        "wordlist": set(),
+    }
 
-    # Cek cache terlebih dahulu
-    cached = load_cache(domain)
-    if cached is not None:
-        subs = cached
-        print(f"[*] Cache ditemukan: {len(subs)} subdomain (umur < 7 hari)")
+    # Cek cache per provider
+    for provider in provider_subs:
+        cached_p = load_cache(domain, provider)
+        if cached_p is not None:
+            provider_cached[provider] = cached_p
+
+    total_cached = sum(len(s) for s in provider_cached.values())
+    if total_cached > 0:
+        print(f"[*] Cache ditemukan: {total_cached} subdomain")
+        for provider, cs in provider_cached.items():
+            if cs:
+                print(f"    {provider}: {len(cs)} subdomain")
+
+    # Selalu coba fetch dari provider, bukan hanya saat cache kosong
+    # 1. crt.sh
+    print("[*] Mengambil sublist dari crt.sh ...", flush=True)
+    s, err = crt_sh(domain)
+    provider_subs["crt.sh"] = s if s else set()
+    if s:
+        print(f"[*] Dapat {len(s)} subdomain dari crt.sh")
     else:
-        # 1. crt.sh
-        print("[*] Mengambil sublist dari crt.sh...", flush=True)
-        s, err = crt_sh(domain)
-        if s:
-            subs |= s
-            print(f"    crt.sh: {len(s)} subdomain")
+        if err:
+            errors.append(err)
+            print(f"    {err}")
         else:
-            if err:
-                errors.append(err)
-                print(f"    {err}")
-            else:
-                print("    Tidak ada subdomain dari crt.sh")
+            print("[*] Tidak ada subdomain dari crt.sh")
 
-        # 2. hackertarget (fallback jika crt.sh kosong atau error)
-        if not subs:
-            print("[*] Mengambil sublist dari hackertarget...", flush=True)
-            s, err = hackertarget(domain)
-            if s:
-                subs |= s
-                print(f"    hackertarget: {len(s)} subdomain")
-            else:
-                if err:
-                    errors.append(err)
-                    print(f"    {err}")
-                else:
-                    print("    Tidak ada subdomain dari hackertarget")
+    # 2. hackertarget (selalu di-fetch)
+    print("[*] Mengambil sublist dari hackertarget ...", flush=True)
+    s, err = hackertarget(domain)
+    provider_subs["hackertarget"] = s if s else set()
+    if s:
+        print(f"[*] Dapat {len(s)} subdomain dari hackertarget")
+    else:
+        if err:
+            errors.append(err)
+            print(f"    {err}")
+        else:
+            print("[*] Tidak ada subdomain dari hackertarget")
 
-        # 3. wordlist (fallback terakhir)
-        if not subs:
-            print("[*] Mengambil sublist dari wordlist (daftar umum)...", flush=True)
-            s, err = wordlist_fallback(domain)
-            if s:
-                subs |= s
-                print(f"    wordlist: {len(s)} subdomain")
-            else:
-                print("    Tidak ditemukan subdomain apa pun.")
+    # 3. wordlist (selalu di-fetch)
+    print("[*] Mengambil sublist dari wordlist (daftar umum) ...", flush=True)
+    s, err = wordlist_fallback(domain)
+    provider_subs["wordlist"] = s if s else set()
+    if s:
+        print(f"[*] Dapat {len(s)} subdomain dari wordlist")
+    else:
+        print("[*] Tidak ditemukan subdomain dari wordlist.")
 
-        # Simpan cache jika ada subdomain yang ditemukan
-        if subs:
-            save_cache(domain, subs)
+    # Bandingkan & simpan cache per provider hanya yang di-fetch
+    provider_final = {}
+    for provider, fetched in provider_subs.items():
+        cached_p = provider_cached[provider]
+        if not fetched:
+            # Provider tidak di-fetch (fallback skip), gunakan cache lama jika ada
+            provider_final[provider] = cached_p if cached_p is not None else set()
+            continue
+        if cached_p is not None:
+            if fetched == cached_p:
+                print(f"[*] Cache {provider} masih sama, tidak perlu update.")
+                provider_final[provider] = cached_p
+            elif len(fetched) >= len(cached_p):
+                print(f"[!] Cache {provider} berbeda ({len(cached_p)} -> {len(fetched)}), simpan baru.")
+                save_cache(domain, provider, fetched)
+                provider_final[provider] = fetched
+            else:
+                print(f"[!] Cache {provider} fetch lebih sedikit ({len(cached_p)} -> {len(fetched)}), cache lama dipertahankan.")
+                provider_final[provider] = cached_p
+        else:
+            save_cache(domain, provider, fetched)
+            provider_final[provider] = fetched
+
+    # Gabungkan semua cache provider menjadi satu set untuk scan
+    subs = set()
+    for psubs in provider_final.values():
+        subs |= psubs
+
+    # Ringkasan cache per provider (yang akan di-scan)
+    print("\n[*] Ringkasan cache per provider (untuk scan):")
+    for name, psubs in provider_final.items():
+        if psubs:
+            print(f"    {name}: {len(psubs)} subdomain")
 
     # Tampilkan error provider jika ada
     if errors:
@@ -358,33 +408,57 @@ def main():
     completed_count = 0
 
     print(f"\nTotal: {total} subdomain unik")
-    print("Memulai scan subdomain...\n", flush=True)
+    print(f"[*] Memulai scan target: {domain} ({total} subdomain)")
+    print("[*] Memproses dengan threading...")
 
     results = []
     max_workers = min(20, total)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(process_subdomain, sub): sub for sub in sorted_subs}
-        for future in as_completed(futures):
-            sub = futures[future]
-            try:
-                result = future.result()
-            except Exception:
-                result = (sub, '-', '-', '-', '-')
-            results.append(result)
+        pending = set(futures.keys())
 
-            with completed_lock:
-                completed_count += 1
-                c = completed_count
-                sub_disp = result[0]
-                ip_disp = result[1]
-                ports_disp = result[2]
-                status_disp = result[3]
-                cdn_disp = result[4]
-                line = (f"[{c}/{total}] {sub_disp} | IP: {ip_disp} | Ports: {ports_disp} | "
-                        f"Status: {status_disp} | CDN: {cdn_disp}")
-                with print_lock:
-                    print(line, flush=True)
+        while pending:
+            done, pending = wait(pending, timeout=60, return_when=FIRST_COMPLETED)
+
+            if not done:
+                # Semua pending ngehang melebihi 60 detik, tandai sebagai gagal
+                for future in list(pending):
+                    sub = futures[future]
+                    result = (sub, '-', '-', '-', '-')
+                    results.append(result)
+                    with completed_lock:
+                        completed_count += 1
+                        c = completed_count
+                        line = (f"[{c}/{total}] {sub} | IP: - | Ports: - | "
+                                f"Status: - | CDN: - (timeout)")
+                        with print_lock:
+                            print(f"\r{line}", end="")
+                        sys.stdout.flush()
+                pending.clear()
+                break
+
+            for future in done:
+                sub = futures[future]
+                try:
+                    result = future.result()
+                except Exception:
+                    result = (sub, '-', '-', '-', '-')
+                results.append(result)
+
+                with completed_lock:
+                    completed_count += 1
+                    c = completed_count
+                    sub_disp = result[0]
+                    ip_disp = result[1]
+                    ports_disp = result[2]
+                    status_disp = result[3]
+                    cdn_disp = result[4]
+                    line = (f"[{c}/{total}] {sub_disp} | IP: {ip_disp} | Ports: {ports_disp} | "
+                            f"Status: {status_disp} | CDN: {cdn_disp}")
+                    with print_lock:
+                        print(f"\r{line}", end="")
+                        sys.stdout.flush()
 
     # Urutkan hasil berdasarkan nama subdomain
     results.sort(key=lambda x: x[0])
@@ -423,8 +497,8 @@ def main():
     with open(jname, 'w') as f:
         json.dump(json_data, f, indent=2)
 
-    print(f"\nHasil disimpan ke: {fname}")
-    print(f"JSON disimpan ke: {jname}")
+    print(f"\n    Hasil disimpan ke: {fname}")
+    print(f"    JSON disimpan ke: {jname}")
 
 if __name__ == '__main__':
     main()
