@@ -305,7 +305,7 @@ def main():
         print(f"[*] Cache ditemukan: {len(subs)} subdomain (umur < 7 hari)")
     else:
         # 1. crt.sh
-        print("[*] Mengambil sublist dari crt.sh...")
+        print("[*] Mengambil sublist dari crt.sh...", flush=True)
         s, err = crt_sh(domain)
         if s:
             subs |= s
@@ -319,7 +319,7 @@ def main():
 
         # 2. hackertarget (fallback jika crt.sh kosong atau error)
         if not subs:
-            print("[*] Mengambil sublist dari hackertarget...")
+            print("[*] Mengambil sublist dari hackertarget...", flush=True)
             s, err = hackertarget(domain)
             if s:
                 subs |= s
@@ -333,7 +333,7 @@ def main():
 
         # 3. wordlist (fallback terakhir)
         if not subs:
-            print("[*] Mengambil sublist dari wordlist (daftar umum)...")
+            print("[*] Mengambil sublist dari wordlist (daftar umum)...", flush=True)
             s, err = wordlist_fallback(domain)
             if s:
                 subs |= s
@@ -358,7 +358,7 @@ def main():
     completed_count = 0
 
     print(f"\nTotal: {total} subdomain unik")
-    print("Memulai scan subdomain...\n")
+    print("Memulai scan subdomain...\n", flush=True)
 
     results = []
     max_workers = min(20, total)
