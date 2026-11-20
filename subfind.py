@@ -10,8 +10,13 @@ import urllib.request
 import urllib.error
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
+
+# Folder khusus cache daftar subdomain per domain
+SUBFIND_CACHE_DIR = "output/subfind_cache"
+CACHE_MAX_AGE_SECONDS = 604800  # 7 hari
 
 # Port umum yang akan di-scan
 COMMON_PORTS = [
@@ -96,6 +101,46 @@ def resolve_ip(host):
         return socket.gethostbyname(host)
     except Exception:
         return None
+
+
+def get_cache_path(domain):
+    """Path file cache daftar subdomain per domain di folder khusus."""
+    os.makedirs(SUBFIND_CACHE_DIR, exist_ok=True)
+    safe = domain.replace('.', '_').replace('/', '_').replace('\\', '_')
+    return f"{SUBFIND_CACHE_DIR}/subfind_{safe}.json"
+
+
+def load_cache(domain):
+    """Baca daftar subdomain dari cache jika masih fresh (< 7 hari)."""
+    path = get_cache_path(domain)
+    if not os.path.exists(path):
+        return None
+    try:
+        mtime = datetime.fromtimestamp(os.path.getmtime(path))
+        age = (datetime.now() - mtime).total_seconds()
+        if age < CACHE_MAX_AGE_SECONDS:
+            with open(path, 'r') as f:
+                data = json.load(f)
+            return set(data.get('subdomains', []))
+        else:
+            return None  # cache expired
+    except Exception:
+        return None
+
+
+def save_cache(domain, subs):
+    """Simpan daftar subdomain ke cache folder khusus."""
+    path = get_cache_path(domain)
+    try:
+        with open(path, 'w') as f:
+            json.dump({
+                'domain': domain,
+                'fetched_at': datetime.now().isoformat(),
+                'subdomains': sorted(list(subs))
+            }, f, indent=2)
+    except Exception:
+        pass
+
 
 def scan_ports_summary(ip, ports=COMMON_PORTS, timeout=1.5):
     """Scan port terbuka pada IP, return daftar angka port saja"""
@@ -243,36 +288,46 @@ def main():
     subs = set()
     errors = []
 
-    # 1. crt.sh
-    print("[*] Mencoba crt.sh...")
-    s, err = crt_sh(domain)
-    if s:
-        subs |= s
-        print(f"    crt.sh: {len(s)} subdomain")
+    # Cek cache terlebih dahulu
+    cached = load_cache(domain)
+    if cached is not None:
+        subs = cached
+        print(f"[*] Cache ditemukan: {len(subs)} subdomain (umur < 7 hari)")
     else:
-        errors.append(err or "crt.sh kosong")
-        print(f"    {err}  <-- kemungkinan: rate-limit, firewall blokir, atau crt.sh down")
-
-    # 2. hackertarget (fallback jika crt.sh kosong atau error)
-    if not subs:
-        print("[*] crt.sh kosong/gagal. Coba hackertarget...")
-        s, err = hackertarget(domain)
+        # 1. crt.sh
+        print("[*] Mencoba crt.sh...")
+        s, err = crt_sh(domain)
         if s:
             subs |= s
-            print(f"    hackertarget: {len(s)} subdomain")
+            print(f"    crt.sh: {len(s)} subdomain")
         else:
-            errors.append(err or "hackertarget kosong")
-            print(f"    {err}")
+            errors.append(err or "crt.sh kosong")
+            print(f"    {err}  <-- kemungkinan: rate-limit, firewall blokir, atau crt.sh down")
 
-    # 3. wordlist (fallback terakhir)
-    if not subs:
-        print("[*] Semua provider online gagal. Coba daftar umum (wordlist)...")
-        s, err = wordlist_fallback(domain)
-        if s:
-            subs |= s
-            print(f"    wordlist: {len(s)} subdomain")
-        else:
-            print("    Tidak ditemukan subdomain apa pun.")
+        # 2. hackertarget (fallback jika crt.sh kosong atau error)
+        if not subs:
+            print("[*] crt.sh kosong/gagal. Coba hackertarget...")
+            s, err = hackertarget(domain)
+            if s:
+                subs |= s
+                print(f"    hackertarget: {len(s)} subdomain")
+            else:
+                errors.append(err or "hackertarget kosong")
+                print(f"    {err}")
+
+        # 3. wordlist (fallback terakhir)
+        if not subs:
+            print("[*] Semua provider online gagal. Coba daftar umum (wordlist)...")
+            s, err = wordlist_fallback(domain)
+            if s:
+                subs |= s
+                print(f"    wordlist: {len(s)} subdomain")
+            else:
+                print("    Tidak ditemukan subdomain apa pun.")
+
+        # Simpan cache jika ada subdomain yang ditemukan
+        if subs:
+            save_cache(domain, subs)
 
     if not subs:
         print("\nTidak ada subdomain yang ditemukan.")
