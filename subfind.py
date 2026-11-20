@@ -25,12 +25,9 @@ SUBFIND_CACHE_DIR = "output/subfind_cache"
 DOMAIN_RE = re.compile(r'^(?!\-)[A-Za-z0-9\-]{1,63}(?<!\-)(\.[A-Za-z0-9\-]{1,63}(?<!\-))*\.[A-Za-z]{2,}$')
 CACHE_MAX_AGE_SECONDS = 2592000  # 30 hari
 
-# Port umum yang akan di-scan
+# Port umum yang akan di-scan (hanya HTTP dan HTTPS)
 COMMON_PORTS = [
-    21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 465, 587,
-    993, 995, 1433, 3306, 3389, 5432, 5900, 6379, 8080,
-    8443, 8888, 10000, 20865, 20885, 20165, 20185, 20195,
-    20971, 20979, 20128
+    80, 443
 ]
 
 # Lock untuk print dan counter thread-safe
