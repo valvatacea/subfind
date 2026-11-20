@@ -42,7 +42,6 @@ def fetch_headers(host, port=80, scheme="http", timeout=5):
 def detect_cdn(ip):
     """Deteksi apakah IP milik CDN melalui header dan rentang IP"""
     cdn = "-"
-    evidence = []
 
     # Cek header HTTP dan HTTPS pada port umum
     for port in SCAN_PORTS:
@@ -52,29 +51,24 @@ def detect_cdn(ip):
             h = headers.lower()
             if 'cloudflare' in h:
                 cdn = 'Cloudflare'
-                evidence.append(f"header:{port}")
                 break
             if 'cloudfront' in h:
                 cdn = 'CloudFront'
-                evidence.append(f"header:{port}")
                 break
             if 'akamai' in h:
                 cdn = 'Akamai'
-                evidence.append(f"header:{port}")
                 break
             if 'fastly' in h:
                 cdn = 'Fastly'
-                evidence.append(f"header:{port}")
                 break
             if 'sucuri' in h:
                 cdn = 'Sucuri'
-                evidence.append(f"header:{port}")
                 break
         except Exception:
             continue
 
     # Fallback: rentang IP Cloudflare
-    if cdn == '-':
+    if cdn == "-":
         cf_prefixes = (
             '104.16','104.17','104.18','104.19','104.20','104.21','104.22','104.23',
             '104.24','104.25','104.26','104.27','104.28','104.29','104.30','104.31',
@@ -122,7 +116,7 @@ def detect_cdn(ip):
         if ip.startswith(cf_prefixes):
             cdn = 'Cloudflare (IP range)'
 
-    return cdn, evidence
+    return cdn
 
 def scan_open_ports(ip, ports=SCAN_PORTS, timeout=1.5):
     """Scan port terbuka pada IP, return daftar angka port saja"""
@@ -189,20 +183,18 @@ def parse_ip_range(input_str):
 def process_ip(ip):
     """Proses satu IP: scan port + deteksi CDN"""
     ports = scan_open_ports(ip)
-    cdn, evidence = detect_cdn(ip)
-    return (ip, ports, cdn, ",".join(evidence) if evidence else "-")
+    cdn = detect_cdn(ip)
+    return (ip, ports, cdn)
 
 def calc_widths(results):
     """Hitung lebar kolom otomatis"""
     w_ip = max(len(r[0]) for r in results)
     w_ports = max(len(r[1]) for r in results)
     w_cdn = max(len(r[2]) for r in results)
-    w_ev = max(len(r[3]) for r in results)
     w_ip = max(w_ip, len("IP"))
     w_ports = max(w_ports, len("PORTS"))
     w_cdn = max(w_cdn, len("CDN"))
-    w_ev = max(w_ev, len("EVIDENCE"))
-    return w_ip, w_ports, w_cdn, w_ev
+    return w_ip, w_ports, w_cdn
 
 def main():
     global completed_count
@@ -246,9 +238,8 @@ def main():
                 ip_disp = result[0]
                 ports_disp = format_ports(result[1])
                 cdn_disp = result[2]
-                ev_disp = result[3]
                 line = (f"[{c}/{len(ips)}] {ip_disp} | Ports: {ports_disp} | "
-                        f"CDN: {cdn_disp} | Evidence: {ev_disp}")
+                        f"CDN: {cdn_disp}")
                 with print_lock:
                     print(f"\r{line}", end="")
                     sys.stdout.flush()
@@ -257,15 +248,15 @@ def main():
     results.sort(key=lambda x: ipaddress.ip_address(x[0]))
 
     # Hitung lebar kolom otomatis
-    w_ip, w_ports, w_cdn, w_ev = calc_widths(results)
-    total_width = w_ip + w_ports + w_cdn + w_ev + 16
+    w_ip, w_ports, w_cdn = calc_widths(results)
+    total_width = w_ip + w_ports + w_cdn + 12
 
     # Cetak tabel akhir
     print("\n" + "=" * total_width)
-    print(f"{'IP':<{w_ip}} {'PORTS':<{w_ports}} {'CDN':<{w_cdn}} {'EVIDENCE'}")
+    print(f"{'IP':<{w_ip}} {'PORTS':<{w_ports}} {'CDN':<{w_cdn}}")
     print("-" * total_width)
-    for ip, ports, cdn, ev in results:
-        print(f"{ip:<{w_ip}} {format_ports(ports):<{w_ports}} {cdn:<{w_cdn}} {ev}")
+    for ip, ports, cdn in results:
+        print(f"{ip:<{w_ip}} {format_ports(ports):<{w_ports}} {cdn:<{w_cdn}}")
 
     # Simpan ke file teks di output/
     OUT_DIR = "output"
@@ -273,19 +264,18 @@ def main():
     safe_name = input_str.replace("/", "_").replace("-", "_").replace(".", "_")
     fname = f"{OUT_DIR}/cdnscan_{safe_name}.txt"
     with open(fname, 'w') as f:
-        f.write("ip|ports|cdn|evidence\n")
-        for ip, ports, cdn, ev in results:
-            f.write(f"{ip}|{format_ports(ports)}|{cdn}|{ev}\n")
+        f.write("ip|ports|cdn\n")
+        for ip, ports, cdn in results:
+            f.write(f"{ip}|{format_ports(ports)}|{cdn}\n")
 
     # Simpan ke file JSON di output/
     jname = f"{OUT_DIR}/cdnscan_{safe_name}.json"
     json_data = []
-    for ip, ports, cdn, ev in results:
+    for ip, ports, cdn in results:
         json_data.append({
             "ip": ip,
             "ports": ports,
-            "cdn": cdn,
-            "evidence": ev
+            "cdn": cdn
         })
     with open(jname, 'w') as f:
         json.dump(json_data, f, indent=2)
