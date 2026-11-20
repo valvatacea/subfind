@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 # cdnscan.py - Scan rentang IP untuk deteksi CDN
-# Penggunaan: python3 cdnscan.py <cidr atau range>
-# Contoh: python3 cdnscan.py 104.16.0.0/12
-#         python3 cdnscan.py 104.16.0.0-104.16.255.255
+# Penggunaan:
+#   python3 cdnscan.py <cidr atau range>     (manual)
+#   python3 cdnscan.py <provider>            (nama provider, misal cloudflare)
+# Contoh:
+#   python3 cdnscan.py 104.16.0.0/20
+#   python3 cdnscan.py 104.16.0.0-104.16.0.255
+#   python3 cdnscan.py cloudflare
+#   python3 cdnscan.py cloudfront
 
 import sys
 import os
@@ -12,7 +17,9 @@ import ipaddress
 import urllib.request
 import urllib.error
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 
@@ -22,10 +29,32 @@ SCAN_PORTS = [
     2095, 2096, 8080, 8443, 8880
 ]
 
+# Provider yang menyediakan IP range secara publik
+PROVIDER_URLS = {
+    'cloudflare': 'https://www.cloudflare.com/ips-v4',
+    'cloudfront': 'https://ip-ranges.amazonaws.com/ip-ranges.json',
+}
+
+# Folder untuk cache IP range provider
+IPRANGE_DIR = "output/ipranges"
+CACHE_MAX_AGE_SECONDS = 86400  # 1 hari
+
 # Lock thread-safe
 print_lock = threading.Lock()
 completed_lock = threading.Lock()
 completed_count = 0
+
+def fetch(url, timeout=15):
+    try:
+        req = urllib.request.Request(url, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read().decode('utf-8', errors='ignore')
+    except urllib.error.HTTPError as e:
+        return f"HTTP_ERROR_{e.code}"
+    except urllib.error.URLError as e:
+        return f"URL_ERROR_{e.reason}"
+    except Exception as e:
+        return f"ERR_{type(e).__name__}"
 
 def fetch_headers(host, port=80, scheme="http", timeout=5):
     """Ambil header response dari host:port"""
@@ -108,6 +137,19 @@ def detect_cdn(ip):
             '199.82','199.83','199.84','199.85','199.86','199.87','199.88','199.89',
             '199.90','199.91','199.92','199.93','199.94','199.95','199.96','199.97',
             '199.98','199.99','199.100','199.101','199.102','199.103','199.104',
+            '199.105','199.106','199.107','198.108','198.109','198.110','198.111',
+            '198.112','198.113','198.114','198.115','198.116','198.117','198.118',
+            '198.119','198.120','198.121','198.122','198.123','198.124','198.125',
+            '198.126','198.127','199.27','199.28','199.29','199.30','199.31','199.33',
+            '199.34','199.35','199.36','199.37','199.38','199.39','199.40','199.41',
+            '199.42','199.43','199.44','199.45','199.46','199.47','199.48','199.49',
+            '199.50','199.51','199.52','199.53','199.54','199.55','199.56','199.57',
+            '199.58','199.59','199.60','199.61','199.62','199.63','199.64','199.65',
+            '199.66','199.67','199.68','199.69','199.70','199.71','199.72','199.73',
+            '199.74','199.75','199.76','199.77','199.78','199.79','199.80','199.81',
+            '199.82','199.83','199.84','199.85','199.86','199.87','199.88','199.89',
+            '199.90','199.91','199.92','199.93','199.94','199.95','199.96','199.97',
+            '199.98','199.99','199.100','199.101','199.102','199.103','199.104',
             '199.105','199.106','199.107','199.108','199.109','199.110','199.111',
             '199.112','199.113','199.114','199.115','199.116','199.117','199.118',
             '199.119','199.120','199.121','199.122','199.123','199.124','199.125',
@@ -180,10 +222,77 @@ def parse_ip_range(input_str):
     except ValueError:
         return ips
 
+def get_provider_ips(provider_name):
+    """Ambil daftar IP dari provider, dengan cache 1 hari"""
+    provider_name = provider_name.lower()
+    if provider_name not in PROVIDER_URLS:
+        return None, f"Provider '{provider_name}' tidak didukung. Tersedia: {', '.join(PROVIDER_URLS.keys())}"
+
+    os.makedirs(IPRANGE_DIR, exist_ok=True)
+    cache_file = f"{IPRANGE_DIR}/{provider_name}.json"
+
+    # Cek apakah cache masih valid (< 1 hari)
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, 'r') as f:
+                cache = json.load(f)
+            fetched_at = datetime.fromisoformat(cache.get('fetched_at', '2000-01-01'))
+            age = (datetime.now() - fetched_at).total_seconds()
+            if age < CACHE_MAX_AGE_SECONDS:
+                return cache.get('ips', []), None
+        except Exception:
+            pass  # Cache rusak, akan di-fetch ulang
+
+    # Fetch dari provider
+    url = PROVIDER_URLS[provider_name]
+    print(f"[*] Mengunduh IP range {provider_name} dari {url} ...")
+    result = fetch(url, timeout=30)
+    if result is None or result.startswith(("HTTP_ERROR_", "URL_ERROR_", "ERR_")):
+        return None, f"Gagal mengunduh {provider_name}: {result}"
+
+    ips = []
+    try:
+        if provider_name == 'cloudflare':
+            # Text file, satu IP per baris
+            for line in result.splitlines():
+                line = line.strip()
+                if line:
+                    try:
+                        ipaddress.ip_network(line, strict=False)
+                        ips.append(line)
+                    except ValueError:
+                        pass
+        elif provider_name == 'cloudfront':
+            # AWS IP ranges JSON, filter hanya CLOUDFRONT service
+            data = json.loads(result)
+            for entry in data.get('prefixes', []):
+                if entry.get('service') == 'CLOUDFRONT':
+                    prefix = entry.get('ip_prefix', '')
+                    if prefix:
+                        ips.append(prefix)
+    except Exception as e:
+        return None, f"Gagal memproses data {provider_name}: {e}"
+
+    # Simpan ke cache
+    try:
+        cache_data = {
+            'fetched_at': datetime.now().isoformat(),
+            'provider': provider_name,
+            'ips': ips
+        }
+        with open(cache_file, 'w') as f:
+            json.dump(cache_data, f, indent=2)
+    except Exception:
+        pass  # Gagal simpan cache tidak masalah, hasil tetap dipakai
+
+    return ips, None
+
 def process_ip(ip):
     """Proses satu IP: scan port + deteksi CDN"""
-    ports = scan_open_ports(ip)
-    cdn = detect_cdn(ip)
+    # Jika ip adalah CIDR (mengandung /), ambil network address saja untuk scanning
+    scan_target = ip.split('/')[0] if '/' in ip else ip
+    ports = scan_open_ports(scan_target)
+    cdn = detect_cdn(scan_target)
     return (ip, ports, cdn)
 
 def calc_widths(results):
@@ -199,21 +308,39 @@ def calc_widths(results):
 def main():
     global completed_count
     if len(sys.argv) < 2:
-        print("Usage: python3 cdnscan.py <cidr atau range>")
+        print("Usage: python3 cdnscan.py <cidr atau range | nama provider>")
         print("Example: python3 cdnscan.py 104.16.0.0/20")
         print("Example: python3 cdnscan.py 104.16.0.0-104.16.0.255")
-        print("Example: python3 cdnscan.py 104.16.0.1")
+        print("Example: python3 cdnscan.py cloudflare")
+        print("Example: python3 cdnscan.py cloudfront")
+        print()
+        print("Provider yang tersedia:")
+        for name, url in PROVIDER_URLS.items():
+            print(f"  - {name} ({url})")
         sys.exit(1)
 
     input_str = sys.argv[1].strip()
     print(f"Scan target: {input_str}\n")
 
-    ips = parse_ip_range(input_str)
-    if not ips:
-        print("Tidak ada IP valid yang ditemukan dari input.")
-        sys.exit(1)
+    # Cek apakah input adalah nama provider
+    if input_str.lower() in PROVIDER_URLS:
+        provider_name = input_str.lower()
+        ips, err = get_provider_ips(provider_name)
+        if err:
+            print(f"[!] {err}")
+            sys.exit(1)
+        if not ips:
+            print(f"[!] Tidak ada IP yang ditemukan untuk provider {provider_name}")
+            sys.exit(1)
+        print(f"[*] Dapat {len(ips)} IP dari provider {provider_name}")
+    else:
+        # Manual input (CIDR, range, atau IP tunggal)
+        ips = parse_ip_range(input_str)
+        if not ips:
+            print("Tidak ada IP valid yang ditemukan dari input.")
+            sys.exit(1)
+        print(f"Total IP untuk di-scan: {len(ips)}")
 
-    print(f"Total IP untuk di-scan: {len(ips)}")
     print("Memproses dengan threading...\n")
 
     results = []
@@ -244,8 +371,12 @@ def main():
                     print(f"\r{line}", end="")
                     sys.stdout.flush()
 
-    # Urutkan hasil berdasarkan IP
-    results.sort(key=lambda x: ipaddress.ip_address(x[0]))
+    # Urutkan hasil berdasarkan IP (handle CIDR dan single IP)
+    def sort_key(item):
+        ip_str = item[0].split('/')[0] if '/' in item[0] else item[0]
+        return ipaddress.ip_address(ip_str)
+
+    results.sort(key=sort_key)
 
     # Hitung lebar kolom otomatis
     w_ip, w_ports, w_cdn = calc_widths(results)
