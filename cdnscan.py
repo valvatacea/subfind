@@ -125,7 +125,7 @@ def detect_cdn(ip):
     return cdn, evidence
 
 def scan_open_ports(ip, ports=SCAN_PORTS, timeout=1.5):
-    """Scan port terbuka pada IP"""
+    """Scan port terbuka pada IP, return daftar angka port saja"""
     open_ports = []
     for port in ports:
         try:
@@ -138,6 +138,15 @@ def scan_open_ports(ip, ports=SCAN_PORTS, timeout=1.5):
         except Exception:
             pass
     return ",".join(open_ports) if open_ports else "-"
+
+def format_ports(ports_str):
+    """Singkatkan daftar port agar kolom tidak terlalu lebar"""
+    if ports_str == "-":
+        return "-"
+    ports = ports_str.split(",")
+    if len(ports) <= 3:
+        return ports_str
+    return f"{','.join(ports[:3])},... ({len(ports)} port)"
 
 def parse_ip_range(input_str):
     """Parse input CIDR atau range (start-end) ke daftar IP string"""
@@ -223,17 +232,19 @@ def main():
         futures = {executor.submit(process_ip, ip): ip for ip in ips}
         for future in as_completed(futures):
             ip = futures[future]
+            result = None
             try:
                 result = future.result()
                 results.append(result)
             except Exception as e:
                 results.append((ip, "-", "-", "-"))
+                result = (ip, "-", "-", "-")
 
             with completed_lock:
                 completed_count += 1
                 c = completed_count
                 ip_disp = result[0]
-                ports_disp = result[1]
+                ports_disp = format_ports(result[1])
                 cdn_disp = result[2]
                 ev_disp = result[3]
                 line = (f"[{c}/{len(ips)}] {ip_disp} | Ports: {ports_disp} | "
@@ -254,7 +265,7 @@ def main():
     print(f"{'IP':<{w_ip}} {'PORTS':<{w_ports}} {'CDN':<{w_cdn}} {'EVIDENCE'}")
     print("-" * total_width)
     for ip, ports, cdn, ev in results:
-        print(f"{ip:<{w_ip}} {ports:<{w_ports}} {cdn:<{w_cdn}} {ev}")
+        print(f"{ip:<{w_ip}} {format_ports(ports):<{w_ports}} {cdn:<{w_cdn}} {ev}")
 
     # Simpan ke file teks di output/
     OUT_DIR = "output"
@@ -264,7 +275,7 @@ def main():
     with open(fname, 'w') as f:
         f.write("ip|ports|cdn|evidence\n")
         for ip, ports, cdn, ev in results:
-            f.write(f"{ip}|{ports}|{cdn}|{ev}\n")
+            f.write(f"{ip}|{format_ports(ports)}|{cdn}|{ev}\n")
 
     # Simpan ke file JSON di output/
     jname = f"{OUT_DIR}/cdnscan_{safe_name}.json"
