@@ -4,6 +4,7 @@
 
 import sys
 import os
+import re
 import socket
 import json
 import time
@@ -17,6 +18,8 @@ HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 
 # Folder khusus cache daftar subdomain per domain
 SUBFIND_CACHE_DIR = "output/subfind_cache"
+# Regex validasi domain sederhana
+DOMAIN_RE = re.compile(r'^(?!\-)[A-Za-z0-9\-]{1,63}(?<!\-)(\.[A-Za-z0-9\-]{1,63}(?<!\-))*\.[A-Za-z]{2,}$')
 CACHE_MAX_AGE_SECONDS = 604800  # 7 hari
 
 # Port umum yang akan di-scan
@@ -236,7 +239,7 @@ def process_subdomain(sub):
 
     for scheme in ("http", "https"):
         try:
-            req = urllib.request.Request(f"{scheme}://{sub}", headers=HEADERS, method="HEAD")
+            req = urllib.request.Request(f"{scheme}://{sub}", headers=HEADERS, method="GET")
             with urllib.request.urlopen(req, timeout=6) as r:
                 http_status = str(r.status)
                 h = str(r.headers).lower()
@@ -286,6 +289,9 @@ def main():
         sys.exit(1)
 
     domain = sys.argv[1].lower().strip()
+    if not DOMAIN_RE.match(domain):
+        print(f"Domain tidak valid: {domain}")
+        sys.exit(1)
     print(f"Scanning: {domain}\n")
 
     errors = []
