@@ -388,7 +388,7 @@ def show_cdnscan_history_page(chat_id, message_id, page, edit=True):
 
 
 def show_cdnscan_history_detail(chat_id, message_id, filename, edit=True):
-    """Tampilkan seluruh data dalam satu list hasil scan CDNScan."""
+    """Tampilkan seluruh data dalam satu list hasil scan CDNScan (dengan paginasi)."""
     OUT_DIR = os.path.join(BASE_DIR, "output")
     fpath = os.path.join(OUT_DIR, filename)
     try:
@@ -423,29 +423,10 @@ def show_cdnscan_history_detail(chat_id, message_id, filename, edit=True):
     target = data[0].get("target", filename) if data else filename
     provider = data[0].get("provider", "-") if data else "-"
 
-    lines = ["_" * 40, f"📋 Riwayat: {target}", "_" * 40, ""]
-    lines.append(f"Provider: {provider}")
-    lines.append(f"Total: {len(data)} data")
-    lines.append("")
-    for item in data:
-        ip = item.get("ip", "-")
-        ports = item.get("ports", "-")
-        cdn = item.get("cdn", "-")
-        status = item.get("status", "-")
-        lines.append(f"{ip} | {ports} | {cdn} | {status}")
-
-    lines.append("")
-    kb = InlineKeyboardMarkup(row_width=1)
-    kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="cdnscan:history:1"))
-
-    text = "\n".join(lines)
-    try:
-        if edit:
-            bot.edit_message_text(text, chat_id, message_id, reply_markup=kb)
-        else:
-            bot.send_message(chat_id, text, reply_markup=kb)
-    except Exception:
-        bot.send_message(chat_id, text, reply_markup=kb)
+    results = [(item.get("ip", "-"), item.get("ports", "-"), item.get("cdn", "-"), item.get("status", "-")) for item in data]
+    save_scan_state(chat_id, "cdnscan", target, results, "CDNScan", page=1)
+    info_text = f"✅ <b>Target sudah discan sebelumnya.</b>\nProvider: {provider}\nTotal: {len(data)} data"
+    show_scan_page(chat_id, message_id, edit=True, info_text=info_text)
 
 
 def get_subfind_history():
@@ -540,7 +521,7 @@ def show_subfind_history_page(chat_id, message_id, page, edit=True):
 
 
 def show_subfind_history_detail(chat_id, message_id, filename, edit=True):
-    """Tampilkan seluruh data dalam satu list hasil scan SubFind."""
+    """Tampilkan seluruh data dalam satu list hasil scan SubFind (dengan paginasi)."""
     OUT_DIR = os.path.join(BASE_DIR, "output")
     fpath = os.path.join(OUT_DIR, filename)
     try:
@@ -574,29 +555,10 @@ def show_subfind_history_detail(chat_id, message_id, filename, edit=True):
 
     target = data[0].get("target", filename) if data else filename
 
-    lines = ["_" * 40, f"📋 Riwayat: {target}", "_" * 40, ""]
-    lines.append(f"Total: {len(data)} subdomain")
-    lines.append("")
-    for item in data:
-        sub = item.get("subdomain", "-")
-        ip = item.get("ip", "-")
-        ports = item.get("ports", "-")
-        status = item.get("status", "-")
-        cdn = item.get("cdn", "-")
-        lines.append(f"{sub} | {ip} | {ports} | {status} | {cdn}")
-
-    lines.append("")
-    kb = InlineKeyboardMarkup(row_width=1)
-    kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="subfind:history:1"))
-
-    text = "\n".join(lines)
-    try:
-        if edit:
-            bot.edit_message_text(text, chat_id, message_id, reply_markup=kb)
-        else:
-            bot.send_message(chat_id, text, reply_markup=kb)
-    except Exception:
-        bot.send_message(chat_id, text, reply_markup=kb)
+    results = [(item.get("subdomain", "-"), item.get("ip", "-"), item.get("ports", "-"), item.get("status", "-"), item.get("cdn", "-")) for item in data]
+    save_scan_state(chat_id, "subfind", target, results, "SubFind", page=1)
+    info_text = f"✅ <b>Target sudah discan sebelumnya.</b>\nTotal: {len(data)} subdomain"
+    show_scan_page(chat_id, message_id, edit=True, info_text=info_text)
 
 
 def save_scan_state(chat_id, mode, target, results, title, page=1):
