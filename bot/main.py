@@ -121,7 +121,7 @@ def pad_label(label, width=12):
 
 
 # ===================== SPINNER & WAKTU =====================
-SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+SPINNER = ['⠋', '⠙', '⠹', '⠼', '⠴', '⠦', '⠧', '⠏']
 
 
 def format_elapsed(seconds):
