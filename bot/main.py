@@ -26,11 +26,12 @@ sys.path.insert(0, BASE_DIR)
 from subfind import (
     enumerate_domain, resolve_ip,
     crt_sh, hackertarget, wordlist_fallback,
-    DOMAIN_RE, CACHE_MAX_AGE_SECONDS as SUBFIND_CACHE_AGE,
+    CACHE_MAX_AGE_SECONDS as SUBFIND_CACHE_AGE,
     get_cache_path, load_cache, save_cache,
     scan_ports_summary, COMMON_PORTS as SUBFIND_PORTS,
     CF_PREFIXES as SUBFIND_CF_PREFIXES, detect_cdn as subfind_detect_cdn,
 )
+from common.validators import validate_domain
 from sniscan import (
     enumerate_hosts,
 )
@@ -1470,7 +1471,7 @@ def text_handler(message):
 
     if mode == "d2ip" and awaiting == "domain":
         domain = text.lower().strip()
-        if not re.match(r'^(?!\-)[A-Za-z0-9\-]{1,63}(\.[A-Za-z0-9\-]{1,63})*\.[A-Za-z]{2,}$', domain):
+        if not validate_domain(domain):
             bot.send_message(chat_id, "Domain tidak valid. Coba lagi (contoh: google.com).")
             return
         sent = bot.send_message(chat_id, f"🌐 <b>D2IP</b>\nMeng-resolve <b>{esc(domain)}</b>...")
@@ -1480,7 +1481,7 @@ def text_handler(message):
 
     if mode == "subfind" and awaiting == "domain":
         domain = text.lower().strip()
-        if not re.match(r'^(?!\\-)[A-Za-z0-9\\-]{1,63}(\\.[A-Za-z0-9\\-]{1,63})*\\.[A-Za-z]{2,}$', domain):
+        if not validate_domain(domain):
             bot.send_message(chat_id, "Domain tidak valid. Coba lagi (contoh: example.com).")
             return
         set_state(chat_id, mode="subfind", awaiting=None)
@@ -1524,7 +1525,7 @@ def text_handler(message):
 
     if mode == "sniscan" and awaiting == "domain":
         domain = text.lower().strip()
-        if not re.match(r'^(?!\\-)[A-Za-z0-9\\-]{1,63}(\\.[A-Za-z0-9\\-]{1,63})*\\.[A-Za-z]{2,}$', domain):
+        if not validate_domain(domain):
             bot.send_message(chat_id, "Domain tidak valid. Coba lagi (contoh: instagram.com).")
             return
         set_state(chat_id, mode="sniscan", awaiting=None)

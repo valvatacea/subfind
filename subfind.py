@@ -14,6 +14,8 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from datetime import datetime
 
+from common.validators import validate_domain
+
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 
 # Timeout default untuk semua operasi socket (DNS, connect, vb.)
@@ -31,8 +33,7 @@ def pad_label(label, width=12):
 
 # Folder khusus cache daftar subdomain per domain
 SUBFIND_CACHE_DIR = os.path.join(BASE_DIR, "output", "subfind_cache")
-# Regex validasi domain sederhana
-DOMAIN_RE = re.compile(r'^(?!\-)[A-Za-z0-9\-]{1,63}(?<!\-)(\.[A-Za-z0-9\-]{1,63}(?<!\-))*\.[A-Za-z]{2,}$')
+# Validasi domain menggunakan common.validators.validate_domain
 CACHE_MAX_AGE_SECONDS = 2592000  # 30 hari
 
 # Port umum yang akan di-scan (hanya HTTP dan HTTPS)
@@ -299,7 +300,7 @@ def enumerate_domain(domain, progress_callback=None):
     Memakai cache per provider (30 hari) seperti CLI asli.
     progress_callback: fungsi dipanggil dengan (current, total) setelah setiap subdomain selesai diproses.
     """
-    if not DOMAIN_RE.match(domain):
+    if not validate_domain(domain):
         return [], [f"Domain tidak valid: {domain}"]
 
     errors = []
@@ -402,7 +403,7 @@ def main():
         sys.exit(1)
 
     domain = sys.argv[1].lower().strip()
-    if not DOMAIN_RE.match(domain):
+    if not validate_domain(domain):
         print(f"Domain tidak valid: {domain}")
         sys.exit(1)
     print(f"Scanning: {domain}\n")

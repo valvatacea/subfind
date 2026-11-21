@@ -18,6 +18,8 @@ import threading
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from common.validators import validate_domain
+
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 socket.setdefaulttimeout(10)
 
@@ -31,9 +33,9 @@ def esc(text):
 
 def pad_label(label, width=12):
     return label + " " * max(0, width - len(label))
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-DOMAIN_RE = re.compile(r'^(?!\-)[A-Za-z0-9\-]{1,63}(?<!\\-)(\.[A-Za-z0-9\-]{1,63}(?<!\\-))*\.[A-Za-z]{2,}$')
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Port tambahan yang di-scan selain 443
 EXTRA_PORTS = [8443, 2053, 2083, 2087, 2096, 444, 777, 80, 8080, 22, 109, 143, 442]
@@ -186,7 +188,7 @@ def enumerate_hosts(domain, progress_callback=None):
     """Enumerasi SNI host untuk domain, return (results, errors).
     progress_callback: fungsi dipanggil dengan (current, total) setelah setiap host selesai diproses.
     """
-    if not DOMAIN_RE.match(domain):
+    if not validate_domain(domain):
         return [], [f"Domain tidak valid: {domain}"]
 
     errors = []
@@ -230,7 +232,7 @@ def main():
         sys.exit(1)
 
     domain = sys.argv[1].lower().strip()
-    if not DOMAIN_RE.match(domain):
+    if not validate_domain(domain):
         print(f"Domain tidak valid: {domain}")
         sys.exit(1)
 
