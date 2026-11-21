@@ -346,9 +346,6 @@ def build_cdnscan_history_page(page=1, per_page=10):
         lines.append("Belum ada hasil scan CDNScan.")
     else:
         lines.append(f"Total: {total} hasil scan")
-        lines.append("")
-        for item in chunk:
-            lines.append(f"• {item['target']} ({item['provider']})")
 
     lines.append("")
     return "\n".join(lines), page, total_pages
@@ -479,9 +476,6 @@ def build_subfind_history_page(page=1, per_page=10):
         lines.append("Belum ada hasil scan SubFind.")
     else:
         lines.append(f"Total: {total} hasil scan")
-        lines.append("")
-        for item in chunk:
-            lines.append(f"• {item['target']} ({item['count']} subdomain)")
 
     lines.append("")
     return "\n".join(lines), page, total_pages
