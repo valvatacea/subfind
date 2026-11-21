@@ -677,9 +677,13 @@ def main():
                 mode = 'a' if file_exists else 'w'
                 with open(fname, mode) as f:
                     if not file_exists:
-                        f.write("ip|ports|cdn|status\n")
+                        f.write(f"═══ CDNSCAN: {input_str} ═══\n\n")
                     for ip, ports, cdn, status in results:
-                        f.write(f"{ip}|{format_ports(ports)}|{cdn}|{status}\n")
+                        f.write(f"IP          : {ip}\n")
+                        f.write(f"PORTS       : {format_ports(ports)}\n")
+                        f.write(f"CDN         : {cdn}\n")
+                        f.write(f"Status      : {status}\n")
+                        f.write("----------------------------------------------\n")
             except Exception as e:
                 print(f"    [!] Gagal menyimpan file teks: {e}")
 

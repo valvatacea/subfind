@@ -421,9 +421,14 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     fname = f"{OUT_DIR}/subfind_{domain}.txt"
     with open(fname, 'w') as f:
-        f.write("subdomain|ip|ports|status|cdn\n")
+        f.write(f"═══ SUBFIND: {domain} ═══\n\n")
         for sub, ip, ports, status, cdn in results:
-            f.write(f"{sub}|{ip}|{ports}|{status}|{cdn}\n")
+            f.write(f"Subdomain   : {sub}\n")
+            f.write(f"IP          : {ip}\n")
+            f.write(f"PORTS       : {ports}\n")
+            f.write(f"Status      : {status}\n")
+            f.write(f"CDN         : {cdn}\n")
+            f.write("----------------------------------------------\n")
 
     jname = f"{OUT_DIR}/subfind_{domain}.json"
     json_data = []
