@@ -1171,10 +1171,14 @@ def cb_handler(call):
                 chat_id, message_id, reply_markup=kb_back("menu:main")
             )
         elif prev_menu == "menu:subfind":
-            set_state(chat_id, mode="subfind", awaiting="domain", prev_menu="menu:main")
+            set_state(chat_id, mode="subfind", awaiting=None, prev_menu="menu:main")
+            kb = InlineKeyboardMarkup(row_width=2)
+            kb.add(InlineKeyboardButton("🔍 Cari Subdomain", callback_data="subfind:search"))
+            kb.add(InlineKeyboardButton("📜 Riwayat Scan", callback_data="subfind:history:1"))
+            kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="back:menu:main"))
             bot.edit_message_text(
-                "🔍 <b>SubFind — Subdomain Enumeration</b>\n\nKirim domain yang mau dicari subdomain-nya (contoh: example.com).",
-                chat_id, message_id, reply_markup=kb_back("menu:main")
+                "🔍 <b>SubFind — Subdomain Enumeration</b>\n\nPilih opsi di bawah:",
+                chat_id, message_id, reply_markup=kb
             )
         elif prev_menu == "menu:cdnscan":
             set_state(chat_id, mode="cdnscan", awaiting="target", prev_menu="menu:main")
