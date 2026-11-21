@@ -301,8 +301,10 @@ def save_scan_state(chat_id, mode, target, results, title, page=1):
               scan_title=title)
 
 
-def show_scan_page(chat_id, message_id, edit=True):
-    """Tampilkan halaman scan saat ini dari state."""
+def show_scan_page(chat_id, message_id, edit=True, info_text=None):
+    """Tampilkan halaman scan saat ini dari state.
+    info_text: teks tambahan yang ditampilkan di atas tabel (misal "sudah discan").
+    """
     st = get_state(chat_id)
     results = st.get("scan_results", [])
     mode = st.get("scan_mode", "subfind")
@@ -312,6 +314,8 @@ def show_scan_page(chat_id, message_id, edit=True):
 
     if not results:
         text = f"⚠️ <b>{title}</b>\nTidak ada data untuk ditampilkan."
+        if info_text:
+            text = f"{info_text}\n\n{text}"
         prev = {"subfind": "menu:subfind", "cdnscan": "menu:cdnscan", "d2ip": "menu:d2ip"}.get(mode, "menu:main")
         try:
             if edit:
@@ -324,6 +328,8 @@ def show_scan_page(chat_id, message_id, edit=True):
 
     text, page, total_pages = build_page_text(results, page, mode, title)
     set_state(chat_id, scan_page=page)
+    if info_text:
+        text = f"{info_text}\n\n{text}"
     try:
         if edit:
             bot.edit_message_text(text, chat_id, message_id, reply_markup=kb_page(mode, page, total_pages))
@@ -776,7 +782,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
         if saved and isinstance(saved, list):
             results = [(item.get("ip", "-"), item.get("ports", "-"), item.get("cdn", "-"), item.get("status", "-")) for item in saved]
             save_scan_state(chat_id, "cdnscan", target, results, "CDNScan", page=1)
-            show_scan_page(chat_id, message_id, edit=True)
+            show_scan_page(chat_id, message_id, edit=True, info_text="✅ <b>Target sudah discan sebelumnya.</b>")
         else:
             try:
                 bot.edit_message_text(
