@@ -7,6 +7,7 @@ import re
 import socket
 import json
 import threading
+import queue
 import ipaddress
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED, as_completed
@@ -50,6 +51,34 @@ if not BOT_TOKEN:
     sys.exit(1)
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
+
+# Antrian thread-safe untuk edit_message_text dari worker thread.
+# Worker thread (scan progres) hanya memasukkan permintaan ke antrian;
+# thread dispatcher (berjalan di latar belakang) yang mengeksekusinya,
+# sehingga semua panggilan Telebot dilakukan dari satu thread saja.
+_edit_queue = queue.Queue()
+
+
+def _edit_dispatcher():
+    """Thread pemroses antrian: mengeksekusi edit_message_text satu per satu."""
+    while True:
+        try:
+            item = _edit_queue.get()
+            if item is None:  # sentinel untuk berhenti
+                break
+            chat_id, message_id, text, kwargs = item
+            try:
+                bot.edit_message_text(text, chat_id, message_id, **kwargs)
+            except Exception:
+                pass
+            _edit_queue.task_done()
+        except Exception:
+            pass
+
+
+_edit_dispatcher_thread = threading.Thread(target=_edit_dispatcher, daemon=True)
+_edit_dispatcher_thread.start()
+
 
 # ===================== KONFIG =====================
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
@@ -843,13 +872,11 @@ def run_subfind(chat_id, message_id, domain):
 
     def progress_callback(current, total):
         if current % 5 == 0 or current == total:
-            try:
-                bot.edit_message_text(
-                    f"🔍 <b>SubFind</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...\nProgress: {current}/{total}",
-                    chat_id, sent.message_id
-                )
-            except Exception:
-                pass
+            _edit_queue.put((
+                chat_id, message_id,
+                f"🔍 <b>SubFind</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...\nProgress: {current}/{total}",
+                {}
+            ))
 
     results, errors = enumerate_domain(domain, progress_callback=progress_callback)
 
@@ -896,13 +923,11 @@ def run_sniscan(chat_id, message_id, domain):
 
     def progress_callback(current, total):
         if current % 5 == 0 or current == total:
-            try:
-                bot.edit_message_text(
-                    f"🔍 <b>SNIScan</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...\nProgress: {current}/{total}",
-                    chat_id, sent.message_id
-                )
-            except Exception:
-                pass
+            _edit_queue.put((
+                chat_id, message_id,
+                f"🔍 <b>SNIScan</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...\nProgress: {current}/{total}",
+                {}
+            ))
 
     results, errors = enumerate_hosts(domain, progress_callback=progress_callback)
 
