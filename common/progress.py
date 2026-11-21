@@ -61,11 +61,11 @@ def build_bar(current, total, width=10, filled_char="█", empty_char="░"):
     return filled_char * filled + empty_char * (width - filled)
 
 
-def build_progress_line(spinner_idx, title, target, current, total,
+def build_progress_text(spinner_idx, title, target, current, total,
                         start_time, filled_char="█", empty_char="░",
                         width=10, label_prefix="Scanning",
                         target_suffix="...", count_template="({current}/{total})",
-                        show_target=True, prefix=""):
+                        show_target=True, prefix="", elapsed=None, eta=None):
     """Bangun satu baris teks progres lengkap.
 
     Args:
@@ -84,13 +84,20 @@ def build_progress_line(spinner_idx, title, target, current, total,
                         Kosongkan untuk tidak menampilkan count.
         show_target: Apakah menampilkan target (default True)
         prefix: Teks di awal sebelum spinner (default '')
+        elapsed: Waktu berlalu dalam detik (dikirim oleh elapsed thread)
+        eta: Estimasi waktu selesai dalam detik (dikirim oleh elapsed thread)
 
     Returns:
         String siap dicetak (tanpa newline)
     """
     now = time.time()
-    elapsed = now - start_time
-    eta = calculate_eta(elapsed, current, total)
+    if elapsed is None:
+        elapsed = now - start_time
+    if eta is None and current > 0 and total > 0 and elapsed > 0:
+        eta = (elapsed / current) * (total - current)
+    else:
+        eta = 0
+
     bar = build_bar(current, total, width=width,
                     filled_char=filled_char, empty_char=empty_char)
     pct = int(current / total * 100) if total > 0 else 0

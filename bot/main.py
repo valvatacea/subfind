@@ -927,7 +927,7 @@ def run_subfind(chat_id, message_id, domain):
     import time
     start_time = time.time()
 
-    # State progres yang dibagikan antara spinner thread dan progress callback
+    # State progres yang dibagikan antara spinner thread, elapsed thread, dan progress callback
     scan_state = {
         "active": True,
         "chat_id": chat_id,
@@ -938,11 +938,13 @@ def run_subfind(chat_id, message_id, domain):
         "total": 0,
         "start_time": start_time,
         "spinner_idx": 0,
+        "elapsed": 0,
+        "eta": 0,
     }
     scan_lock = threading.Lock()
 
     def _spinner_loop():
-        """Thread mandiri: memutar spinner dan mengupdate progres ke antrian."""
+        """Thread mandiri: memutar spinner dan mengupdate progres ke antrian (setiap 0.5 detik)."""
         while True:
             with scan_lock:
                 if not scan_state["active"]:
@@ -953,17 +955,43 @@ def run_subfind(chat_id, message_id, domain):
                 state["title"], state["target"],
                 state["current"], state["total"],
                 state["start_time"], state["spinner_idx"],
+                state["elapsed"], state["eta"],
             )
             _edit_queue.put((state["chat_id"], state["message_id"], text, {}))
 
             with scan_lock:
                 scan_state["spinner_idx"] += 1
 
-            time.sleep(0.4)
+            time.sleep(0.5)
+
+    def _elapsed_loop():
+        """Thread mandiri: menghitung elapsed time dan ETA (setiap 1 detik)."""
+        while True:
+            with scan_lock:
+                if not scan_state["active"]:
+                    break
+                state = dict(scan_state)
+
+            now = time.time()
+            elapsed = now - state["start_time"]
+            if state["current"] > 0 and state["total"] > 0 and elapsed > 0:
+                eta = (elapsed / state["current"]) * (state["total"] - state["current"])
+            else:
+                eta = 0
+
+            with scan_lock:
+                scan_state["elapsed"] = elapsed
+                scan_state["eta"] = eta
+
+            time.sleep(1.0)
 
     # Jalankan spinner thread terpisah (independen dari progres scan)
     spinner_thread = threading.Thread(target=_spinner_loop, daemon=True)
     spinner_thread.start()
+
+    # Jalankan elapsed thread terpisah (independen dari progres scan)
+    elapsed_thread = threading.Thread(target=_elapsed_loop, daemon=True)
+    elapsed_thread.start()
 
     def progress_callback(current, total):
         with scan_lock:
@@ -972,7 +1000,7 @@ def run_subfind(chat_id, message_id, domain):
 
     results, errors = enumerate_domain(domain, progress_callback=progress_callback)
 
-    # Matikan spinner thread
+    # Matikan spinner dan elapsed thread
     with scan_lock:
         scan_state["active"] = False
 
@@ -1016,7 +1044,7 @@ def run_sniscan(chat_id, message_id, domain):
     import time
     start_time = time.time()
 
-    # State progres yang dibagikan antara spinner thread dan progress callback
+    # State progres yang dibagikan antara spinner thread, elapsed thread, dan progress callback
     scan_state = {
         "active": True,
         "chat_id": chat_id,
@@ -1027,11 +1055,13 @@ def run_sniscan(chat_id, message_id, domain):
         "total": 0,
         "start_time": start_time,
         "spinner_idx": 0,
+        "elapsed": 0,
+        "eta": 0,
     }
     scan_lock = threading.Lock()
 
     def _spinner_loop():
-        """Thread mandiri: memutar spinner dan mengupdate progres ke antrian."""
+        """Thread mandiri: memutar spinner dan mengupdate progres ke antrian (setiap 0.5 detik)."""
         while True:
             with scan_lock:
                 if not scan_state["active"]:
@@ -1042,17 +1072,43 @@ def run_sniscan(chat_id, message_id, domain):
                 state["title"], state["target"],
                 state["current"], state["total"],
                 state["start_time"], state["spinner_idx"],
+                state["elapsed"], state["eta"],
             )
             _edit_queue.put((state["chat_id"], state["message_id"], text, {}))
 
             with scan_lock:
                 scan_state["spinner_idx"] += 1
 
-            time.sleep(0.4)
+            time.sleep(0.5)
+
+    def _elapsed_loop():
+        """Thread mandiri: menghitung elapsed time dan ETA (setiap 1 detik)."""
+        while True:
+            with scan_lock:
+                if not scan_state["active"]:
+                    break
+                state = dict(scan_state)
+
+            now = time.time()
+            elapsed = now - state["start_time"]
+            if state["current"] > 0 and state["total"] > 0 and elapsed > 0:
+                eta = (elapsed / state["current"]) * (state["total"] - state["current"])
+            else:
+                eta = 0
+
+            with scan_lock:
+                scan_state["elapsed"] = elapsed
+                scan_state["eta"] = eta
+
+            time.sleep(1.0)
 
     # Jalankan spinner thread terpisah (independen dari progres scan)
     spinner_thread = threading.Thread(target=_spinner_loop, daemon=True)
     spinner_thread.start()
+
+    # Jalankan elapsed thread terpisah (independen dari progres scan)
+    elapsed_thread = threading.Thread(target=_elapsed_loop, daemon=True)
+    elapsed_thread.start()
 
     def progress_callback(current, total):
         with scan_lock:
@@ -1061,7 +1117,7 @@ def run_sniscan(chat_id, message_id, domain):
 
     results, errors = enumerate_hosts(domain, progress_callback=progress_callback)
 
-    # Matikan spinner thread
+    # Matikan spinner dan elapsed thread
     with scan_lock:
         scan_state["active"] = False
 
@@ -1569,6 +1625,8 @@ def run_cdnscan_target_batch(chat_id, message_id):
         "total": total_batch_ips,
         "start_time": start_time,
         "spinner_idx": 0,
+        "elapsed": 0,
+        "eta": 0,
     }
     scan_lock = threading.Lock()
 
@@ -1581,8 +1639,8 @@ def run_cdnscan_target_batch(chat_id, message_id):
     except Exception:
         pass
 
-    # Jalankan spinner thread terpisah
     def _spinner_loop():
+        """Thread mandiri: memutar spinner dan mengupdate progres ke antrian (setiap 0.5 detik)."""
         while True:
             with scan_lock:
                 if not scan_state["active"]:
@@ -1593,16 +1651,41 @@ def run_cdnscan_target_batch(chat_id, message_id):
                 state_copy["title"], state_copy["target"],
                 state_copy["current"], state_copy["total"],
                 state_copy["start_time"], state_copy["spinner_idx"],
+                state_copy["elapsed"], state_copy["eta"],
             )
             _edit_queue.put((state_copy["chat_id"], state_copy["message_id"], text, {}))
 
             with scan_lock:
                 scan_state["spinner_idx"] += 1
 
-            time.sleep(0.4)
+            time.sleep(0.5)
+
+    def _elapsed_loop():
+        """Thread mandiri: menghitung elapsed time dan ETA (setiap 1 detik)."""
+        while True:
+            with scan_lock:
+                if not scan_state["active"]:
+                    break
+                state = dict(scan_state)
+
+            now = time.time()
+            elapsed = now - state["start_time"]
+            if state["current"] > 0 and state["total"] > 0 and elapsed > 0:
+                eta = (elapsed / state["current"]) * (state["total"] - state["current"])
+            else:
+                eta = 0
+
+            with scan_lock:
+                scan_state["elapsed"] = elapsed
+                scan_state["eta"] = eta
+
+            time.sleep(1.0)
 
     spinner_thread = threading.Thread(target=_spinner_loop, daemon=True)
     spinner_thread.start()
+
+    elapsed_thread = threading.Thread(target=_elapsed_loop, daemon=True)
+    elapsed_thread.start()
 
     # Simpan hasil per-target
     target_results = {}  # target -> list of results
@@ -1626,7 +1709,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
                     scan_state["current"] = c
 
     finally:
-        # Matikan spinner thread
+        # Matikan spinner dan elapsed thread
         with scan_lock:
             scan_state["active"] = False
 

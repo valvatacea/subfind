@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from common.validators import validate_domain
 from common.http_status import get_http_status_multi
-from common.progress import build_progress_line
+from common.progress import build_progress_text
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 socket.setdefaulttimeout(10)
@@ -251,7 +251,7 @@ def main():
 
     def progress_callback(current, total):
         spinner_idx[0] += 1
-        line = build_progress_line(
+        line = build_progress_text(
             spinner_idx[0], "SNIScan", domain, current, total, start_time,
             filled_char="█", empty_char="░", width=10, label_prefix="Scanning"
         )

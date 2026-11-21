@@ -20,7 +20,7 @@ import threading
 import time
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from common.progress import build_progress_line
+from common.progress import build_progress_text
 from common.http_status import get_http_status_multi
 from datetime import datetime
 
@@ -616,7 +616,7 @@ def main():
 
                     c += 1
                     spinner_idx[0] += 1
-                    line = build_progress_line(
+                    line = build_progress_text(
                         spinner_idx[0], "CDNScan", "", c, len(ips), start_time,
                         filled_char="█", empty_char="░", width=10,
                         label_prefix="", target_suffix="",
