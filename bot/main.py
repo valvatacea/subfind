@@ -237,17 +237,15 @@ def kb_limit(prev_menu="cdnscan:ranges:page"):
     return m
 
 
-def kb_next_target(prev_menu="menu:cdnscan", show_view=False):
+def kb_next_target(prev_menu="menu:cdnscan", show_view=False, show_next=True):
     m = InlineKeyboardMarkup(row_width=2)
+    buttons = []
     if show_view:
-        m.add(
-            InlineKeyboardButton("👁️ Lihat", callback_data="cdnscan:view"),
-            InlineKeyboardButton("▶️ Next", callback_data="cdnscan:next"),
-        )
-    else:
-        m.add(
-            InlineKeyboardButton("▶️ Next", callback_data="cdnscan:next"),
-        )
+        buttons.append(InlineKeyboardButton("👁️ Lihat", callback_data="cdnscan:view"))
+    if show_next:
+        buttons.append(InlineKeyboardButton("▶️ Next", callback_data="cdnscan:next"))
+    if buttons:
+        m.add(*buttons)
     m.add(InlineKeyboardButton("↩️ Kembali", callback_data=f"back:{prev_menu}"))
     return m
 
@@ -1343,19 +1341,8 @@ def cb_handler(call):
     elif data == "cdnscan:next":
         st = get_state(chat_id)
         targets = st.get("cdn_targets", []) or []
-        index = st.get("cdn_target_index", 0)
 
-        # Skip target yang sudah selesai (completed) — cari target berikutnya yang belum dipindai
-        while index < len(targets):
-            target = targets[index]
-            state = load_state(target)
-            if state and state.get("completed"):
-                index += 1
-                set_state(chat_id, cdn_target_index=index)
-            else:
-                break
-
-        if index < len(targets):
+        if targets:
             threading.Thread(target=run_cdnscan_target_batch, args=(chat_id, message_id), daemon=True).start()
         else:
             try:
@@ -1561,7 +1548,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
         _edit_queue.put((
             chat_id, message_id,
             "✅ <b>CDNScan selesai</b>\nSemua target telah discan.",
-            {"reply_markup": kb_next_target("menu:cdnscan", show_view=True)}
+            {"reply_markup": kb_next_target("menu:cdnscan", show_view=True, show_next=False)}
         ))
         clear_state(chat_id)
         return
@@ -1699,7 +1686,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
         _edit_queue.put((
             chat_id, message_id,
             "✅ <b>CDNScan selesai</b>\nSemua target telah discan.",
-            {"reply_markup": kb_next_target("menu:cdnscan", show_view=True)}
+            {"reply_markup": kb_next_target("menu:cdnscan", show_view=True, show_next=False)}
         ))
         clear_state(chat_id)
         return
