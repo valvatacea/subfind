@@ -621,6 +621,9 @@ def main():
         results = []
         max_workers = min(30, len(ips))
         c = 0
+        start_time = time.time()
+        spinner_idx = [0]
+        SPINNER = ['⠋', '⠙', '⠹', '⠼', '⠴', '⠦', '⠧', '⠏']
 
         try:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -635,16 +638,36 @@ def main():
                         results.append((ip, "-", "-", "-"))
                         result = (ip, "-", "-", "-")
 
-                    ip_disp = result[0]
-                    ports_disp = format_ports(result[1])
-                    cdn_disp = result[2]
-                    status_disp = result[3]
-                    line = (f"    [{c}/{len(ips)}] {ip_disp} | Ports: {ports_disp} | "
-                            f"CDN: {cdn_disp} | Status: {status_disp}")
+                    c += 1
+                    spinner_idx[0] += 1
+                    now = time.time()
+                    elapsed = now - start_time
+                    if c > 0 and len(ips) > 0:
+                        eta = (elapsed / c) * (len(ips) - c)
+                        filled = int(c / len(ips) * 10)
+                        pct = int(c / len(ips) * 100)
+                    else:
+                        eta = 0
+                        filled = 0
+                        pct = 0
+                    bar = "█" * filled + "░" * (10 - filled)
+                    mins = int(elapsed // 60)
+                    secs = int(elapsed % 60)
+                    eta_mins = int(eta // 60)
+                    eta_secs = int(eta % 60)
+                    spinner = SPINNER[spinner_idx[0] % len(SPINNER)]
+                    if mins > 0:
+                        elapsed_str = f"{mins}m {secs}s"
+                    else:
+                        elapsed_str = f"{secs}s"
+                    if eta_mins > 0:
+                        eta_str = f"{eta_mins}m {eta_secs}s"
+                    else:
+                        eta_str = f"{eta_secs}s"
+                    line = (f"\r{spinner} [{c}/{len(ips)}] {bar} {pct}% Elapsed: {elapsed_str} | ETA: {eta_str}")
                     with print_lock:
-                        print(f"\r{line}", end="")
+                        print(line, end="")
                         sys.stdout.flush()
-                        c += 1
         except KeyboardInterrupt:
             print("\n\n    [!] Scan dibatalkan oleh pengguna (Ctrl+C).")
             if results:
