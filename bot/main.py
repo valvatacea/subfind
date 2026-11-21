@@ -1539,21 +1539,22 @@ def run_cdnscan_target_batch(chat_id, message_id):
     for t in targets:
         t_state = load_state(t)
         t_offset = t_state.get('scanned_count', 0) if t_state else 0
-        # Terapkan limit per target agar total sesuai dengan batas yang diset user
-        t_all = parse_ip_range(t, max_ips=limit if limit > 0 else None)
-        t_total = len(t_all) if t_all else 0
-        t_sisa = max(0, t_total - min(t_offset, t_total))
+
+        # Hitung total IP dalam range (tanpa limit) untuk mengetahui sisa sebenarnya
+        t_all_full = parse_ip_range(t)
+        t_total_full = len(t_all_full) if t_all_full else 0
+        t_sisa = max(0, t_total_full - t_offset)
 
         if t_sisa > 0:
-            # Ambil IP sesuai limit dari offset
+            # Ambil IP sesuai limit dari offset untuk batch ini
             ips = parse_ip_range(t, offset=t_offset, max_ips=limit if limit > 0 else None)
             for ip in ips:
                 batch_items.append((t, ip))
                 total_batch_ips += 1
-            target_info[t] = {"offset": t_offset, "total_effective": t_total, "sisa": t_sisa}
+            target_info[t] = {"offset": t_offset, "total_effective": t_total_full, "sisa": t_sisa}
         else:
             # Target sudah 100% selesai
-            target_info[t] = {"offset": t_offset, "total_effective": t_total, "sisa": 0}
+            target_info[t] = {"offset": t_offset, "total_effective": t_total_full, "sisa": 0}
 
     if not batch_items:
         # Semua target 100% selesai
