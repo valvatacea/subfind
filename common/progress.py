@@ -99,9 +99,15 @@ def build_progress_line(spinner_idx, title, target, current, total,
     elapsed_str = format_elapsed(elapsed)
     eta_str = format_elapsed(eta)
 
+    # Clamp pct agar tidak melebihi 100%
+    if total > 0:
+        pct = min(int(current / total * 100), 100)
+    else:
+        pct = 0
+
     # Bangun bagian count
     if count_template:
-        count_str = count_template.format(current=current, total=total)
+        count_str = count_template.format(current=min(current, total), total=total)
     else:
         count_str = ""
 

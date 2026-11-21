@@ -135,6 +135,14 @@ def build_progress_text(title, target, current, total, start_time, spinner_idx):
     now = time.time()
     elapsed = now - start_time
 
+    # Clamp current dan pct agar tidak melebihi total (hindari >100%)
+    if total > 0:
+        current = min(current, total)
+        pct = int(current / total * 100)
+    else:
+        current = 0
+        pct = 0
+
     if current > 0 and total > 0:
         eta = calculate_eta(elapsed, current, total)
     else:
@@ -143,7 +151,6 @@ def build_progress_text(title, target, current, total, start_time, spinner_idx):
     # Progress bar: 10 blok, emoji kotak biru terisi dan kosong
     bar = build_bar(current, total, width=10,
                     filled_char="🟦", empty_char="⬜")
-    pct = int(current / total * 100) if total > 0 else 0
 
     # Spinner dari spinner_idx yang dikelola oleh spinner thread (independen dari progres)
     spinner = SPINNER[spinner_idx % len(SPINNER)]
@@ -1530,7 +1537,9 @@ def run_cdnscan_target_batch(chat_id, message_id):
         t_all = parse_ip_range(t, max_ips=limit if limit > 0 else None)
         t_total = len(t_all) if t_all else 0
         total_all_ips += t_total
-        scanned_all_ips += min(t_offset, t_total)  # Jangan melebihi total efektif
+        # Hanya hitung scanned untuk target yang SUDAH selesai (sebelum index saat ini)
+        if targets.index(t) < index:
+            scanned_all_ips += min(t_offset, t_total)  # Jangan melebihi total efektif
 
     target = targets[index]
     import time
