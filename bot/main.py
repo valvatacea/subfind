@@ -834,7 +834,11 @@ def run_d2ip(chat_id, message_id, domain):
 
 # ===================== SUBFIND (impor dari subfind.py) =====================
 def run_subfind(chat_id, message_id, domain):
-    sent = bot.send_message(chat_id, f"🔍 <b>SubFind</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...")
+    if message_id is None:
+        sent = bot.send_message(chat_id, f"🔍 <b>SubFind</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...")
+        message_id = sent.message_id
+    else:
+        sent = type('obj', (object,), {'message_id': message_id})()
 
     def progress_callback(current, total):
         if current % 5 == 0 or current == total:
@@ -883,7 +887,11 @@ def run_subfind(chat_id, message_id, domain):
 
 # ===================== SNISCAN (impor dari sniscan.py) =====================
 def run_sniscan(chat_id, message_id, domain):
-    sent = bot.send_message(chat_id, f"🔍 <b>SNIScan</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...")
+    if message_id is None:
+        sent = bot.send_message(chat_id, f"🔍 <b>SNIScan</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...")
+        message_id = sent.message_id
+    else:
+        sent = type('obj', (object,), {'message_id': message_id})()
 
     def progress_callback(current, total):
         if current % 5 == 0 or current == total:
@@ -1472,12 +1480,11 @@ def text_handler(message):
 
     if mode == "subfind" and awaiting == "domain":
         domain = text.lower().strip()
-        if not re.match(r'^(?!\-)[A-Za-z0-9\-]{1,63}(\.[A-Za-z0-9\-]{1,63})*\.[A-Za-z]{2,}$', domain):
+        if not re.match(r'^(?!\\-)[A-Za-z0-9\\-]{1,63}(\\.[A-Za-z0-9\\-]{1,63})*\\.[A-Za-z]{2,}$', domain):
             bot.send_message(chat_id, "Domain tidak valid. Coba lagi (contoh: example.com).")
             return
-        sent = bot.send_message(chat_id, f"🔍 <b>SubFind</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...")
         set_state(chat_id, mode="subfind", awaiting=None)
-        threading.Thread(target=run_subfind, args=(chat_id, sent.message_id, domain), daemon=True).start()
+        threading.Thread(target=run_subfind, args=(chat_id, None, domain), daemon=True).start()
         return
 
     if mode == "cdnscan_limit" and awaiting == "custom_limit":
@@ -1517,12 +1524,11 @@ def text_handler(message):
 
     if mode == "sniscan" and awaiting == "domain":
         domain = text.lower().strip()
-        if not re.match(r'^(?!\-)[A-Za-z0-9\-]{1,63}(\.[A-Za-z0-9\-]{1,63})*\.[A-Za-z]{2,}$', domain):
+        if not re.match(r'^(?!\\-)[A-Za-z0-9\\-]{1,63}(\\.[A-Za-z0-9\\-]{1,63})*\\.[A-Za-z]{2,}$', domain):
             bot.send_message(chat_id, "Domain tidak valid. Coba lagi (contoh: instagram.com).")
             return
-        sent = bot.send_message(chat_id, f"🔍 <b>SNIScan</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...")
         set_state(chat_id, mode="sniscan", awaiting=None)
-        threading.Thread(target=run_sniscan, args=(chat_id, sent.message_id, domain), daemon=True).start()
+        threading.Thread(target=run_sniscan, args=(chat_id, None, domain), daemon=True).start()
         return
 
     # Fallback
