@@ -952,10 +952,10 @@ def run_subfind(chat_id, message_id, domain):
                 state = dict(scan_state)
 
             text = build_progress_text(
-                state["title"], state["target"],
+                state["spinner_idx"], state["title"], state["target"],
                 state["current"], state["total"],
-                state["start_time"], state["spinner_idx"],
-                state["elapsed"], state["eta"],
+                state["start_time"],
+                elapsed=state["elapsed"], eta=state["eta"],
             )
             _edit_queue.put((state["chat_id"], state["message_id"], text, {}))
 
@@ -1069,10 +1069,10 @@ def run_sniscan(chat_id, message_id, domain):
                 state = dict(scan_state)
 
             text = build_progress_text(
-                state["title"], state["target"],
+                state["spinner_idx"], state["title"], state["target"],
                 state["current"], state["total"],
-                state["start_time"], state["spinner_idx"],
-                state["elapsed"], state["eta"],
+                state["start_time"],
+                elapsed=state["elapsed"], eta=state["eta"],
             )
             _edit_queue.put((state["chat_id"], state["message_id"], text, {}))
 
@@ -1648,10 +1648,10 @@ def run_cdnscan_target_batch(chat_id, message_id):
                 state_copy = dict(scan_state)
 
             text = build_progress_text(
-                state_copy["title"], state_copy["target"],
+                state_copy["spinner_idx"], state_copy["title"], state_copy["target"],
                 state_copy["current"], state_copy["total"],
-                state_copy["start_time"], state_copy["spinner_idx"],
-                state_copy["elapsed"], state_copy["eta"],
+                state_copy["start_time"],
+                elapsed=state_copy["elapsed"], eta=state_copy["eta"],
             )
             _edit_queue.put((state_copy["chat_id"], state_copy["message_id"], text, {}))
 
