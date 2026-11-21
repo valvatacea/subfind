@@ -143,7 +143,7 @@ def kb_confirm_scan(callback_prefix, target, prev_menu="menu:main"):
     m = InlineKeyboardMarkup(row_width=2)
     m.add(
         InlineKeyboardButton("✅ Mulai scan", callback_data=f"{callback_prefix}:start:{target}"),
-        InlineKeyboardButton("↩️ Batal", callback_data=f"back:{prev_menu}"),
+        InlineKeyboardButton("↩️ Kembali", callback_data=f"back:{prev_menu}"),
     )
     return m
 
@@ -157,7 +157,7 @@ def kb_provider():
     m = InlineKeyboardMarkup(row_width=2)
     for name in PROVIDER_URLS:
         m.add(InlineKeyboardButton(f"🌐 {PROVIDER_DISPLAY[name]}", callback_data=f"cdnscan:provider:{name}"))
-    m.add(InlineKeyboardButton("↩️ Batal", callback_data="back:menu:cdnscan"))
+    m.add(InlineKeyboardButton("↩️ Kembali", callback_data="back:menu:cdnscan"))
     return m
 
 
@@ -181,7 +181,7 @@ def kb_ranges(ranges, page=1, per_page=8, selected=None):
         nav.append(InlineKeyboardButton("Next ⏭️", callback_data=f"cdnscan:ranges:page:{page+1}"))
     m.add(*nav)
     m.add(InlineKeyboardButton("✅ Scan yang dipilih", callback_data="cdnscan:range:confirm"))
-    m.add(InlineKeyboardButton("↩️ Batal", callback_data="back:menu:cdnscan"))
+    m.add(InlineKeyboardButton("↩️ Kembali", callback_data="back:menu:cdnscan"))
     return m
 
 
@@ -191,7 +191,7 @@ def kb_limit(prev_menu="cdnscan:ranges:page"):
         InlineKeyboardButton("500", callback_data="cdnscan:limit:500"),
         InlineKeyboardButton("1000", callback_data="cdnscan:limit:1000"),
         InlineKeyboardButton("🔢 Custom", callback_data="cdnscan:limit:custom"),
-        InlineKeyboardButton("↩️ Batal", callback_data=f"back:{prev_menu}"),
+        InlineKeyboardButton("↩️ Kembali", callback_data=f"back:{prev_menu}"),
     )
     return m
 
@@ -200,7 +200,7 @@ def kb_next_target(prev_menu="menu:cdnscan"):
     m = InlineKeyboardMarkup(row_width=2)
     m.add(
         InlineKeyboardButton("▶️ Next", callback_data="cdnscan:next"),
-        InlineKeyboardButton("↩️ Batal", callback_data=f"back:{prev_menu}"),
+        InlineKeyboardButton("↩️ Kembali", callback_data=f"back:{prev_menu}"),
     )
     return m
 
@@ -211,7 +211,7 @@ def kb_cdnscan_menu():
         m.add(InlineKeyboardButton(f"🌐 {PROVIDER_DISPLAY[name]}", callback_data=f"cdnscan:provider:{name}"))
     m.add(InlineKeyboardButton("✏️ Masukkan IP/CIDR sendiri", callback_data="cdnscan:manual"))
     m.add(InlineKeyboardButton("📜 Riwayat Scan", callback_data="cdnscan:history:1"))
-    m.add(InlineKeyboardButton("↩️ Batal", callback_data="back:menu:main"))
+    m.add(InlineKeyboardButton("↩️ Kembali", callback_data="back:menu:main"))
     return m
 
 
