@@ -133,11 +133,14 @@ def format_elapsed(seconds):
     return f"{minutes}m {secs}s"
 
 
-def build_progress_text(title, target, current, total, start_time, spinner_idx, last_update, is_final=False):
+def build_progress_text(title, target, current, total, start_time, last_update, is_final=False):
     """Bangun teks progres dengan spinner, bar, persentase, elapsed time, dan ETA.
 
     Rate limiting: jika belum lewat 1 detik sejak update terakhir dan bukan final,
     kembalikan None (tidak ada update yang dikirim).
+
+    Spinner dipilih berdasarkan waktu berlalu (elapsed) agar berputar mulus
+    terlepas dari seberapa cepat item selesai diproses.
     """
     import time
     now = time.time()
@@ -158,7 +161,8 @@ def build_progress_text(title, target, current, total, start_time, spinner_idx, 
     bar = "🟦" * filled + "⬜" * (10 - filled)
     pct = int(current / total * 100) if total > 0 else 0
 
-    spinner = SPINNER[spinner_idx % len(SPINNER)]
+    # Spinner berdasarkan waktu berlalu (10 frame per detik)
+    spinner = SPINNER[int(elapsed * 10) % len(SPINNER)]
 
     return (f"{spinner} <b>{title}</b>\n"
             f"Memindai <b>{esc(target)}</b>...\n"
@@ -924,14 +928,12 @@ def run_subfind(chat_id, message_id, domain):
 
     import time
     start_time = time.time()
-    spinner_idx = [0]
     last_update = [None]
 
     def progress_callback(current, total):
-        spinner_idx[0] += 1
         is_final = (current == total)
         if current % 2 == 0 or is_final:
-            text = build_progress_text("SubFind", domain, current, total, start_time, spinner_idx[0], last_update, is_final)
+            text = build_progress_text("SubFind", domain, current, total, start_time, last_update, is_final)
             if text is not None:
                 _edit_queue.put((
                     chat_id, message_id,
@@ -980,14 +982,12 @@ def run_sniscan(chat_id, message_id, domain):
 
     import time
     start_time = time.time()
-    spinner_idx = [0]
     last_update = [None]
 
     def progress_callback(current, total):
-        spinner_idx[0] += 1
         is_final = (current == total)
         if current % 2 == 0 or is_final:
-            text = build_progress_text("SNIScan", domain, current, total, start_time, spinner_idx[0], last_update, is_final)
+            text = build_progress_text("SNIScan", domain, current, total, start_time, last_update, is_final)
             if text is not None:
                 _edit_queue.put((
                     chat_id, message_id,
@@ -1456,7 +1456,6 @@ def run_cdnscan_target_batch(chat_id, message_id):
     results = []
     max_workers = min(30, len(ips))
     c = 0
-    spinner_idx = [0]
     last_update = [None]
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -1469,10 +1468,9 @@ def run_cdnscan_target_batch(chat_id, message_id):
             except Exception:
                 results.append((ip, "-", "-", "-"))
             c += 1
-            spinner_idx[0] += 1
             is_final = (c == len(ips))
             if c % 2 == 0 or is_final:
-                text = build_progress_text("CDNScan", f"Target [{index + 1}/{len(targets)}]: {esc(target)}", c, len(ips), start_time, spinner_idx[0], last_update, is_final)
+                text = build_progress_text("CDNScan", f"Target [{index + 1}/{len(targets)}]: {esc(target)}", c, len(ips), start_time, last_update, is_final)
                 if text is not None:
                     _edit_queue.put((
                         chat_id, message_id,
