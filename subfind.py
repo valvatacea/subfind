@@ -22,6 +22,13 @@ socket.setdefaulttimeout(10)
 # Folder dasar berdasarkan lokasi file ini (seperti worktree repo)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+def esc(text):
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def pad_label(label, width=12):
+    return label + " " * max(0, width - len(label))
+
 # Folder khusus cache daftar subdomain per domain
 SUBFIND_CACHE_DIR = os.path.join(BASE_DIR, "output", "subfind_cache")
 # Regex validasi domain sederhana
@@ -415,10 +422,14 @@ def main():
     total_width = w_sub + w_ip + w_ports + w_status + w_cdn + 12
 
     print("\n" + "=" * total_width)
-    print(f"{'SUBDOMAIN':<{w_sub}} {'IP':<{w_ip}} {'PORTS':<{w_ports}} {'STATUS':<{w_status}} {'CDN'}")
-    print("-" * total_width)
+    # Output teks ke layar (CLI) - format blok key-value
     for sub, ip, ports, status, cdn in results:
-        print(f"{sub:<{w_sub}} {ip:<{w_ip}} {ports:<{w_ports}} {status:<{w_status}} {cdn}")
+        print(f"{pad_label('Subdomain', 12)}: {sub}")
+        print(f"{pad_label('IP', 12)}: {ip}")
+        print(f"{pad_label('PORTS', 12)}: {ports}")
+        print(f"{pad_label('Status', 12)}: {status}")
+        print(f"{pad_label('CDN', 12)}: {cdn}")
+        print("----------------------------------------------")
 
     OUT_DIR = os.path.join(BASE_DIR, "output")
     os.makedirs(OUT_DIR, exist_ok=True)

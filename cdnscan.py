@@ -29,6 +29,12 @@ HEADERS = {
     'Connection': 'keep-alive',
     'Upgrade-Insecure-Requests': '1',
 }
+def esc(text):
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def pad_label(label, width=12):
+    return label + " " * max(0, width - len(label))
 
 # Folder dasar berdasarkan lokasi file ini
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -660,12 +666,14 @@ def main():
         w_ip, w_ports, w_cdn, w_status = calc_widths(results)
         total_width = w_ip + w_ports + w_cdn + w_status + 16
 
-        # Cetak tabel akhir
-        print(f"\n    {'=' * total_width}")
-        print(f"    {'IP':<{w_ip}} {'PORTS':<{w_ports}} {'CDN':<{w_cdn}} {'STATUS':<{w_status}}")
-        print(f"    {'-' * total_width}")
+        # Cetak hasil akhir ke layar (CLI) - format blok key-value
+        print()
         for ip, ports, cdn, status in results:
-            print(f"    {ip:<{w_ip}} {format_ports(ports):<{w_ports}} {cdn:<{w_cdn}} {status:<{w_status}}")
+            print(f"{pad_label('IP', 12)}: {ip}")
+            print(f"{pad_label('PORTS', 12)}: {format_ports(ports)}")
+            print(f"{pad_label('CDN', 12)}: {cdn}")
+            print(f"{pad_label('Status', 12)}: {status}")
+            print("----------------------------------------------")
 
         # Simpan ke file output sesuai --format
         save_txt = args.format in ('txt', 'both')
