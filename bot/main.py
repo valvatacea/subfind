@@ -210,90 +210,32 @@ def build_page_text(results, page, mode, title):
     lines = [underline, title_line, underline, ""]
 
     if mode == "subfind":
-        headers = ["No", "SUBDOMAIN", "IP", "PORTS", "STATUS", "CDN"]
-        rows = []
         for i, (sub, ip, ports, status, cdn) in enumerate(chunk, start=start + 1):
-            rows.append([
-                f"{i}.",
-                esc(sub),
-                esc(ip),
-                esc(ports),
-                esc(status),
-                esc(cdn),
-            ])
+            lines.append(f"Subdomain   : {esc(sub)}")
+            lines.append(f"IP          : {esc(ip)}")
+            lines.append(f"PORTS       : {esc(ports)}")
+            lines.append(f"Status      : {esc(status)}")
+            lines.append(f"CDN         : {esc(cdn)}")
+            lines.append("----------------------------------------------")
     elif mode == "cdnscan":
-        headers = ["No", "IP", "PORTS", "CDN", "STATUS"]
-        rows = []
         for i, (ip, ports, cdn, status) in enumerate(chunk, start=start + 1):
-            rows.append([
-                f"{i}.",
-                esc(ip),
-                esc(format_ports(ports)),
-                esc(cdn),
-                esc(status),
-            ])
+            lines.append(f"IP          : {esc(ip)}")
+            lines.append(f"PORTS       : {esc(format_ports(ports))}")
+            lines.append(f"CDN         : {esc(cdn)}")
+            lines.append(f"Status      : {esc(status)}")
+            lines.append("----------------------------------------------")
     elif mode == "sniscan":
-        headers = ["No", "SNI Host", "IP", "TLS", "ALPN", "Port Lain"]
-        rows = []
         for i, r in enumerate(chunk, start=start + 1):
-            rows.append([
-                f"{i}.",
-                esc(r[0]),  # sni_host
-                esc(r[1]),  # ip
-                esc(r[2]),  # tls_version
-                esc(r[3]),  # alpn
-                esc(r[5]),  # extra_ports_str
-            ])
+            lines.append(f"SNI Host    : {esc(r[0])}")
+            lines.append(f"Direct IP   : {esc(r[1])} ({r[6]}ms)")
+            lines.append(f"TLS/ALPN    : {esc(r[2])} | ALPN: {esc(r[3])}")
+            lines.append(f"Port TLS    : {esc(r[4])}({esc(r[2])})")
+            lines.append(f"Port Lain   : {esc(r[5])}")
+            lines.append("----------------------------------------------")
     elif mode == "d2ip":
         for line in chunk:
             lines.append(line)
         return "\n".join(lines), page, total_pages
-    else:
-        headers = ["No"]
-        rows = [[str(i)] for i in range(start + 1, start + 1 + len(chunk))]
-
-    # Hitung lebar kolom berdasarkan header dan data (hapus tag HTML untuk perhitungan)
-    import re
-    strip_re = re.compile(r"<[^>]+>")
-    col_widths = []
-    for col_idx, header in enumerate(headers):
-        values = [header] + [r[col_idx] for r in rows]
-        max_w = max(len(strip_re.sub("", v)) for v in values)
-        col_widths.append(max_w)
-
-    # Header baris: label dengan spasi di sekitar '|'
-    header_cells = [f"<b>{h}</b>" for h in headers]
-    header_line = " | ".join(
-        f" {header_cells[idx].strip()} "
-        for idx in range(len(headers))
-    )
-    # Hitung ulang lebar header setelah spasi tambahan
-    header_cells_plain = [f" {h} " for h in headers]
-    col_widths = [max(w, len(h)) for w, h in zip(col_widths, header_cells_plain)]
-
-    # Bangun header ulang dengan lebar yang dihitung
-    header_line = " | ".join(
-        f" {header_cells[idx]} " + " " * (col_widths[idx] - len(strip_re.sub("", header_cells[idx])))
-        for idx in range(len(headers))
-    ).rstrip()
-
-    lines.append(header_line)
-
-    # Garis pembatas menyesuaikan lebar tiap kolom
-    sep_cells = ["-" * w for w in col_widths]
-    sep_line = "-+-".join(sep_cells)
-    lines.append(sep_line)
-    lines.append("")
-
-    # Baris data dengan spasi di sekitar '|'
-    for row in rows:
-        cells = []
-        for idx, val in enumerate(row):
-            plain = strip_re.sub("", val)
-            cells.append(val + " " * (col_widths[idx] - len(plain)))
-        line = " | ".join(f" {cell} " for cell in cells).rstrip()
-        lines.append(line)
-        lines.append(sep_line)
 
     return "\n".join(lines), page, total_pages
 
@@ -759,6 +701,7 @@ def show_sniscan_history_detail(chat_id, message_id, filename, edit=True):
             item.get("alpn", "-"),
             item.get("tls_port", "-"),
             ",".join(str(p) for p in item.get("extra_ports", [])) if item.get("extra_ports") else "-",
+            item.get("response_time_ms", 0),
         )
         for item in data
     ]
@@ -944,6 +887,7 @@ def run_sniscan(chat_id, message_id, domain):
             r["alpn"],
             r["tls_port"],
             ",".join(str(p) for p in r["extra_ports"]) if r["extra_ports"] else "-",
+            r["response_time_ms"],
         )
         for r in results
     ]
