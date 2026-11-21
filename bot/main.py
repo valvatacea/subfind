@@ -878,7 +878,7 @@ def run_subfind(chat_id, message_id, domain):
 
     # Simpan ke state dan tampilkan halaman 1 (pagination)
     save_scan_state(chat_id, "subfind", domain, results, "SubFind")
-    show_scan_page(chat_id, message_id, edit=True)
+    show_scan_page(chat_id, sent.message_id, edit=True)
 
 
 # ===================== SNISCAN (impor dari sniscan.py) =====================
@@ -953,7 +953,7 @@ def run_sniscan(chat_id, message_id, domain):
 
     # Simpan ke state dan tampilkan halaman 1 (pagination)
     save_scan_state(chat_id, "sniscan", domain, results_tuples, "SNIScan")
-    show_scan_page(chat_id, message_id, edit=True)
+    show_scan_page(chat_id, sent.message_id, edit=True)
 
 
 # ===================== HELP =====================
