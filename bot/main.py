@@ -85,6 +85,11 @@ def esc(text):
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def pad_label(label, width=12):
+    """Pad label dengan &nbsp; agar tanda : sejajar di render HTML (spasi biasa kollapse)."""
+    return label + "&nbsp;" * max(0, width - len(label))
+
+
 # ===================== KEYBOARD =====================
 def kb_main():
     m = InlineKeyboardMarkup(row_width=2)
@@ -211,26 +216,26 @@ def build_page_text(results, page, mode, title):
 
     if mode == "subfind":
         for i, (sub, ip, ports, status, cdn) in enumerate(chunk, start=start + 1):
-            lines.append(f"Subdomain   : {esc(sub)}")
-            lines.append(f"IP          : {esc(ip)}")
-            lines.append(f"PORTS       : {esc(ports)}")
-            lines.append(f"Status      : {esc(status)}")
-            lines.append(f"CDN         : {esc(cdn)}")
+            lines.append(f"{pad_label('Subdomain', 12)}: {esc(sub)}")
+            lines.append(f"{pad_label('IP', 12)}: {esc(ip)}")
+            lines.append(f"{pad_label('PORTS', 12)}: {esc(ports)}")
+            lines.append(f"{pad_label('Status', 12)}: {esc(status)}")
+            lines.append(f"{pad_label('CDN', 12)}: {esc(cdn)}")
             lines.append("----------------------------------------------")
     elif mode == "cdnscan":
         for i, (ip, ports, cdn, status) in enumerate(chunk, start=start + 1):
-            lines.append(f"IP          : {esc(ip)}")
-            lines.append(f"PORTS       : {esc(format_ports(ports))}")
-            lines.append(f"CDN         : {esc(cdn)}")
-            lines.append(f"Status      : {esc(status)}")
+            lines.append(f"{pad_label('IP', 12)}: {esc(ip)}")
+            lines.append(f"{pad_label('PORTS', 12)}: {esc(format_ports(ports))}")
+            lines.append(f"{pad_label('CDN', 12)}: {esc(cdn)}")
+            lines.append(f"{pad_label('Status', 12)}: {esc(status)}")
             lines.append("----------------------------------------------")
     elif mode == "sniscan":
         for i, r in enumerate(chunk, start=start + 1):
-            lines.append(f"SNI Host    : {esc(r[0])}")
-            lines.append(f"Direct IP   : {esc(r[1])} ({r[6]}ms)")
-            lines.append(f"TLS/ALPN    : {esc(r[2])} | ALPN: {esc(r[3])}")
-            lines.append(f"Port TLS    : {esc(r[4])}({esc(r[2])})")
-            lines.append(f"Port Lain   : {esc(r[5])}")
+            lines.append(f"{pad_label('SNI Host', 12)}: {esc(r[0])}")
+            lines.append(f"{pad_label('Direct IP', 12)}: {esc(r[1])} ({r[6]}ms)")
+            lines.append(f"{pad_label('TLS/ALPN', 12)}: {esc(r[2])} | ALPN: {esc(r[3])}")
+            lines.append(f"{pad_label('Port TLS', 12)}: {esc(r[4])}({esc(r[2])})")
+            lines.append(f"{pad_label('Port Lain', 12)}: {esc(r[5])}")
             lines.append("----------------------------------------------")
     elif mode == "d2ip":
         for line in chunk:
