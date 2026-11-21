@@ -1526,10 +1526,11 @@ def run_cdnscan_target_batch(chat_id, message_id):
     for t in targets:
         t_state = load_state(t)
         t_offset = t_state.get('scanned_count', 0) if t_state else 0
-        t_all = parse_ip_range(t)
+        # Terapkan limit per target agar total sesuai dengan batas yang diset user
+        t_all = parse_ip_range(t, max_ips=limit if limit > 0 else None)
         t_total = len(t_all) if t_all else 0
         total_all_ips += t_total
-        scanned_all_ips += t_offset  # Sudah discan dari target sebelumnya
+        scanned_all_ips += min(t_offset, t_total)  # Jangan melebihi total efektif
 
     target = targets[index]
     import time
