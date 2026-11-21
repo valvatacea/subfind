@@ -1611,8 +1611,16 @@ def run_cdnscan_target_batch(chat_id, message_id):
     set_state(chat_id, cdn_target_index=index + 1)
 
     if index + 1 < len(targets):
-        # Ada target lagi, lanjut
-        threading.Thread(target=run_cdnscan_target_batch, args=(chat_id, message_id), daemon=True).start()
+        # Ada target lagi, tampilkan pesan jeda dengan tombol Next untuk target berikutnya
+        # Jangan auto-start — tunggu user klik Next agar tidak ada race condition
+        st = get_state(chat_id)
+        prev_menu = st.get("prev_menu", "menu:cdnscan")
+        _edit_queue.put((
+            chat_id, message_id,
+            f"⏸️ <b>CDNScan jeda</b>\nTarget [{index + 1}/{len(targets)}]: <b>{esc(target)}</b>\nSelesai.\nKlik Next untuk melanjutkan ke target berikutnya.",
+            {"reply_markup": kb_next_target(prev_menu)}
+        ))
+        return
     else:
         # Semua selesai, tampilkan hasil target terakhir dengan pagination
         save_scan_state(chat_id, "cdnscan", target, results, "CDNScan")
