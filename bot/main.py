@@ -1338,6 +1338,17 @@ def cb_handler(call):
         st = get_state(chat_id)
         targets = st.get("cdn_targets", []) or []
         index = st.get("cdn_target_index", 0)
+
+        # Skip target yang sudah selesai (completed) — cari target berikutnya yang belum dipindai
+        while index < len(targets):
+            target = targets[index]
+            state = load_state(target)
+            if state and state.get("completed"):
+                index += 1
+                set_state(chat_id, cdn_target_index=index)
+            else:
+                break
+
         if index < len(targets):
             threading.Thread(target=run_cdnscan_target_batch, args=(chat_id, message_id), daemon=True).start()
         else:
@@ -1525,8 +1536,19 @@ def run_cdnscan_target_batch(chat_id, message_id):
 
     ips = parse_ip_range(target, offset=state_offset, max_ips=limit if limit > 0 else None)
     if not ips:
+        # Target tidak punai IP yang bisa dipindai (sudah selesai atau tidak valid)
         set_state(chat_id, cdn_target_index=index + 1)
-        threading.Thread(target=run_cdnscan_target_batch, args=(chat_id, message_id), daemon=True).start()
+        if index + 1 < len(targets):
+            st = get_state(chat_id)
+            prev_menu = st.get("prev_menu", "menu:cdnscan")
+            _edit_queue.put((
+                chat_id, message_id,
+                f"⏸️ <b>CDNScan jeda</b>\nTarget [{index + 1}/{len(targets)}]: <b>{esc(target)}</b>\nTidak ada IP untuk dipindai.\nKlik Next untuk melanjutkan ke target berikutnya.",
+                {"reply_markup": kb_next_target(prev_menu)}
+            ))
+        else:
+            save_scan_state(chat_id, "cdnscan", target, [], "CDNScan")
+            show_scan_page(chat_id, message_id, edit=True)
         return
 
     results = []
