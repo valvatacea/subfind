@@ -86,8 +86,8 @@ def esc(text):
 
 
 def pad_label(label, width=12):
-    """Pad label dengan non-breaking space agar tanda : sejajar di render HTML."""
-    return label + "\u3000" * max(0, width - len(label))
+    """Tanpa padding - label langsung diikuti titik dua."""
+    return label
 
 
 # ===================== KEYBOARD =====================
