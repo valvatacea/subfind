@@ -686,7 +686,7 @@ def show_sniscan_history_detail(chat_id, message_id, filename, edit=True):
             pass
         return
 
-    if not data or not isinstance(data, list):
+    if not data:
         text = "❌ Tidak ada data dalam file scan."
         kb = InlineKeyboardMarkup(row_width=1)
         kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="sniscan:history:1"))
@@ -699,22 +699,49 @@ def show_sniscan_history_detail(chat_id, message_id, filename, edit=True):
             pass
         return
 
-    target = data[0].get("target", filename) if data else filename
+    if isinstance(data, list):
+        target = data[0].get("target", filename) if data else filename
+        results = [
+            (
+                item.get("sni_host", "-"),
+                item.get("ip", "-"),
+                item.get("tls_version", "-"),
+                item.get("alpn", "-"),
+                item.get("tls_port", "-"),
+                ",".join(str(p) for p in item.get("extra_ports", [])) if item.get("extra_ports") else "-",
+                item.get("response_time_ms", 0),
+            )
+            for item in data
+        ]
+    elif isinstance(data, dict):
+        target = data.get("target", data.get("domain", filename))
+        results = [
+            (
+                item.get("sni_host", "-"),
+                item.get("ip", "-"),
+                item.get("tls_version", "-"),
+                item.get("alpn", "-"),
+                item.get("tls_port", "-"),
+                ",".join(str(p) for p in item.get("extra_ports", [])) if item.get("extra_ports") else "-",
+                item.get("response_time_ms", 0),
+            )
+            for item in data.get("results", [])
+        ]
+    else:
+        text = "❌ Tidak ada data dalam file scan."
+        kb = InlineKeyboardMarkup(row_width=1)
+        kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="sniscan:history:1"))
+        try:
+            if edit:
+                bot.edit_message_text(text, chat_id, message_id, reply_markup=kb)
+            else:
+                bot.send_message(chat_id, text, reply_markup=kb)
+        except Exception:
+            pass
+        return
 
-    results = [
-        (
-            item.get("sni_host", "-"),
-            item.get("ip", "-"),
-            item.get("tls_version", "-"),
-            item.get("alpn", "-"),
-            item.get("tls_port", "-"),
-            ",".join(str(p) for p in item.get("extra_ports", [])) if item.get("extra_ports") else "-",
-            item.get("response_time_ms", 0),
-        )
-        for item in data
-    ]
     save_scan_state(chat_id, "sniscan", target, results, "SNIScan", page=1)
-    info_text = f"✅ <b>Target sudah discan sebelumnya.</b>\nTotal: {len(data)} host"
+    info_text = f"✅ <b>Target sudah discan sebelumnya.</b>\nTotal: {len(results)} host"
     show_scan_page(chat_id, message_id, edit=True, info_text=info_text, back_target="sniscan:history:1")
 
 
