@@ -1524,7 +1524,7 @@ def text_handler(message):
             return
         st = get_state(chat_id)
         targets = st.get("cdn_targets", []) or []
-        set_state(chat_id, mode="cdnscan_limit", awaiting=None, cdn_limit=limit, cdn_targets=targets, cdn_target_index=0)
+        set_state(chat_id, mode="cdnscan_limit", awaiting=None, cdn_limit=limit, cdn_targets=targets, cdn_target_index=0, prev_menu="cdnscan:ranges:page")
         sent = bot.send_message(
             chat_id,
             f"🔢 <b>Limit IP diset: {limit}</b>\nSedang memproses scan...",
