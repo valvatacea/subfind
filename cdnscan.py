@@ -21,6 +21,7 @@ import time
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from common.progress import build_progress_line
+from common.http_status import get_http_status_multi
 from datetime import datetime
 
 HEADERS = {
@@ -98,39 +99,13 @@ def fetch_headers(host, port=80, scheme="http", timeout=5):
 
 
 def detect_cdn_and_status(ip):
-    """Deteksi CDN dan status HTTP dalam satu kali request per port."""
+    """Deteksi CDN dan status HTTP.
+    
+    Status diambil dari get_http_status_multi (HTTP/HTTPS GET request).
+    CDN dideteksi dari rentang IP Cloudflare.
+    """
     cdn = "-"
-    status = "-"
-
-    # Cek header HTTP dan HTTPS pada port umum
-    for port in SCAN_PORTS:
-        scheme = "https" if port == 443 else "http"
-        try:
-            headers, code = fetch_headers(ip, port, scheme, timeout=5)
-            h = headers
-
-            # Deteksi CDN dari header
-            if cdn == "-":
-                if 'cloudflare' in h:
-                    cdn = 'Cloudflare'
-                elif 'cloudfront' in h:
-                    cdn = 'CloudFront'
-                elif 'akamai' in h:
-                    cdn = 'Akamai'
-                elif 'fastly' in h:
-                    cdn = 'Fastly'
-                elif 'sucuri' in h:
-                    cdn = 'Sucuri'
-
-            # Simpan status code dari respons pertama yang sukses
-            if status == "-" and code is not None:
-                status = str(code)
-
-            # Jika sudah dapat CDN dan status, berhenti
-            if cdn != "-" and status != "-":
-                break
-        except Exception:
-            continue
+    status = get_http_status_multi(ip, timeout=5)
 
     # Fallback: rentang IP Cloudflare
     if cdn == "-":

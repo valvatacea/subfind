@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from datetime import datetime
 
 from common.validators import validate_domain
+from common.http_status import get_http_status_multi
 from common.progress import build_progress_line
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
@@ -247,31 +248,8 @@ def process_subdomain(sub):
 
     ports_str = scan_ports_summary(ip)
 
-    http_status = '-'
+    http_status = get_http_status_multi(sub, timeout=6)
     cdn = '-'
-
-    for scheme in ("http", "https"):
-        try:
-            req = urllib.request.Request(f"{scheme}://{sub}", headers=HEADERS, method="GET")
-            with urllib.request.urlopen(req, timeout=6) as r:
-                http_status = str(r.status)
-                h = str(r.headers).lower()
-                if 'cloudflare' in h:
-                    cdn = 'Cloudflare'
-                elif 'cloudfront' in h:
-                    cdn = 'CloudFront'
-                elif 'akamai' in h:
-                    cdn = 'Akamai'
-                elif 'fastly' in h:
-                    cdn = 'Fastly'
-                elif 'sucuri' in h:
-                    cdn = 'Sucuri'
-                break
-        except urllib.error.HTTPError as e:
-            http_status = str(e.code)
-            break
-        except Exception:
-            continue
 
     # Fallback CDN via IP range
     if cdn == '-':

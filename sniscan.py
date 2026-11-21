@@ -19,6 +19,7 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from common.validators import validate_domain
+from common.http_status import get_http_status_multi
 from common.progress import build_progress_line
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
@@ -146,7 +147,7 @@ def scan_extra_ports(ip):
 
 def process_host(sub):
     """Proses satu SNI host: resolve IP, TLS handshake ke IP dengan SNI, scan port lain.
-    Return dict: {sni_host, ip, response_time_ms, tls_version, alpn, tls_port, extra_ports}.
+    Return dict: {sni_host, ip, response_time_ms, tls_version, alpn, tls_port, extra_ports, status}.
     """
     ip = resolve_ip(sub)
     if not ip:
@@ -158,7 +159,10 @@ def process_host(sub):
             "alpn": "-",
             "tls_port": "-",
             "extra_ports": [],
+            "status": "-",
         }
+
+    status = get_http_status_multi(ip, timeout=5)
 
     tls, alpn, ok, elapsed_ms = tls_handshake(ip, sub)
     if not ok:
@@ -170,6 +174,7 @@ def process_host(sub):
             "alpn": "-",
             "tls_port": "-",
             "extra_ports": [],
+            "status": status,
         }
 
     extra = scan_extra_ports(ip)
@@ -182,6 +187,7 @@ def process_host(sub):
         "alpn": alpn,
         "tls_port": "443",
         "extra_ports": extra,
+        "status": status,
     }
 
 
