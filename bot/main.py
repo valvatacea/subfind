@@ -86,8 +86,8 @@ def esc(text):
 
 
 def pad_label(label, width=12):
-    """Pad label dengan &nbsp; agar tanda : sejajar di render HTML (spasi biasa kollapse)."""
-    return label + "&nbsp;" * max(0, width - len(label))
+    """Pad label dengan non-breaking space agar tanda : sejajar di render HTML."""
+    return label + "\u00a0" * max(0, width - len(label))
 
 
 # ===================== KEYBOARD =====================
