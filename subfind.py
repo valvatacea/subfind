@@ -285,22 +285,16 @@ def calc_widths(results):
     w_cdn = max(w_cdn, len("CDN"))
     return w_sub, w_ip, w_ports, w_status, w_cdn
 
-def main():
-    global completed_count
-    if len(sys.argv) < 2:
-        print("Usage: python3 subfind.py <domain>")
-        print("Example: python3 subfind.py contoh.com")
-        sys.exit(1)
 
-    domain = sys.argv[1].lower().strip()
+def enumerate_domain(domain):
+    """Enumerasi subdomain untuk domain, return (results, errors).
+    Digunakan baik oleh CLI main() maupun bot. Tidak mencetak ke stdout.
+    Memakai cache per provider (30 hari) seperti CLI asli.
+    """
     if not DOMAIN_RE.match(domain):
-        print(f"Domain tidak valid: {domain}")
-        sys.exit(1)
-    print(f"Scanning: {domain}\n")
+        return [], [f"Domain tidak valid: {domain}"]
 
     errors = []
-
-    # Sublist terpisah per provider
     provider_subs = {
         "crt.sh": set(),
         "hackertarget": set(),
@@ -318,101 +312,54 @@ def main():
         if cached_p is not None:
             provider_cached[provider] = cached_p
 
-    total_cached = sum(len(s) for s in provider_cached.values())
-    if total_cached > 0:
-        print(f"[*] Cache ditemukan: {total_cached} subdomain")
-        for provider, cs in provider_cached.items():
-            if cs:
-                print(f"    {provider}: {len(cs)} subdomain")
-
-    # Selalu coba fetch dari provider, bukan hanya saat cache kosong
-    # 1. crt.sh
-    print("[*] Mengambil sublist dari crt.sh ...", flush=True)
+    # 1. crt.sh (selalu fetch)
     s, err = crt_sh(domain)
     provider_subs["crt.sh"] = s if s else set()
-    if s:
-        print(f"[*] Dapat {len(s)} subdomain dari crt.sh")
-    else:
-        if err:
-            errors.append(err)
-            print(f"    {err}")
-        else:
-            print("[*] Tidak ada subdomain dari crt.sh")
+    if err:
+        errors.append(f"crt.sh: {err}")
 
-    # 2. hackertarget (selalu di-fetch)
-    print("[*] Mengambil sublist dari hackertarget ...", flush=True)
+    # 2. hackertarget (selalu fetch)
     s, err = hackertarget(domain)
     provider_subs["hackertarget"] = s if s else set()
-    if s:
-        print(f"[*] Dapat {len(s)} subdomain dari hackertarget")
-    else:
-        if err:
-            errors.append(err)
-            print(f"    {err}")
-        else:
-            print("[*] Tidak ada subdomain dari hackertarget")
+    if err:
+        errors.append(f"hackertarget: {err}")
 
-    # 3. wordlist (selalu di-fetch)
-    print("[*] Mengambil sublist dari wordlist (daftar umum) ...", flush=True)
+    # 3. wordlist (selalu fetch)
     s, err = wordlist_fallback(domain)
     provider_subs["wordlist"] = s if s else set()
-    if s:
-        print(f"[*] Dapat {len(s)} subdomain dari wordlist")
-    else:
-        print("[*] Tidak ditemukan subdomain dari wordlist.")
 
-    # Bandingkan & simpan cache per provider hanya yang di-fetch
+    # Bandingkan & simpan cache per provider (logika sama dengan CLI asli)
     provider_final = {}
     for provider, fetched in provider_subs.items():
         cached_p = provider_cached[provider]
         if not fetched:
-            # Provider tidak di-fetch (fallback skip), gunakan cache lama jika ada
+            # Provider gagal fetch, gunakan cache lama jika ada
             provider_final[provider] = cached_p if cached_p is not None else set()
             continue
         if cached_p is not None:
             if fetched == cached_p:
-                print(f"[*] Cache {provider} masih sama, tidak perlu update.")
                 provider_final[provider] = cached_p
             elif len(fetched) >= len(cached_p):
-                print(f"[!] Cache {provider} berbeda ({len(cached_p)} -> {len(fetched)}), simpan baru.")
                 save_cache(domain, provider, fetched)
                 provider_final[provider] = fetched
             else:
-                print(f"[!] Cache {provider} fetch lebih sedikit ({len(cached_p)} -> {len(fetched)}), cache lama dipertahankan.")
+                # Fetch lebih sedikit dari cache, pegang cache lama
                 provider_final[provider] = cached_p
         else:
             save_cache(domain, provider, fetched)
             provider_final[provider] = fetched
 
-    # Gabungkan semua cache provider menjadi satu set untuk scan
+    # Gabungkan semua provider_final untuk scan
     subs = set()
     for psubs in provider_final.values():
         subs |= psubs
 
-    # Ringkasan cache per provider (yang akan di-scan)
-    print("\n[*] Ringkasan cache per provider (untuk scan):")
-    for name, psubs in provider_final.items():
-        if psubs:
-            print(f"    {name}: {len(psubs)} subdomain")
-
-    # Tampilkan error provider jika ada
-    if errors:
-        print(f"\n[!] Provider gagal: {'; '.join(errors)}")
-
     if not subs:
-        print("\nTidak ada subdomain yang ditemukan.")
-        sys.exit(0)
+        return [], errors
 
     sorted_subs = sorted(subs)
-    total = len(sorted_subs)
-    completed_count = 0
-
-    print(f"\nTotal: {total} subdomain unik")
-    print(f"[*] Memulai scan target: {domain} ({total} subdomain)")
-    print("[*] Memproses dengan threading...")
-
     results = []
-    max_workers = min(20, total)
+    max_workers = min(20, len(sorted_subs))
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(process_subdomain, sub): sub for sub in sorted_subs}
@@ -420,24 +367,12 @@ def main():
 
         while pending:
             done, pending = wait(pending, timeout=60, return_when=FIRST_COMPLETED)
-
             if not done:
-                # Semua pending ngehang melebihi 60 detik, tandai sebagai gagal
                 for future in list(pending):
                     sub = futures[future]
-                    result = (sub, '-', '-', '-', '-')
-                    results.append(result)
-                    with completed_lock:
-                        completed_count += 1
-                        c = completed_count
-                        line = (f"[{c}/{total}] {sub} | IP: - | Ports: - | "
-                                f"Status: - | CDN: - (timeout)")
-                        with print_lock:
-                            print(f"\r{line}", end="")
-                        sys.stdout.flush()
+                    results.append((sub, '-', '-', '-', '-'))
                 pending.clear()
                 break
-
             for future in done:
                 sub = futures[future]
                 try:
@@ -446,35 +381,42 @@ def main():
                     result = (sub, '-', '-', '-', '-')
                 results.append(result)
 
-                with completed_lock:
-                    completed_count += 1
-                    c = completed_count
-                    sub_disp = result[0]
-                    ip_disp = result[1]
-                    ports_disp = result[2]
-                    status_disp = result[3]
-                    cdn_disp = result[4]
-                    line = (f"[{c}/{total}] {sub_disp} | IP: {ip_disp} | Ports: {ports_disp} | "
-                            f"Status: {status_disp} | CDN: {cdn_disp}")
-                    with print_lock:
-                        print(f"\r{line}", end="")
-                        sys.stdout.flush()
-
-    # Urutkan hasil berdasarkan nama subdomain
     results.sort(key=lambda x: x[0])
+    return results, errors
 
-    # Hitung lebar kolom otomatis
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python3 subfind.py <domain>")
+        print("Example: python3 subfind.py contoh.com")
+        sys.exit(1)
+
+    domain = sys.argv[1].lower().strip()
+    if not DOMAIN_RE.match(domain):
+        print(f"Domain tidak valid: {domain}")
+        sys.exit(1)
+    print(f"Scanning: {domain}\n")
+
+    results, errors = enumerate_domain(domain)
+
+    if errors:
+        print(f"[!] Provider gagal: {'; '.join(errors)}")
+
+    if not results:
+        print("\nTidak ada subdomain yang ditemukan.")
+        sys.exit(0)
+
+    total = len(results)
+
     w_sub, w_ip, w_ports, w_status, w_cdn = calc_widths(results)
-    total_width = w_sub + w_ip + w_ports + w_status + w_cdn + 12  # 12 = spasi antar kolom
+    total_width = w_sub + w_ip + w_ports + w_status + w_cdn + 12
 
-    # Cetak tabel akhir
     print("\n" + "=" * total_width)
     print(f"{'SUBDOMAIN':<{w_sub}} {'IP':<{w_ip}} {'PORTS':<{w_ports}} {'STATUS':<{w_status}} {'CDN'}")
     print("-" * total_width)
     for sub, ip, ports, status, cdn in results:
         print(f"{sub:<{w_sub}} {ip:<{w_ip}} {ports:<{w_ports}} {status:<{w_status}} {cdn}")
 
-    # Simpan ke file teks di folder output/
     OUT_DIR = os.path.join(BASE_DIR, "output")
     os.makedirs(OUT_DIR, exist_ok=True)
     fname = f"{OUT_DIR}/subfind_{domain}.txt"
@@ -483,7 +425,6 @@ def main():
         for sub, ip, ports, status, cdn in results:
             f.write(f"{sub}|{ip}|{ports}|{status}|{cdn}\n")
 
-    # Simpan ke file JSON di folder output/
     jname = f"{OUT_DIR}/subfind_{domain}.json"
     json_data = []
     for sub, ip, ports, status, cdn in results:

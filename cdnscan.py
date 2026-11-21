@@ -30,6 +30,9 @@ HEADERS = {
     'Upgrade-Insecure-Requests': '1',
 }
 
+# Folder dasar berdasarkan lokasi file ini
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # Port yang di-scan untuk deteksi CDN (hanya port umum web)
 SCAN_PORTS = [
     80, 443
@@ -50,10 +53,10 @@ PROVIDER_URLS = {
     'cloudfront': 'https://ip-ranges.amazonaws.com/ip-ranges.json',
 }
 
-# Folder untuk cache IP range provider dan hasil scan
-IPRANGE_DIR = "output/ipranges"
-SCAN_DIR = "output"
-STATE_DIR = "output/states"
+# Folder untuk cache IP range provider dan hasil scan (absolut dari lokasi file ini)
+IPRANGE_DIR = os.path.join(BASE_DIR, "output", "ipranges")
+SCAN_DIR = os.path.join(BASE_DIR, "output")
+STATE_DIR = os.path.join(BASE_DIR, "output", "states")
 CACHE_MAX_AGE_SECONDS = 604800  # 7 hari untuk cache IP range provider
 SCAN_CACHE_MAX_AGE_SECONDS = 604800  # 7 hari untuk skip scan ulang
 
