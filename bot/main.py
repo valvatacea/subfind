@@ -33,6 +33,7 @@ from subfind import (
     CF_PREFIXES as SUBFIND_CF_PREFIXES, detect_cdn as subfind_detect_cdn,
 )
 from common.validators import validate_domain
+from common.progress import format_elapsed, calculate_eta, build_bar, SPINNER
 from sniscan import (
     enumerate_hosts,
 )
@@ -121,35 +122,27 @@ def pad_label(label, width=12):
 
 
 # ===================== SPINNER & WAKTU =====================
-SPINNER = ['⠋', '⠙', '⠹', '⠼', '⠴', '⠦', '⠧', '⠏']
-
-
-def format_elapsed(seconds):
-    """Format durasi detik menjadi string yang mudah dibaca."""
-    if seconds < 60:
-        return f"{int(seconds)}s"
-    minutes = int(seconds // 60)
-    secs = int(seconds % 60)
-    return f"{minutes}m {secs}s"
+# SPINNER, format_elapsed diimpor dari common.progress
 
 
 def build_progress_text(title, target, current, total, start_time, spinner_idx):
     """Bangun teks progres dengan spinner, bar, persentase, elapsed time, dan ETA.
 
     Tidak ada rate limiting di sini — spinner thread mengontrol timing (setiap 0,4 detik).
+    Output format HTML untuk Telegram, menggunakan emoji 🟦⬜ untuk progress bar.
     """
     import time
     now = time.time()
     elapsed = now - start_time
 
     if current > 0 and total > 0:
-        eta = (elapsed / current) * (total - current)
+        eta = calculate_eta(elapsed, current, total)
     else:
         eta = 0
 
     # Progress bar: 10 blok, emoji kotak biru terisi dan kosong
-    filled = int(current / total * 10) if total > 0 else 0
-    bar = "🟦" * filled + "⬜" * (10 - filled)
+    bar = build_bar(current, total, width=10,
+                    filled_char="🟦", empty_char="⬜")
     pct = int(current / total * 100) if total > 0 else 0
 
     # Spinner dari spinner_idx yang dikelola oleh spinner thread (independen dari progres)

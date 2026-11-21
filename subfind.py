@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from datetime import datetime
 
 from common.validators import validate_domain
+from common.progress import build_progress_line
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 
@@ -408,38 +409,16 @@ def main():
         sys.exit(1)
     print(f"Scanning: {domain}\n")
 
-    import time
     start_time = time.time()
     spinner_idx = [0]
-    SPINNER = ['⠋', '⠙', '⠹', '⠼', '⠴', '⠦', '⠧', '⠏']
 
     def progress_callback(current, total):
         spinner_idx[0] += 1
-        now = time.time()
-        elapsed = now - start_time
-        if current > 0 and total > 0:
-            eta = (elapsed / current) * (total - current)
-            filled = int(current / total * 10)
-            pct = int(current / total * 100)
-        else:
-            eta = 0
-            filled = 0
-            pct = 0
-        bar = "█" * filled + "░" * (10 - filled)
-        mins = int(elapsed // 60)
-        secs = int(elapsed % 60)
-        eta_mins = int(eta // 60)
-        eta_secs = int(eta % 60)
-        spinner = SPINNER[spinner_idx[0] % len(SPINNER)]
-        if mins > 0:
-            elapsed_str = f"{mins}m {secs}s"
-        else:
-            elapsed_str = f"{secs}s"
-        if eta_mins > 0:
-            eta_str = f"{eta_mins}m {eta_secs}s"
-        else:
-            eta_str = f"{eta_secs}s"
-        print(f"\r{spinner} Scanning {domain}... {bar} {pct}% ({current}/{total}) Elapsed: {elapsed_str} | ETA: {eta_str}", end="")
+        line = build_progress_line(
+            spinner_idx[0], "SubFind", domain, current, total, start_time,
+            filled_char="█", empty_char="░", width=10, label_prefix="Scanning"
+        )
+        print(f"\r{line}", end="")
 
     results, errors = enumerate_domain(domain, progress_callback=progress_callback)
     print()  # baris baru setelah progres selesai
