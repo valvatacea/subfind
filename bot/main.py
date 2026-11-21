@@ -205,8 +205,8 @@ def build_page_text(results, page, mode, title):
             rows.append([
                 f"{i}.",
                 esc(sub),
-                f"<code>{esc(ip)}</code>",
-                f"<code>{esc(ports)}</code>",
+                esc(ip),
+                esc(ports),
                 esc(status),
                 esc(cdn),
             ])
@@ -216,8 +216,8 @@ def build_page_text(results, page, mode, title):
         for i, (ip, ports, cdn, status) in enumerate(chunk, start=start + 1):
             rows.append([
                 f"{i}.",
-                f"<code>{esc(ip)}</code>",
-                f"<code>{esc(format_ports(ports))}</code>",
+                esc(ip),
+                esc(format_ports(ports)),
                 esc(cdn),
                 esc(status),
             ])
