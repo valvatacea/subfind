@@ -100,11 +100,11 @@ def kb_back(prev_menu="menu:main"):
     return m
 
 
-def kb_confirm_scan(callback_prefix, target):
+def kb_confirm_scan(callback_prefix, target, prev_menu="menu:main"):
     m = InlineKeyboardMarkup(row_width=2)
     m.add(
         InlineKeyboardButton("✅ Mulai scan", callback_data=f"{callback_prefix}:start:{target}"),
-        InlineKeyboardButton("↩️ Batal", callback_data="menu:main"),
+        InlineKeyboardButton("↩️ Batal", callback_data=f"back:{prev_menu}"),
     )
     return m
 
