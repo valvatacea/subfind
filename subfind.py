@@ -286,10 +286,11 @@ def calc_widths(results):
     return w_sub, w_ip, w_ports, w_status, w_cdn
 
 
-def enumerate_domain(domain):
+def enumerate_domain(domain, progress_callback=None):
     """Enumerasi subdomain untuk domain, return (results, errors).
     Digunakan baik oleh CLI main() maupun bot. Tidak mencetak ke stdout.
     Memakai cache per provider (30 hari) seperti CLI asli.
+    progress_callback: fungsi dipanggil dengan (current, total) setelah setiap subdomain selesai diproses.
     """
     if not DOMAIN_RE.match(domain):
         return [], [f"Domain tidak valid: {domain}"]
@@ -380,6 +381,8 @@ def enumerate_domain(domain):
                 except Exception:
                     result = (sub, '-', '-', '-', '-')
                 results.append(result)
+                if progress_callback:
+                    progress_callback(len(results), len(sorted_subs))
 
     results.sort(key=lambda x: x[0])
     return results, errors

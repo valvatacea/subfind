@@ -16,7 +16,7 @@ import urllib.request
 import urllib.error
 import threading
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 socket.setdefaulttimeout(10)
@@ -174,8 +174,10 @@ def process_host(sub):
     }
 
 
-def enumerate_hosts(domain):
-    """Enumerasi SNI host untuk domain, return (results, errors)."""
+def enumerate_hosts(domain, progress_callback=None):
+    """Enumerasi SNI host untuk domain, return (results, errors).
+    progress_callback: fungsi dipanggil dengan (current, total) setelah setiap host selesai diproses.
+    """
     if not DOMAIN_RE.match(domain):
         return [], [f"Domain tidak valid: {domain}"]
 
@@ -200,9 +202,12 @@ def enumerate_hosts(domain):
 
     with ThreadPoolExecutor(max_workers=min(20, len(sorted_subs))) as executor:
         futures = {executor.submit(process_host, sub): sub for sub in sorted_subs}
-        for future in futures:
+        for future in as_completed(futures):
             try:
-                results.append(future.result())
+                result = future.result()
+                results.append(result)
+                if progress_callback:
+                    progress_callback(len(results), len(sorted_subs))
             except Exception:
                 pass
 

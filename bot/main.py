@@ -834,7 +834,19 @@ def run_d2ip(chat_id, message_id, domain):
 
 # ===================== SUBFIND (impor dari subfind.py) =====================
 def run_subfind(chat_id, message_id, domain):
-    results, errors = enumerate_domain(domain)
+    sent = bot.send_message(chat_id, f"🔍 <b>SubFind</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...")
+
+    def progress_callback(current, total):
+        if current % 5 == 0 or current == total:
+            try:
+                bot.edit_message_text(
+                    f"🔍 <b>SubFind</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...\nProgress: {current}/{total}",
+                    chat_id, sent.message_id
+                )
+            except Exception:
+                pass
+
+    results, errors = enumerate_domain(domain, progress_callback=progress_callback)
 
     if errors:
         try:
@@ -871,7 +883,19 @@ def run_subfind(chat_id, message_id, domain):
 
 # ===================== SNISCAN (impor dari sniscan.py) =====================
 def run_sniscan(chat_id, message_id, domain):
-    results, errors = enumerate_hosts(domain)
+    sent = bot.send_message(chat_id, f"🔍 <b>SNIScan</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...")
+
+    def progress_callback(current, total):
+        if current % 5 == 0 or current == total:
+            try:
+                bot.edit_message_text(
+                    f"🔍 <b>SNIScan</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...\nProgress: {current}/{total}",
+                    chat_id, sent.message_id
+                )
+            except Exception:
+                pass
+
+    results, errors = enumerate_hosts(domain, progress_callback=progress_callback)
 
     if errors:
         try:
