@@ -1248,6 +1248,7 @@ def cb_handler(call):
         selected = st.get("cdn_selected", [])
         provider = st.get("cdn_provider", "")
         prev_menu = st.get("prev_menu", "menu:cdnscan")
+        set_state(chat_id, cdn_range_page=page)
         bot.edit_message_text(
             f"🛡️ <b>Pilih rentang IP — {provider}</b>\nHalaman {page}",
             chat_id, message_id, reply_markup=kb_ranges(ranges, page=page, selected=selected)
