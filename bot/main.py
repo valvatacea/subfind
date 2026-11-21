@@ -133,23 +133,14 @@ def format_elapsed(seconds):
     return f"{minutes}m {secs}s"
 
 
-def build_progress_text(title, target, current, total, start_time, last_update, is_final=False):
+def build_progress_text(title, target, current, total, start_time, spinner_idx):
     """Bangun teks progres dengan spinner, bar, persentase, elapsed time, dan ETA.
 
-    Rate limiting: jika belum lewat 1 detik sejak update terakhir dan bukan final,
-    kembalikan None (tidak ada update yang dikirim).
-
-    Spinner dipilih berdasarkan waktu berlalu (elapsed) agar berputar mulus
-    terlepas dari seberapa cepat item selesai diproses.
+    Tidak ada rate limiting di sini — spinner thread mengontrol timing (setiap 0,4 detik).
     """
     import time
     now = time.time()
     elapsed = now - start_time
-
-    # Rate limiting: maksimal 1 update per detik, kecuali final
-    if not is_final and last_update[0] is not None and (now - last_update[0]) < 1.0:
-        return None
-    last_update[0] = now
 
     if current > 0 and total > 0:
         eta = (elapsed / current) * (total - current)
@@ -161,8 +152,8 @@ def build_progress_text(title, target, current, total, start_time, last_update, 
     bar = "🟦" * filled + "⬜" * (10 - filled)
     pct = int(current / total * 100) if total > 0 else 0
 
-    # Spinner berdasarkan waktu berlalu (10 frame per detik)
-    spinner = SPINNER[int(elapsed * 10) % len(SPINNER)]
+    # Spinner dari spinner_idx yang dikelola oleh spinner thread (independen dari progres)
+    spinner = SPINNER[spinner_idx % len(SPINNER)]
 
     return (f"{spinner} <b>{title}</b>\n"
             f"Memindai <b>{esc(target)}</b>...\n"
@@ -928,20 +919,55 @@ def run_subfind(chat_id, message_id, domain):
 
     import time
     start_time = time.time()
-    last_update = [None]
+
+    # State progres yang dibagikan antara spinner thread dan progress callback
+    scan_state = {
+        "active": True,
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "title": "SubFind",
+        "target": domain,
+        "current": 0,
+        "total": 0,
+        "start_time": start_time,
+        "spinner_idx": 0,
+    }
+    scan_lock = threading.Lock()
+
+    def _spinner_loop():
+        """Thread mandiri: memutar spinner dan mengupdate progres ke antrian."""
+        while True:
+            with scan_lock:
+                if not scan_state["active"]:
+                    break
+                state = dict(scan_state)
+
+            text = build_progress_text(
+                state["title"], state["target"],
+                state["current"], state["total"],
+                state["start_time"], state["spinner_idx"],
+            )
+            _edit_queue.put((state["chat_id"], state["message_id"], text, {}))
+
+            with scan_lock:
+                scan_state["spinner_idx"] += 1
+
+            time.sleep(0.4)
+
+    # Jalankan spinner thread terpisah (independen dari progres scan)
+    spinner_thread = threading.Thread(target=_spinner_loop, daemon=True)
+    spinner_thread.start()
 
     def progress_callback(current, total):
-        is_final = (current == total)
-        if current % 2 == 0 or is_final:
-            text = build_progress_text("SubFind", domain, current, total, start_time, last_update, is_final)
-            if text is not None:
-                _edit_queue.put((
-                    chat_id, message_id,
-                    text,
-                    {}
-                ))
+        with scan_lock:
+            scan_state["current"] = current
+            scan_state["total"] = total
 
     results, errors = enumerate_domain(domain, progress_callback=progress_callback)
+
+    # Matikan spinner thread
+    with scan_lock:
+        scan_state["active"] = False
 
     if errors:
         _edit_queue.put((
@@ -982,20 +1008,55 @@ def run_sniscan(chat_id, message_id, domain):
 
     import time
     start_time = time.time()
-    last_update = [None]
+
+    # State progres yang dibagikan antara spinner thread dan progress callback
+    scan_state = {
+        "active": True,
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "title": "SNIScan",
+        "target": domain,
+        "current": 0,
+        "total": 0,
+        "start_time": start_time,
+        "spinner_idx": 0,
+    }
+    scan_lock = threading.Lock()
+
+    def _spinner_loop():
+        """Thread mandiri: memutar spinner dan mengupdate progres ke antrian."""
+        while True:
+            with scan_lock:
+                if not scan_state["active"]:
+                    break
+                state = dict(scan_state)
+
+            text = build_progress_text(
+                state["title"], state["target"],
+                state["current"], state["total"],
+                state["start_time"], state["spinner_idx"],
+            )
+            _edit_queue.put((state["chat_id"], state["message_id"], text, {}))
+
+            with scan_lock:
+                scan_state["spinner_idx"] += 1
+
+            time.sleep(0.4)
+
+    # Jalankan spinner thread terpisah (independen dari progres scan)
+    spinner_thread = threading.Thread(target=_spinner_loop, daemon=True)
+    spinner_thread.start()
 
     def progress_callback(current, total):
-        is_final = (current == total)
-        if current % 2 == 0 or is_final:
-            text = build_progress_text("SNIScan", domain, current, total, start_time, last_update, is_final)
-            if text is not None:
-                _edit_queue.put((
-                    chat_id, message_id,
-                    text,
-                    {}
-                ))
+        with scan_lock:
+            scan_state["current"] = current
+            scan_state["total"] = total
 
     results, errors = enumerate_hosts(domain, progress_callback=progress_callback)
+
+    # Matikan spinner thread
+    with scan_lock:
+        scan_state["active"] = False
 
     if errors:
         _edit_queue.put((
@@ -1409,7 +1470,21 @@ def run_cdnscan_target_batch(chat_id, message_id):
     target = targets[index]
     import time
     start_time = time.time()
-    spinner_idx = [0]
+
+    # State progres yang dibagikan antara spinner thread dan progress callback
+    scan_state = {
+        "active": True,
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "title": "CDNScan",
+        "target": f"Target [{index + 1}/{len(targets)}]: {esc(target)}",
+        "current": 0,
+        "total": 0,
+        "start_time": start_time,
+        "spinner_idx": 0,
+    }
+    scan_lock = threading.Lock()
+
     try:
         _edit_queue.put((
             chat_id, message_id,
@@ -1422,7 +1497,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
     # Cek state resume untuk target ini
     state = load_state(target)
     state_offset = state.get('scanned_count', 0) if state else 0
-    if state and state.get('completed'):
+    if state and state.get("completed"):
         # Sudah selesai, tampilkan hasil scan dari file JSON
         OUT_DIR = os.path.join(BASE_DIR, "output")
         safe_name = target.replace("/", "_").replace("-", "_").replace(".", "_")
@@ -1456,27 +1531,49 @@ def run_cdnscan_target_batch(chat_id, message_id):
     results = []
     max_workers = min(30, len(ips))
     c = 0
-    last_update = [None]
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(process_ip, ip): ip for ip in ips}
-        for future in as_completed(futures):
-            ip = futures[future]
-            try:
-                result = future.result()
-                results.append(result)
-            except Exception:
-                results.append((ip, "-", "-", "-"))
-            c += 1
-            is_final = (c == len(ips))
-            if c % 2 == 0 or is_final:
-                text = build_progress_text("CDNScan", f"Target [{index + 1}/{len(targets)}]: {esc(target)}", c, len(ips), start_time, last_update, is_final)
-                if text is not None:
-                    _edit_queue.put((
-                        chat_id, message_id,
-                        text,
-                        {}
-                    ))
+    # Jalankan spinner thread terpisah (independen dari progres scan)
+    def _spinner_loop():
+        while True:
+            with scan_lock:
+                if not scan_state["active"]:
+                    break
+                state_copy = dict(scan_state)
+
+            text = build_progress_text(
+                state_copy["title"], state_copy["target"],
+                state_copy["current"], state_copy["total"],
+                state_copy["start_time"], state_copy["spinner_idx"],
+            )
+            _edit_queue.put((state_copy["chat_id"], state_copy["message_id"], text, {}))
+
+            with scan_lock:
+                scan_state["spinner_idx"] += 1
+
+            time.sleep(0.4)
+
+    spinner_thread = threading.Thread(target=_spinner_loop, daemon=True)
+    spinner_thread.start()
+
+    try:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(process_ip, ip): ip for ip in ips}
+            for future in as_completed(futures):
+                ip = futures[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                except Exception:
+                    results.append((ip, "-", "-", "-"))
+                c += 1
+                with scan_lock:
+                    scan_state["current"] = c
+                    scan_state["total"] = len(ips)
+
+    finally:
+        # Matikan spinner thread
+        with scan_lock:
+            scan_state["active"] = False
 
     results.sort(key=lambda x: ipaddress.ip_address(x[0].split('/')[0] if '/' in x[0] else x[0]))
 
