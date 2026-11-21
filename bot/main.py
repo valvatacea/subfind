@@ -274,7 +274,7 @@ def build_page_text(results, page, mode, title):
     return "\n".join(lines), page, total_pages
 
 
-def kb_page(mode, page, total_pages):
+def kb_page(mode, page, total_pages, back_target=None):
     """Tombol prev / halaman / next + kembali ke menu."""
     m = InlineKeyboardMarkup(row_width=3)
     buttons = []
@@ -284,7 +284,7 @@ def kb_page(mode, page, total_pages):
     if page < total_pages:
         buttons.append(InlineKeyboardButton("Next ⏭️", callback_data=f"page:{mode}:{page + 1}"))
     m.add(*buttons)
-    prev = {"subfind": "menu:subfind", "cdnscan": "menu:cdnscan", "d2ip": "menu:d2ip"}.get(mode, "menu:main")
+    prev = back_target or {"subfind": "menu:subfind", "cdnscan": "menu:cdnscan", "d2ip": "menu:d2ip"}.get(mode, "menu:main")
     m.add(InlineKeyboardButton("↩️ Kembali", callback_data=f"back:{prev}"))
     return m
 
@@ -423,7 +423,7 @@ def show_cdnscan_history_detail(chat_id, message_id, filename, edit=True):
     results = [(item.get("ip", "-"), item.get("ports", "-"), item.get("cdn", "-"), item.get("status", "-")) for item in data]
     save_scan_state(chat_id, "cdnscan", target, results, "CDNScan", page=1)
     info_text = f"✅ <b>Target sudah discan sebelumnya.</b>\nProvider: {provider}\nTotal: {len(data)} data"
-    show_scan_page(chat_id, message_id, edit=True, info_text=info_text)
+    show_scan_page(chat_id, message_id, edit=True, info_text=info_text, back_target="cdnscan:history:1")
 
 
 def get_subfind_history():
@@ -552,7 +552,7 @@ def show_subfind_history_detail(chat_id, message_id, filename, edit=True):
     results = [(item.get("subdomain", "-"), item.get("ip", "-"), item.get("ports", "-"), item.get("status", "-"), item.get("cdn", "-")) for item in data]
     save_scan_state(chat_id, "subfind", target, results, "SubFind", page=1)
     info_text = f"✅ <b>Target sudah discan sebelumnya.</b>\nTotal: {len(data)} subdomain"
-    show_scan_page(chat_id, message_id, edit=True, info_text=info_text)
+    show_scan_page(chat_id, message_id, edit=True, info_text=info_text, back_target="subfind:history:1")
 
 
 def save_scan_state(chat_id, mode, target, results, title, page=1):
@@ -566,9 +566,10 @@ def save_scan_state(chat_id, mode, target, results, title, page=1):
               scan_title=title)
 
 
-def show_scan_page(chat_id, message_id, edit=True, info_text=None):
+def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=None):
     """Tampilkan halaman scan saat ini dari state.
     info_text: teks tambahan yang ditampilkan di atas tabel (misal "sudah discan").
+    back_target: callback_data untuk tombol Kembali (override default).
     """
     st = get_state(chat_id)
     results = st.get("scan_results", [])
@@ -581,7 +582,7 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None):
         text = f"⚠️ <b>{title}</b>\nTidak ada data untuk ditampilkan."
         if info_text:
             text = f"{info_text}\n\n{text}"
-        prev = {"subfind": "menu:subfind", "cdnscan": "menu:cdnscan", "d2ip": "menu:d2ip"}.get(mode, "menu:main")
+        prev = back_target or {"subfind": "menu:subfind", "cdnscan": "menu:cdnscan", "d2ip": "menu:d2ip"}.get(mode, "menu:main")
         try:
             if edit:
                 bot.edit_message_text(text, chat_id, message_id, reply_markup=kb_back(prev))
@@ -597,11 +598,11 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None):
         text = f"{info_text}\n\n{text}"
     try:
         if edit:
-            bot.edit_message_text(text, chat_id, message_id, reply_markup=kb_page(mode, page, total_pages))
+            bot.edit_message_text(text, chat_id, message_id, reply_markup=kb_page(mode, page, total_pages, back_target=back_target))
         else:
-            bot.send_message(chat_id, text, reply_markup=kb_page(mode, page, total_pages))
+            bot.send_message(chat_id, text, reply_markup=kb_page(mode, page, total_pages, back_target=back_target))
     except Exception:
-        bot.send_message(chat_id, text, reply_markup=kb_page(mode, page, total_pages))
+        bot.send_message(chat_id, text, reply_markup=kb_page(mode, page, total_pages, back_target=back_target))
 
 
 # ===================== D2IP (dari d2ip.sh) =====================
