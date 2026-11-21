@@ -189,7 +189,7 @@ def kb_sniscan_menu():
     m = InlineKeyboardMarkup(row_width=2)
     m.add(InlineKeyboardButton("🔍 Scan SNI Host", callback_data="sniscan:search"))
     m.add(InlineKeyboardButton("📜 Riwayat Scan", callback_data="sniscan:history:1"))
-    m.add(InlineKeyboardButton("↩️ Batal", callback_data="back:menu:main"))
+    m.add(InlineKeyboardButton("↩️ Kembali", callback_data="back:menu:main"))
     return m
 
 
