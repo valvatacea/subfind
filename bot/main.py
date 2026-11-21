@@ -308,10 +308,10 @@ def build_page_text(results, page, mode, title):
         for i, r in enumerate(chunk, start=start + 1):
             lines.append(f"{pad_label('SNI Host', 12)}: {esc(r[0])}")
             lines.append(f"{pad_label('Direct IP', 12)}: {esc(r[1])} ({r[6]}ms)")
-            lines.append(f"{pad_label('Status', 12)}: {esc(r[7])}")
             lines.append(f"{pad_label('TLS/ALPN', 12)}: {esc(r[2])} | ALPN: {esc(r[3])}")
             lines.append(f"{pad_label('Port TLS', 12)}: {esc(r[4])}({esc(r[2])})")
             lines.append(f"{pad_label('Port Lain', 12)}: {esc(r[5])}")
+            lines.append(f"{pad_label('Status', 12)}: {esc(r[7])}")
             lines.append("----------------------------------------------")
     elif mode == "d2ip":
         for line in chunk:
