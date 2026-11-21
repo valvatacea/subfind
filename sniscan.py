@@ -221,7 +221,7 @@ def main():
         print(f"Domain tidak valid: {domain}")
         sys.exit(1)
 
-    print(f"═══ SCANSNI (NON-CF & MULTI-PORT): {domain} ═══")
+    print(f"═══ SNISCAN (TLS HANDSHAKE & MULTI-PORT): {domain} ═══")
     print()
 
     results, errors = enumerate_hosts(domain)
@@ -246,7 +246,7 @@ def main():
     # Simpan teks
     fname = f"{OUTPUT_DIR}/sniscan_{domain}.txt"
     with open(fname, 'w') as f:
-        f.write(f"═══ SCANSNI (NON-CF & MULTI-PORT): {domain} ═══\n\n")
+        f.write(f"═══ SNISCAN (TLS HANDSHAKE & MULTI-PORT): {domain} ═══\n\n")
         for r in results:
             extra_str = ",".join(str(p) for p in r["extra_ports"]) if r["extra_ports"] else "-"
             f.write(f"SNI Host  : {r['sni_host']}\n")

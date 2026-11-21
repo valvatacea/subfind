@@ -31,6 +31,9 @@ from subfind import (
     scan_ports_summary, COMMON_PORTS as SUBFIND_PORTS,
     CF_PREFIXES as SUBFIND_CF_PREFIXES, detect_cdn as subfind_detect_cdn,
 )
+from sniscan import (
+    enumerate_hosts,
+)
 from cdnscan import (
     parse_ip_range, process_ip,
     PROVIDER_URLS, get_provider_ips,
@@ -89,6 +92,7 @@ def kb_main():
         InlineKeyboardButton("🌐 D2IP (Domain ➜ IP)", callback_data="menu:d2ip"),
         InlineKeyboardButton("🔍 SubFind (Subdomain)", callback_data="menu:subfind"),
         InlineKeyboardButton("🛡️ CDNScan (CDN/IP)", callback_data="menu:cdnscan"),
+        InlineKeyboardButton("🔍 SNIScan (TLS/IP)", callback_data="menu:sniscan"),
         InlineKeyboardButton("❓ Bantuan", callback_data="menu:help"),
     )
     return m
@@ -176,6 +180,13 @@ def kb_cdnscan_menu():
     return m
 
 
+def kb_sniscan_menu():
+    m = InlineKeyboardMarkup(row_width=2)
+    m.add(InlineKeyboardButton("📜 Riwayat Scan", callback_data="sniscan:history:1"))
+    m.add(InlineKeyboardButton("↩️ Batal", callback_data="back:menu:main"))
+    return m
+
+
 # ===================== PAGINATION HELPER =====================
 def build_page_text(results, page, mode, title):
     """Bangun teks halaman dalam format normal (bukan <pre>).
@@ -219,6 +230,18 @@ def build_page_text(results, page, mode, title):
                 esc(format_ports(ports)),
                 esc(cdn),
                 esc(status),
+            ])
+    elif mode == "sniscan":
+        headers = ["No", "SNI Host", "IP", "TLS", "ALPN", "Port Lain"]
+        rows = []
+        for i, r in enumerate(chunk, start=start + 1):
+            rows.append([
+                f"{i}.",
+                esc(r[0]),  # sni_host
+                esc(r[1]),  # ip
+                esc(r[2]),  # tls_version
+                esc(r[3]),  # alpn
+                esc(r[5]),  # extra_ports_str
             ])
     elif mode == "d2ip":
         for line in chunk:
@@ -605,6 +628,144 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=N
         bot.send_message(chat_id, text, reply_markup=kb_page(mode, page, total_pages, back_target=back_target))
 
 
+# ===================== SNISCAN HISTORY =====================
+def get_sniscan_history():
+    """Baca daftar file hasil scan SNIScan JSON dari output/."""
+    OUT_DIR = os.path.join(BASE_DIR, "output")
+    if not os.path.exists(OUT_DIR):
+        return []
+    files = []
+    for fname in os.listdir(OUT_DIR):
+        if fname.startswith("sniscan_") and fname.endswith(".json"):
+            try:
+                with open(os.path.join(OUT_DIR, fname), 'r') as f:
+                    data = json.load(f)
+                if isinstance(data, list) and len(data) > 0:
+                    first = data[0]
+                    target = first.get("target", fname.replace("sniscan_", "").replace(".json", ""))
+                    count = len(data)
+                else:
+                    target = fname.replace("sniscan_", "").replace(".json", "")
+                    count = 0
+                files.append({
+                    "type": "sniscan",
+                    "target": target,
+                    "count": count,
+                    "file": fname,
+                })
+            except Exception:
+                files.append({
+                    "type": "sniscan",
+                    "target": fname,
+                    "count": 0,
+                    "file": fname,
+                })
+    files.sort(key=lambda x: x["file"], reverse=True)
+    return files
+
+
+def build_sniscan_history_page(page=1, per_page=10):
+    """Bangun teks halaman riwayat SNIScan dengan tombol inline per entri."""
+    files = get_sniscan_history()
+    total = len(files)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * per_page
+    end = start + per_page
+    chunk = files[start:end]
+
+    lines = ["_" * 40, "📜 Riwayat SNIScan", "_" * 40, ""]
+    if not files:
+        lines.append("Belum ada hasil scan SNIScan.")
+    else:
+        lines.append(f"Total: {total} hasil scan")
+    lines.append("")
+    return "\n".join(lines), page, total_pages
+
+
+def show_sniscan_history_page(chat_id, message_id, page, edit=True):
+    """Tampilkan halaman riwayat SNIScan dengan tombol inline per entri."""
+    text, page, total_pages = build_sniscan_history_page(page)
+    kb = InlineKeyboardMarkup(row_width=2)
+
+    files = get_sniscan_history()
+    start = (page - 1) * 10
+    end = start + 10
+    chunk = files[start:end]
+    for item in chunk:
+        label = f"{item['target']} ({item['count']} host)"
+        kb.add(InlineKeyboardButton(label, callback_data=f"sniscan:history:detail:{item['file']}"))
+
+    nav = []
+    if page > 1:
+        nav.append(InlineKeyboardButton("⏮️ Prev", callback_data=f"sniscan:history:{page - 1}"))
+    nav.append(InlineKeyboardButton(f"{page}/{total_pages}", callback_data="sniscan:history:noop"))
+    if page < total_pages:
+        nav.append(InlineKeyboardButton("Next ⏭️", callback_data=f"sniscan:history:{page + 1}"))
+    kb.add(*nav)
+
+    kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="back:menu:sniscan"))
+
+    try:
+        if edit:
+            bot.edit_message_text(text, chat_id, message_id, reply_markup=kb)
+        else:
+            bot.send_message(chat_id, text, reply_markup=kb)
+    except Exception:
+        bot.send_message(chat_id, text, reply_markup=kb)
+
+
+def show_sniscan_history_detail(chat_id, message_id, filename, edit=True):
+    """Tampilkan seluruh data dalam satu list hasil scan SNIScan (dengan paginasi)."""
+    OUT_DIR = os.path.join(BASE_DIR, "output")
+    fpath = os.path.join(OUT_DIR, filename)
+    try:
+        with open(fpath, 'r') as f:
+            data = json.load(f)
+    except Exception:
+        text = "❌ Gagal membaca file hasil scan."
+        kb = InlineKeyboardMarkup(row_width=1)
+        kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="sniscan:history:1"))
+        try:
+            if edit:
+                bot.edit_message_text(text, chat_id, message_id, reply_markup=kb)
+            else:
+                bot.send_message(chat_id, text, reply_markup=kb)
+        except Exception:
+            pass
+        return
+
+    if not data or not isinstance(data, list):
+        text = "❌ Tidak ada data dalam file scan."
+        kb = InlineKeyboardMarkup(row_width=1)
+        kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="sniscan:history:1"))
+        try:
+            if edit:
+                bot.edit_message_text(text, chat_id, message_id, reply_markup=kb)
+            else:
+                bot.send_message(chat_id, text, reply_markup=kb)
+        except Exception:
+            pass
+        return
+
+    target = data[0].get("target", filename) if data else filename
+
+    results = [
+        (
+            item.get("sni_host", "-"),
+            item.get("ip", "-"),
+            item.get("tls_version", "-"),
+            item.get("alpn", "-"),
+            item.get("tls_port", "-"),
+            ",".join(str(p) for p in item.get("extra_ports", [])) if item.get("extra_ports") else "-",
+        )
+        for item in data
+    ]
+    save_scan_state(chat_id, "sniscan", target, results, "SNIScan", page=1)
+    info_text = f"✅ <b>Target sudah discan sebelumnya.</b>\nTotal: {len(data)} host"
+    show_scan_page(chat_id, message_id, edit=True, info_text=info_text, back_target="sniscan:history:1")
+
+
 # ===================== D2IP (dari d2ip.sh) =====================
 def d2ip_resolve_multi(domain):
     """Resolve domain menggunakan multiple resolver seperti d2ip.sh CLI.
@@ -729,7 +890,66 @@ def run_subfind(chat_id, message_id, domain):
     show_scan_page(chat_id, message_id, edit=True)
 
 
-# ===================== CDNSCAN (impor dari cdnscan.py) =====================
+# ===================== SNISCAN (impor dari sniscan.py) =====================
+def run_sniscan(chat_id, message_id, domain):
+    results, errors = enumerate_hosts(domain)
+
+    if errors:
+        try:
+            bot.edit_message_text(
+                f"[!] Provider gagal: {'; '.join(errors)}",
+                chat_id, message_id
+            )
+        except Exception:
+            pass
+
+    if not results:
+        try:
+            bot.edit_message_text(
+                f"⚠️ <b>SNIScan</b>\nTidak ada SNI host ditemukan untuk <b>{esc(domain)}</b>.",
+                chat_id, message_id, reply_markup=kb_back("menu:sniscan")
+            )
+        except Exception:
+            bot.send_message(chat_id, f"⚠️ Tidak ada SNI host ditemukan untuk <b>{esc(domain)}</b>.", reply_markup=kb_back("menu:sniscan"))
+        clear_state(chat_id)
+        return
+
+    # Simpan hasil ke JSON (output/sniscan_<domain>.json)
+    OUT_DIR = os.path.join(BASE_DIR, "output")
+    os.makedirs(OUT_DIR, exist_ok=True)
+    jname = f"{OUT_DIR}/sniscan_{domain}.json"
+    json_data = [
+        {
+            "sni_host": r["sni_host"],
+            "ip": r["ip"],
+            "response_time_ms": r["response_time_ms"],
+            "tls_version": r["tls_version"],
+            "alpn": r["alpn"],
+            "tls_port": r["tls_port"],
+            "extra_ports": r["extra_ports"],
+            "target": domain
+        }
+        for r in results
+    ]
+    with open(jname, 'w') as f:
+        json.dump(json_data, f, indent=2)
+
+    # Konversi ke tuple untuk pagination (sama pola dengan subfind)
+    results_tuples = [
+        (
+            r["sni_host"],
+            r["ip"],
+            r["tls_version"],
+            r["alpn"],
+            r["tls_port"],
+            ",".join(str(p) for p in r["extra_ports"]) if r["extra_ports"] else "-",
+        )
+        for r in results
+    ]
+
+    # Simpan ke state dan tampilkan halaman 1 (pagination)
+    save_scan_state(chat_id, "sniscan", domain, results_tuples, "SNIScan")
+    show_scan_page(chat_id, message_id, edit=True)
 
 
 # ===================== HELP =====================
@@ -738,9 +958,10 @@ HELP_TEXT = (
     "<b>Menu:</b>\n"
     "🌐 D2IP — Resolve domain ke IP. Ketik domain (contoh: google.com).\n"
     "🔍 SubFind — Cari subdomain + IP + port + status + CDN. Ketik domain (contoh: example.com).\n"
-    "🛡️ CDNScan — Deteksi CDN dari IP/CIDR/range atau provider (cloudflare/cloudfront).\n\n"
+    "🛡️ CDNScan — Deteksi CDN dari IP/CIDR/range atau provider (cloudflare/cloudfront).\n"
+    "🔍 SNIScan — Scan SNI host via TLS handshake + deteksi port. Ketik domain (contoh: instagram.com).\n\n"
     "<b>Cara pakai:</b>\n"
-    "1. Klik tombol menu yang diinginkan (D2IP / SubFind / CDNScan)\n"
+    "1. Klik tombol menu yang diinginkan (D2IP / SubFind / CDNScan / SNIScan)\n"
     "2. Ketik domain atau IP/CIDR sesuai yang diminta\n"
     "3. Tunggu scan selesai\n"
     "4. Lihat hasil per halaman dengan tombol Prev / Next\n\n"
@@ -807,6 +1028,13 @@ def cb_handler(call):
         bot.edit_message_text(
             "🛡️ <b>CDNScan — Deteksi CDN</b>\n\nPilih provider atau masukkan IP/CIDR/range secara manual:",
             chat_id, message_id, reply_markup=kb_cdnscan_menu()
+        )
+
+    elif data == "menu:sniscan":
+        set_state(chat_id, mode="sniscan", awaiting="domain", prev_menu="menu:main")
+        bot.edit_message_text(
+            "🔍 <b>SNIScan — TLS Handshake & Multi-Port</b>\n\nPilih opsi di bawah:",
+            chat_id, message_id, reply_markup=kb_sniscan_menu()
         )
 
     elif data.startswith("d2ip:start:"):
@@ -904,6 +1132,15 @@ def cb_handler(call):
             filename = parts[3]
             show_subfind_history_detail(chat_id, message_id, filename, edit=True)
 
+    elif data.startswith("sniscan:history:"):
+        parts = data.split(":")
+        if len(parts) == 3 and parts[2].isdigit():
+            page = int(parts[2])
+            show_sniscan_history_page(chat_id, message_id, page, edit=True)
+        elif len(parts) == 4 and parts[2] == "detail":
+            filename = parts[3]
+            show_sniscan_history_detail(chat_id, message_id, filename, edit=True)
+
     elif data.startswith("cdnscan:limit:"):
         parts = data.split(":")
         # cdnscan:limit:<n>  (targets sudah disimpan di state oleh cdnscan:range:confirm)
@@ -985,6 +1222,12 @@ def cb_handler(call):
             bot.edit_message_text(
                 "🛡️ <b>CDNScan — Deteksi CDN</b>\n\nPilih provider atau masukkan IP/CIDR/range secara manual:",
                 chat_id, message_id, reply_markup=kb_cdnscan_menu()
+            )
+        elif prev_menu == "menu:sniscan":
+            set_state(chat_id, mode="sniscan", awaiting="domain", prev_menu="menu:main")
+            bot.edit_message_text(
+                "🔍 <b>SNIScan — TLS Handshake & Multi-Port</b>\n\nKirim domain yang mau discan SNI-nya (contoh: instagram.com).",
+                chat_id, message_id, reply_markup=kb_back("menu:main")
             )
         elif prev_menu == "cdnscan_provider":
             provider = st.get("cdn_provider", "")
@@ -1246,6 +1489,16 @@ def text_handler(message):
             f"🔢 <b>CDNScan — Limit IP</b>\nTarget: {esc(target)}\nBerapa IP maksimal per batch? (maksimal 1000)",
             chat_id, sent.message_id, reply_markup=kb_limit("menu:cdnscan")
         )
+        return
+
+    if mode == "sniscan" and awaiting == "domain":
+        domain = text.lower().strip()
+        if not re.match(r'^(?!\-)[A-Za-z0-9\-]{1,63}(\.[A-Za-z0-9\-]{1,63})*\.[A-Za-z]{2,}$', domain):
+            bot.send_message(chat_id, "Domain tidak valid. Coba lagi (contoh: instagram.com).")
+            return
+        sent = bot.send_message(chat_id, f"🔍 <b>SNIScan</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...")
+        set_state(chat_id, mode="sniscan", awaiting=None)
+        threading.Thread(target=run_sniscan, args=(chat_id, sent.message_id, domain), daemon=True).start()
         return
 
     # Fallback
