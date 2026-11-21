@@ -118,7 +118,7 @@ def kb_provider():
     m = InlineKeyboardMarkup(row_width=2)
     for name in PROVIDER_URLS:
         m.add(InlineKeyboardButton(f"🌐 {PROVIDER_DISPLAY[name]}", callback_data=f"cdnscan:provider:{name}"))
-    m.add(InlineKeyboardButton("↩️ Batal", callback_data="menu:main"))
+    m.add(InlineKeyboardButton("↩️ Batal", callback_data="back:menu:cdnscan"))
     return m
 
 
@@ -142,18 +142,18 @@ def kb_ranges(ranges, page=1, per_page=8, selected=None):
         nav.append(InlineKeyboardButton("Next ⏭️", callback_data=f"cdnscan:ranges:page:{page+1}"))
     m.add(*nav)
     m.add(InlineKeyboardButton("✅ Scan yang dipilih", callback_data="cdnscan:range:confirm"))
-    m.add(InlineKeyboardButton("↩️ Batal", callback_data="menu:main"))
+    m.add(InlineKeyboardButton("↩️ Batal", callback_data="back:menu:cdnscan"))
     return m
 
 
-def kb_limit():
+def kb_limit(prev_menu="cdnscan:ranges:page"):
     m = InlineKeyboardMarkup(row_width=3)
     m.add(
         InlineKeyboardButton("500", callback_data="cdnscan:limit:500"),
         InlineKeyboardButton("1000", callback_data="cdnscan:limit:1000"),
         InlineKeyboardButton("Semua", callback_data="cdnscan:limit:0"),
         InlineKeyboardButton("🔢 Custom", callback_data="cdnscan:limit:custom"),
-        InlineKeyboardButton("↩️ Batal", callback_data="menu:main"),
+        InlineKeyboardButton("↩️ Batal", callback_data=f"back:{prev_menu}"),
     )
     return m
 
@@ -179,8 +179,9 @@ def kb_cdnscan_menu():
 # ===================== PAGINATION HELPER =====================
 def build_page_text(results, page, mode, title):
     """Bangun teks halaman dalam format normal (bukan <pre>).
-    Judul dan label teks biasa; hanya IP dan PORTS yang <code> (monospace).
-    Pembatas underscore 50 karakter.
+    Label kolom renggang dengan spasi di sekitar '|', garis pembatas
+    menyesuaikan lebar tiap kolom agar nyaman di layar HP.
+    Hanya IP dan PORTS yang <code> (monospace).
     """
     total = len(results)
     per_page = 50 if mode == "d2ip" else ITEM_PER_PAGE
@@ -192,29 +193,82 @@ def build_page_text(results, page, mode, title):
     chunk = results[start:end]
 
     title_line = f"{title} — Halaman {page}/{total_pages} ({total} data)"
-    underline = "_" * 50
+    underline = "_" * 40
 
     lines = [underline, title_line, underline, ""]
 
     if mode == "subfind":
-        lines.append("<b>No</b> | <b>SUBDOMAIN</b> | <b>IP</b> | <b>PORTS</b> | <b>STATUS</b> | <b>CDN</b>")
-        lines.append("-" * 30)
+        headers = ["No", "SUBDOMAIN", "IP", "PORTS", "STATUS", "CDN"]
+        rows = []
         for i, (sub, ip, ports, status, cdn) in enumerate(chunk, start=start + 1):
-            lines.append(
-                f"{i}. {esc(sub)} | <code>{esc(ip)}</code> | <code>{esc(ports)}</code> | "
-                f"{esc(status)} | {esc(cdn)}"
-            )
+            rows.append([
+                str(i),
+                esc(sub),
+                f"<code>{esc(ip)}</code>",
+                f"<code>{esc(ports)}</code>",
+                esc(status),
+                esc(cdn),
+            ])
     elif mode == "cdnscan":
-        lines.append("<b>No</b> | <b>IP</b> | <b>PORTS</b> | <b>CDN</b> | <b>STATUS</b>")
-        lines.append("-" * 30)
+        headers = ["No", "IP", "PORTS", "CDN", "STATUS"]
+        rows = []
         for i, (ip, ports, cdn, status) in enumerate(chunk, start=start + 1):
-            lines.append(
-                f"{i}. <code>{esc(ip)}</code> | <code>{esc(format_ports(ports))}</code> | "
-                f"{esc(cdn)} | {esc(status)}"
-            )
+            rows.append([
+                str(i),
+                f"<code>{esc(ip)}</code>",
+                f"<code>{esc(format_ports(ports))}</code>",
+                esc(cdn),
+                esc(status),
+            ])
     elif mode == "d2ip":
         for line in chunk:
             lines.append(line)
+        return "\n".join(lines), page, total_pages
+    else:
+        headers = ["No"]
+        rows = [[str(i)] for i in range(start + 1, start + 1 + len(chunk))]
+
+    # Hitung lebar kolom berdasarkan header dan data (hapus tag HTML untuk perhitungan)
+    import re
+    strip_re = re.compile(r"<[^>]+>")
+    col_widths = []
+    for col_idx, header in enumerate(headers):
+        values = [header] + [r[col_idx] for r in rows]
+        max_w = max(len(strip_re.sub("", v)) for v in values)
+        col_widths.append(max_w)
+
+    # Header baris: label dengan spasi di sekitar '|'
+    header_cells = [f"<b>{h}</b>" for h in headers]
+    header_line = " | ".join(
+        f" {header_cells[idx].strip()} "
+        for idx in range(len(headers))
+    )
+    # Hitung ulang lebar header setelah spasi tambahan
+    header_cells_plain = [f" {h} " for h in headers]
+    col_widths = [max(w, len(h)) for w, h in zip(col_widths, header_cells_plain)]
+
+    # Bangun header ulang dengan lebar yang dihitung
+    header_line = " | ".join(
+        f" {header_cells[idx]} " + " " * (col_widths[idx] - len(strip_re.sub("", header_cells[idx])))
+        for idx in range(len(headers))
+    ).rstrip()
+
+    lines.append(header_line)
+
+    # Garis pembatas menyesuaikan lebar tiap kolom
+    sep_cells = ["-" * w for w in col_widths]
+    sep_line = "-+-".join(sep_cells)
+    lines.append(sep_line)
+    lines.append("")
+
+    # Baris data dengan spasi di sekitar '|'
+    for row in rows:
+        cells = []
+        for idx, val in enumerate(row):
+            plain = strip_re.sub("", val)
+            cells.append(val + " " * (col_widths[idx] - len(plain)))
+        line = " | ".join(f" {cell} " for cell in cells).rstrip()
+        lines.append(line)
 
     return "\n".join(lines), page, total_pages
 
@@ -228,6 +282,7 @@ def kb_page(mode, page, total_pages):
     buttons.append(InlineKeyboardButton(f"{page}/{total_pages}", callback_data="page:noop"))
     if page < total_pages:
         buttons.append(InlineKeyboardButton("Next ⏭️", callback_data=f"page:{mode}:{page + 1}"))
+    m.add(*buttons)
     prev = {"subfind": "menu:subfind", "cdnscan": "menu:cdnscan", "d2ip": "menu:d2ip"}.get(mode, "menu:main")
     m.add(InlineKeyboardButton("↩️ Kembali", callback_data=f"back:{prev}"))
     return m
@@ -874,8 +929,11 @@ def text_handler(message):
             threading.Thread(target=fetch_provider_ranges, args=(chat_id, sent.message_id, target.lower()), daemon=True).start()
             return
         sent = bot.send_message(chat_id, f"🛡️ <b>CDNScan</b>\nMemproses target <b>{esc(target)}</b>...")
-        set_state(chat_id, mode="cdnscan", awaiting=None, cdn_targets=[target], cdn_limit=0, cdn_target_index=0)
-        threading.Thread(target=run_cdnscan_target_batch, args=(chat_id, sent.message_id), daemon=True).start()
+        set_state(chat_id, mode="cdnscan_limit", awaiting=None, cdn_targets=[target], cdn_limit=0, cdn_target_index=0)
+        bot.edit_message_text(
+            f"🔢 <b>CDNScan — Limit IP</b>\nTarget: {esc(target)}\nBerapa IP maksimal per batch? (maksimal 1000)",
+            chat_id, sent.message_id, reply_markup=kb_limit("menu:cdnscan")
+        )
         return
 
     # Fallback
