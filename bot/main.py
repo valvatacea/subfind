@@ -1611,13 +1611,18 @@ def run_cdnscan_target_batch(chat_id, message_id):
     if not completed:
         # Masih ada sisa IP di target ini, jangan lanjut ke target berikutnya.
         # Tampilkan progres dan beri opsi lanjut.
+        # Hitung total IP dan sisa untuk ditampilkan
+        all_ips = parse_ip_range(target)
+        total_ips = len(all_ips) if all_ips else 0
+        sisa_ips = max(0, total_ips - new_offset)
+
         st = get_state(chat_id)
         prev_menu = st.get("prev_menu", "menu:cdnscan")
         set_state(chat_id, cdn_target_index=index)
         _edit_queue.put((
             chat_id, message_id,
             f"⏸️ <b>CDNScan jeda</b>\nTarget [{index + 1}/{len(targets)}]: <b>{esc(target)}</b>\n"
-            f"Sudah discan: {new_offset} IP, masih ada sisa.\nKlik Next untuk melanjutkan target ini.",
+            f"Sudah discan: {new_offset} IP, sisa: {sisa_ips} IP.\nKlik Next untuk melanjutkan target ini.",
             {"reply_markup": kb_next_target(prev_menu)}
         ))
         return
