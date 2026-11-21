@@ -182,6 +182,7 @@ def kb_cdnscan_menu():
 
 def kb_sniscan_menu():
     m = InlineKeyboardMarkup(row_width=2)
+    m.add(InlineKeyboardButton("🔍 Scan SNI Host", callback_data="sniscan:search"))
     m.add(InlineKeyboardButton("📜 Riwayat Scan", callback_data="sniscan:history:1"))
     m.add(InlineKeyboardButton("↩️ Batal", callback_data="back:menu:main"))
     return m
@@ -1031,10 +1032,17 @@ def cb_handler(call):
         )
 
     elif data == "menu:sniscan":
-        set_state(chat_id, mode="sniscan", awaiting="domain", prev_menu="menu:main")
+        set_state(chat_id, mode="sniscan", awaiting=None, prev_menu="menu:main")
         bot.edit_message_text(
             "🔍 <b>SNIScan — TLS Handshake & Multi-Port</b>\n\nPilih opsi di bawah:",
             chat_id, message_id, reply_markup=kb_sniscan_menu()
+        )
+
+    elif data == "sniscan:search":
+        set_state(chat_id, mode="sniscan", awaiting="domain", prev_menu="menu:sniscan")
+        bot.edit_message_text(
+            "🔍 <b>SNIScan — Domain ➜ SNI</b>\n\nKirim domain yang mau discan SNI-nya (contoh: instagram.com).",
+            chat_id, message_id, reply_markup=kb_back("menu:sniscan")
         )
 
     elif data.startswith("d2ip:start:"):
@@ -1224,10 +1232,10 @@ def cb_handler(call):
                 chat_id, message_id, reply_markup=kb_cdnscan_menu()
             )
         elif prev_menu == "menu:sniscan":
-            set_state(chat_id, mode="sniscan", awaiting="domain", prev_menu="menu:main")
+            set_state(chat_id, mode="sniscan", awaiting=None, prev_menu="menu:main")
             bot.edit_message_text(
-                "🔍 <b>SNIScan — TLS Handshake & Multi-Port</b>\n\nKirim domain yang mau discan SNI-nya (contoh: instagram.com).",
-                chat_id, message_id, reply_markup=kb_back("menu:main")
+                "🔍 <b>SNIScan — TLS Handshake & Multi-Port</b>\n\nPilih opsi di bawah:",
+                chat_id, message_id, reply_markup=kb_sniscan_menu()
             )
         elif prev_menu == "cdnscan_provider":
             provider = st.get("cdn_provider", "")
