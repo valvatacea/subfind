@@ -16,18 +16,32 @@ Kumpulan skrip CLI untuk mencari subdomain, mengubah domain menjadi IP, dan memi
 | **Batas IP per Scan** | Maksimal 3000 IP per batch (dapat diubah) |
 | **Output** | Teks (`.txt`) dan JSON (`.json`) di folder `output/` |
 | **CLI Args** | Opsi non-interaktif (`-l`, `-d`, `-f`, `-y`) |
+| **Validasi Domain** | Validasi domain terpusat di `common/validators.py` |
 
 ## Struktur Repo
 
 ```
 /root/subfind/
-├── cdnscan.py        # Scanner rentang IP + deteksi CDN + status HTTP
-├── subfind.py        # Subdomain finder + IP + CDN
-├── d2ip.sh           # Resolver domain ke IP
-├── .gitignore        # output/ dan __pycache__ diabaikan Git
-├── output/           # Hasil scan (disimpan di sini, tidak di-commit)
+├── bot/                    # Telegram bot (D2IP / SubFind / CDNScan / SNIScan)
+│   ├── main.py             # Bot Telegram dengan menu inline dan pagination
+│   ├── __init__.py
+│   ├── .env                # BOT_TOKEN (jangan di-commit)
+│   ├── .env.example        # Contoh .env
+│   ├── requirements.txt
+│   ├── setup_profile.py
+│   ├── setup_profile_photo.py
+│   └── setup_profile_photo_ptb.py
+├── cdnscan.py              # Scanner rentang IP + deteksi CDN + status HTTP
+├── common/                 # Modul bersama (validasi domain, dll.)
+│   ├── __init__.py
+│   └── validators.py       # Fungsi validate_domain()
+├── d2ip.sh                 # Resolver domain ke IP
+├── .gitignore              # output/, __pycache__, .env, .venv diabaikan Git
+├── output/                 # Hasil scan (disimpan di sini, tidak di-commit)
 │   └── cdnscan_*.txt / .json
-└── README.md         # Dokumentasi ini
+├── sniscan.py              # SNI Host Scanner + TLS Detector + Multi-Port Scan
+├── subfind.py              # Subdomain finder + IP + CDN
+└── README.md               # Dokumentasi ini
 ```
 
 ## Persyaratan
@@ -79,15 +93,22 @@ python3 cdnscan.py 104.16.0.0/24 -l 500 -d 0.3 -f both -y
 | `--yes` | `-y` | Konfirmasi otomatis semua prompt (non-interaktif) |
 
 **Output:**
-- `output/cdnscan_<cidr>.txt` — Tabel pipe-delimited: `ip|ports|cdn|status`
-- `output/cdnscan_<cidr>.json` — JSON array dengan kunci `ip`, `ports`, `cdn`, `status`
+- `output/cdnscan_<cidr>.txt` — Blok key-value: `IP / PORTS / CDN / STATUS`
+- `output/cdnscan_<cidr>.json` — JSON array dengan kunci `ip`, `ports`, `cdn`, `status`, `target`, `provider`
 
 **Contoh output teks:**
 ```
-IP          PORTS  CDN        STATUS
--------------------------------------------
-1.1.1.1     80,443 Cloudflare 200
-1.1.1.2     80,443 Cloudflare 200
+═══ CDNSCAN: 104.16.0.0/24 ═══
+
+IP          : 104.16.0.1
+PORTS       : 80,443
+CDN         : Cloudflare
+Status      : 200
+----------------------------------------------
+IP          : 104.16.0.2
+PORTS       : 80,443
+CDN         : Cloudflare
+Status      : 200
 ```
 
 ### 2. subfind.py — Subdomain Finder + IP + CDN
@@ -108,8 +129,48 @@ Fitur:
 - Port scan dan deteksi CDN pada setiap subdomain
 - Tampilan progres in-place (update baris yang sama)
 - Export ke format JSON
+- Validasi domain melalui `common/validators.py`
 
-### 3. d2ip.sh — Resolver Domain ke IP
+**Output:**
+- `output/subfind_<domain>.txt` — Blok key-value: `Subdomain / IP / PORTS / STATUS / CDN`
+- `output/subfind_<domain>.json` — JSON array dengan kunci `subdomain`, `ip`, `ports`, `status`, `cdn`, `target`
+
+### 3. sniscan.py — SNI Host Scanner + TLS Detector + Multi-Port Scan
+
+```bash
+python3 sniscan.py <domain>
+```
+
+**Contoh:**
+```bash
+python3 sniscan.py instagram.com
+```
+
+Fitur:
+- Cari subdomain/SNI host via crt.sh dengan fallback HackerTarget + wordlist
+- Resolve IP untuk setiap subdomain
+- TLS handshake dengan SNI (deteksi versi TLS dan ALPN)
+- Scan port tambahan (8443, 2053, 2083, 2087, 2096, 444, 777, 80, 8080, 22, 109, 143, 442)
+- Threading untuk pemrosesan paralel
+- Validasi domain melalui `common/validators.py`
+
+**Output:**
+- `output/sniscan_<domain>.txt` — Blok key-value: `SNI Host / Direct IP / TLS/ALPN / Port TLS / Port Lain`
+- `output/sniscan_<domain>.json` — JSON array dengan kunci `sni_host`, `ip`, `response_time_ms`, `tls_version`, `alpn`, `tls_port`, `extra_ports`, `target`
+
+**Contoh output teks:**
+```
+═══ SNISCAN (TLS HANDSHAKE & MULTI-PORT): instagram.com ═══
+
+SNI Host    : admin.instagram.com
+Direct IP   : 57.144.100.134 (64ms)
+TLS/ALPN    : TLSv1.3 | ALPN: h2
+Port TLS    : 443(TLSv1.3)
+Port Lain   : 80
+----------------------------------------------
+```
+
+### 4. d2ip.sh — Resolver Domain ke IP
 
 ```bash
 ./d2ip.sh <domain>
@@ -152,6 +213,10 @@ Semua hasil disimpan di folder `output/` (tidak di-commit ke Git karena sudah ad
 output/
 ├── cdnscan_104_16_0_0_24.txt
 ├── cdnscan_104_16_0_0_24.json
+├── subfind_*.txt
+├── subfind_*.json
+├── sniscan_*.txt
+├── sniscan_*.json
 ├── states/
 │   └── cdnscan_104_16_0_0_24.json
 └── ipranges/
@@ -159,8 +224,12 @@ output/
     └── cloudfront.json
 ```
 
-- `output/cdnscan_*.txt` — Hasil scan dalam format teks
+- `output/cdnscan_*.txt` — Hasil scan dalam format teks (blok key-value)
 - `output/cdnscan_*.json` — Hasil scan dalam format JSON
+- `output/subfind_*.txt` — Hasil scan subdomain dalam format teks (blok key-value)
+- `output/subfind_*.json` — Hasil scan subdomain dalam format JSON
+- `output/sniscan_*.txt` — Hasil scan SNI dalam format teks (blok key-value)
+- `output/sniscan_*.json` — Hasil scan SNI dalam format JSON
 - `output/states/*.json` — State progres resume per rentang
 - `output/ipranges/*.json` — Cache IP range provider (7 hari)
 
@@ -197,4 +266,4 @@ Proprietari / Internal — untuk penggunaan pribadi dan bisnis terkait jasa VPN/
 ---
 
 Dibuat untuk kebutuhan deteksi infrastruktur CDN dan pemetaan subdomain.  
-Repo: `valvatacea/subfind` (private)
+Repo: [valvatacea/subfind](https://github.com/valvatacea/subfind) (private)
