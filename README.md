@@ -196,5 +196,5 @@ Proprietari / Internal — untuk penggunaan pribadi dan bisnis terkait jasa VPN/
 
 ---
 
-Dibuat untuk kebutuhan deteksi infrastruktur CDN dan pemetaan subdomain.  
-Repo: `valvatacea/subfind` (private)
+Dibuat untuk kebutuhan deteksi infrastruktur CDN dan pemetaan subdomain. 
+Repo: [valvatacea/subfind](https://github.com/valvatacea/subfind) (private)
