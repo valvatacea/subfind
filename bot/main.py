@@ -1255,6 +1255,8 @@ def cb_handler(call):
             show_cdnscan_history_page(chat_id, message_id, 1, edit=True)
         elif prev_menu == "subfind:history:1":
             show_subfind_history_page(chat_id, message_id, 1, edit=True)
+        elif prev_menu == "sniscan:history:1":
+            show_sniscan_history_page(chat_id, message_id, 1, edit=True)
         else:
             # Fallback ke menu utama
             clear_state(chat_id)
