@@ -172,6 +172,7 @@ def kb_cdnscan_menu():
     for name in PROVIDER_URLS:
         m.add(InlineKeyboardButton(f"🌐 {PROVIDER_DISPLAY[name]}", callback_data=f"cdnscan:provider:{name}"))
     m.add(InlineKeyboardButton("✏️ Masukkan IP/CIDR sendiri", callback_data="cdnscan:manual"))
+    m.add(InlineKeyboardButton("📜 Riwayat Scan", callback_data="cdnscan:history:1"))
     m.add(InlineKeyboardButton("↩️ Batal", callback_data="menu:main"))
     return m
 
@@ -288,6 +289,314 @@ def kb_page(mode, page, total_pages):
     return m
 
 
+
+
+# ===================== HISTORY =====================
+def get_cdnscan_history():
+    """Baca daftar file hasil scan CDNScan JSON dari output/."""
+    OUT_DIR = os.path.join(BASE_DIR, "output")
+    if not os.path.exists(OUT_DIR):
+        return []
+    files = []
+    for fname in os.listdir(OUT_DIR):
+        if fname.startswith("cdnscan_") and fname.endswith(".json"):
+            try:
+                with open(os.path.join(OUT_DIR, fname), 'r') as f:
+                    data = json.load(f)
+                if isinstance(data, list) and len(data) > 0:
+                    first = data[0]
+                    target = first.get("target", fname.replace("cdnscan_", "").replace(".json", ""))
+                    provider = first.get("provider", "-")
+                    count = len(data)
+                else:
+                    target = fname.replace("cdnscan_", "").replace(".json", "")
+                    provider = "-"
+                    count = 0
+                files.append({
+                    "type": "cdnscan",
+                    "target": target,
+                    "provider": provider,
+                    "count": count,
+                    "file": fname,
+                })
+            except Exception:
+                files.append({
+                    "type": "cdnscan",
+                    "target": fname,
+                    "provider": "-",
+                    "count": 0,
+                    "file": fname,
+                })
+    files.sort(key=lambda x: x["file"], reverse=True)
+    return files
+
+
+def build_cdnscan_history_page(page=1, per_page=10):
+    """Bangun teks halaman riwayat CDNScan dengan tombol inline per entri."""
+    files = get_cdnscan_history()
+    total = len(files)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * per_page
+    end = start + per_page
+    chunk = files[start:end]
+
+    lines = ["_" * 40, "📜 Riwayat CDNScan", "_" * 40, ""]
+    if not files:
+        lines.append("Belum ada hasil scan CDNScan.")
+    else:
+        lines.append(f"Total: {total} hasil scan")
+        lines.append("")
+        for item in chunk:
+            lines.append(f"• {item['target']} ({item['provider']})")
+
+    lines.append("")
+    return "\n".join(lines), page, total_pages
+
+
+def show_cdnscan_history_page(chat_id, message_id, page, edit=True):
+    """Tampilkan halaman riwayat CDNScan dengan tombol inline per entri."""
+    text, page, total_pages = build_cdnscan_history_page(page)
+    kb = InlineKeyboardMarkup(row_width=2)
+
+    files = get_cdnscan_history()
+    per_page = 10
+    start = (page - 1) * per_page
+    end = start + 10
+    chunk = files[start:end]
+    for item in chunk:
+        label = f"{item['target']} ({item['provider']})"
+        kb.add(InlineKeyboardButton(label, callback_data=f"cdnscan:history:detail:{item['file']}"))
+
+    nav = []
+    if page > 1:
+        nav.append(InlineKeyboardButton("⏮️ Prev", callback_data=f"cdnscan:history:{page - 1}"))
+    nav.append(InlineKeyboardButton(f"{page}/{total_pages}", callback_data="cdnscan:history:noop"))
+    if page < total_pages:
+        nav.append(InlineKeyboardButton("Next ⏭️", callback_data=f"cdnscan:history:{page + 1}"))
+    kb.add(*nav)
+
+    kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="back:menu:cdnscan"))
+
+    try:
+        if edit:
+            bot.edit_message_text(text, chat_id, message_id, reply_markup=kb)
+        else:
+            bot.send_message(chat_id, text, reply_markup=kb)
+    except Exception:
+        bot.send_message(chat_id, text, reply_markup=kb)
+
+
+def show_cdnscan_history_detail(chat_id, message_id, filename, edit=True):
+    """Tampilkan seluruh data dalam satu list hasil scan CDNScan."""
+    OUT_DIR = os.path.join(BASE_DIR, "output")
+    fpath = os.path.join(OUT_DIR, filename)
+    try:
+        with open(fpath, 'r') as f:
+            data = json.load(f)
+    except Exception:
+        text = "❌ Gagal membaca file hasil scan."
+        kb = InlineKeyboardMarkup(row_width=1)
+        kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="cdnscan:history:1"))
+        try:
+            if edit:
+                bot.edit_message_text(text, chat_id, message_id, reply_markup=kb)
+            else:
+                bot.send_message(chat_id, text, reply_markup=kb)
+        except Exception:
+            pass
+        return
+
+    if not data or not isinstance(data, list):
+        text = "❌ Tidak ada data dalam file scan."
+        kb = InlineKeyboardMarkup(row_width=1)
+        kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="cdnscan:history:1"))
+        try:
+            if edit:
+                bot.edit_message_text(text, chat_id, message_id, reply_markup=kb)
+            else:
+                bot.send_message(chat_id, text, reply_markup=kb)
+        except Exception:
+            pass
+        return
+
+    target = data[0].get("target", filename) if data else filename
+    provider = data[0].get("provider", "-") if data else "-"
+
+    lines = ["_" * 40, f"📋 Riwayat: {target}", "_" * 40, ""]
+    lines.append(f"Provider: {provider}")
+    lines.append(f"Total: {len(data)} data")
+    lines.append("")
+    for item in data:
+        ip = item.get("ip", "-")
+        ports = item.get("ports", "-")
+        cdn = item.get("cdn", "-")
+        status = item.get("status", "-")
+        lines.append(f"{ip} | {ports} | {cdn} | {status}")
+
+    lines.append("")
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="cdnscan:history:1"))
+
+    text = "\n".join(lines)
+    try:
+        if edit:
+            bot.edit_message_text(text, chat_id, message_id, reply_markup=kb)
+        else:
+            bot.send_message(chat_id, text, reply_markup=kb)
+    except Exception:
+        bot.send_message(chat_id, text, reply_markup=kb)
+
+
+def get_subfind_history():
+    """Baca daftar file hasil scan SubFind JSON dari output/."""
+    OUT_DIR = os.path.join(BASE_DIR, "output")
+    if not os.path.exists(OUT_DIR):
+        return []
+    files = []
+    for fname in os.listdir(OUT_DIR):
+        if fname.startswith("subfind_") and fname.endswith(".json"):
+            try:
+                with open(os.path.join(OUT_DIR, fname), 'r') as f:
+                    data = json.load(f)
+                if isinstance(data, list) and len(data) > 0:
+                    first = data[0]
+                    target = first.get("target", fname.replace("subfind_", "").replace(".json", ""))
+                    count = len(data)
+                else:
+                    target = fname.replace("subfind_", "").replace(".json", "")
+                    count = 0
+                files.append({
+                    "type": "subfind",
+                    "target": target,
+                    "count": count,
+                    "file": fname,
+                })
+            except Exception:
+                files.append({
+                    "type": "subfind",
+                    "target": fname,
+                    "count": 0,
+                    "file": fname,
+                })
+    files.sort(key=lambda x: x["file"], reverse=True)
+    return files
+
+
+def build_subfind_history_page(page=1, per_page=10):
+    """Bangun teks halaman riwayat SubFind dengan tombol inline per entri."""
+    files = get_subfind_history()
+    total = len(files)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * per_page
+    end = start + per_page
+    chunk = files[start:end]
+
+    lines = ["_" * 40, "📜 Riwayat SubFind", "_" * 40, ""]
+    if not files:
+        lines.append("Belum ada hasil scan SubFind.")
+    else:
+        lines.append(f"Total: {total} hasil scan")
+        lines.append("")
+        for item in chunk:
+            lines.append(f"• {item['target']} ({item['count']} subdomain)")
+
+    lines.append("")
+    return "\n".join(lines), page, total_pages
+
+
+def show_subfind_history_page(chat_id, message_id, page, edit=True):
+    """Tampilkan halaman riwayat SubFind dengan tombol inline per entri."""
+    text, page, total_pages = build_subfind_history_page(page)
+    kb = InlineKeyboardMarkup(row_width=2)
+
+    files = get_subfind_history()
+    per_page = 10
+    start = (page - 1) * per_page
+    end = start + 10
+    chunk = files[start:end]
+    for item in chunk:
+        label = f"{item['target']} ({item['count']} subdomain)"
+        kb.add(InlineKeyboardButton(label, callback_data=f"subfind:history:detail:{item['file']}"))
+
+    nav = []
+    if page > 1:
+        nav.append(InlineKeyboardButton("⏮️ Prev", callback_data=f"subfind:history:{page - 1}"))
+    nav.append(InlineKeyboardButton(f"{page}/{total_pages}", callback_data="subfind:history:noop"))
+    if page < total_pages:
+        nav.append(InlineKeyboardButton("Next ⏭️", callback_data=f"subfind:history:{page + 1}"))
+    kb.add(*nav)
+
+    kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="back:menu:subfind"))
+
+    try:
+        if edit:
+            bot.edit_message_text(text, chat_id, message_id, reply_markup=kb)
+        else:
+            bot.send_message(chat_id, text, reply_markup=kb)
+    except Exception:
+        bot.send_message(chat_id, text, reply_markup=kb)
+
+
+def show_subfind_history_detail(chat_id, message_id, filename, edit=True):
+    """Tampilkan seluruh data dalam satu list hasil scan SubFind."""
+    OUT_DIR = os.path.join(BASE_DIR, "output")
+    fpath = os.path.join(OUT_DIR, filename)
+    try:
+        with open(fpath, 'r') as f:
+            data = json.load(f)
+    except Exception:
+        text = "❌ Gagal membaca file hasil scan."
+        kb = InlineKeyboardMarkup(row_width=1)
+        kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="subfind:history:1"))
+        try:
+            if edit:
+                bot.edit_message_text(text, chat_id, message_id, reply_markup=kb)
+            else:
+                bot.send_message(chat_id, text, reply_markup=kb)
+        except Exception:
+            pass
+        return
+
+    if not data or not isinstance(data, list):
+        text = "❌ Tidak ada data dalam file scan."
+        kb = InlineKeyboardMarkup(row_width=1)
+        kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="subfind:history:1"))
+        try:
+            if edit:
+                bot.edit_message_text(text, chat_id, message_id, reply_markup=kb)
+            else:
+                bot.send_message(chat_id, text, reply_markup=kb)
+        except Exception:
+            pass
+        return
+
+    target = data[0].get("target", filename) if data else filename
+
+    lines = ["_" * 40, f"📋 Riwayat: {target}", "_" * 40, ""]
+    lines.append(f"Total: {len(data)} subdomain")
+    lines.append("")
+    for item in data:
+        sub = item.get("subdomain", "-")
+        ip = item.get("ip", "-")
+        ports = item.get("ports", "-")
+        status = item.get("status", "-")
+        cdn = item.get("cdn", "-")
+        lines.append(f"{sub} | {ip} | {ports} | {status} | {cdn}")
+
+    lines.append("")
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="subfind:history:1"))
+
+    text = "\n".join(lines)
+    try:
+        if edit:
+            bot.edit_message_text(text, chat_id, message_id, reply_markup=kb)
+        else:
+            bot.send_message(chat_id, text, reply_markup=kb)
+    except Exception:
+        bot.send_message(chat_id, text, reply_markup=kb)
 
 
 def save_scan_state(chat_id, mode, target, results, title, page=1):
@@ -454,7 +763,7 @@ def run_subfind(chat_id, message_id, domain):
     OUT_DIR = os.path.join(BASE_DIR, "output")
     os.makedirs(OUT_DIR, exist_ok=True)
     jname = f"{OUT_DIR}/subfind_{domain}.json"
-    json_data = [{"subdomain": r[0], "ip": r[1], "ports": r[2], "status": r[3], "cdn": r[4]} for r in results]
+    json_data = [{"subdomain": r[0], "ip": r[1], "ports": r[2], "status": r[3], "cdn": r[4], "target": domain} for r in results]
     with open(jname, 'w') as f:
         json.dump(json_data, f, indent=2)
 
@@ -529,6 +838,7 @@ def cb_handler(call):
         set_state(chat_id, mode="subfind", awaiting="domain", prev_menu="menu:main")
         kb = InlineKeyboardMarkup(row_width=2)
         kb.add(InlineKeyboardButton("🔍 Cari Subdomain", callback_data="subfind:search"))
+        kb.add(InlineKeyboardButton("📜 Riwayat Scan", callback_data="subfind:history:1"))
         kb.add(InlineKeyboardButton("↩️ Kembali", callback_data="back:menu:main"))
         bot.edit_message_text(
             "🔍 <b>SubFind — Subdomain Enumeration</b>\n\nPilih opsi di bawah:",
@@ -618,6 +928,24 @@ def cb_handler(call):
                 f"🛡️ <b>CDNScan — Limit IP</b>\nTarget: {esc(target_display)}\nBerapa IP maksimal per batch? (maksimal 1000)",
                 chat_id, message_id, reply_markup=kb_limit()
             )
+
+    elif data.startswith("cdnscan:history:"):
+        parts = data.split(":")
+        if len(parts) == 3 and parts[2].isdigit():
+            page = int(parts[2])
+            show_cdnscan_history_page(chat_id, message_id, page, edit=True)
+        elif len(parts) == 4 and parts[2] == "detail":
+            filename = parts[3]
+            show_cdnscan_history_detail(chat_id, message_id, filename, edit=True)
+
+    elif data.startswith("subfind:history:"):
+        parts = data.split(":")
+        if len(parts) == 3 and parts[2].isdigit():
+            page = int(parts[2])
+            show_subfind_history_page(chat_id, message_id, page, edit=True)
+        elif len(parts) == 4 and parts[2] == "detail":
+            filename = parts[3]
+            show_subfind_history_detail(chat_id, message_id, filename, edit=True)
 
     elif data.startswith("cdnscan:limit:"):
         parts = data.split(":")
@@ -829,7 +1157,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
     os.makedirs(OUT_DIR, exist_ok=True)
     safe_name = target.replace("/", "_").replace("-", "_").replace(".", "_")
     jname = f"{OUT_DIR}/cdnscan_{safe_name}.json"
-    json_data = [{"ip": r[0], "ports": r[1], "cdn": r[2], "status": r[3]} for r in results]
+    json_data = [{"ip": r[0], "ports": r[1], "cdn": r[2], "status": r[3], "target": target, "provider": st.get("cdn_provider", "manual")} for r in results]
     with open(jname, 'w') as f:
         json.dump(json_data, f, indent=2)
 

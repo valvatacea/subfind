@@ -546,7 +546,7 @@ def main():
             range_safe = cidr.replace("/", "_").replace("-", "_").replace(".", "_")
             tsname = f"{provider_name}_{range_safe}"
             tfname = f"{SCAN_DIR}/cdnscan_{tsname}.txt"
-            targets.append((cidr, cidr, user_limit, tfname, tsname))
+            targets.append((cidr, cidr, user_limit, tfname, tsname, provider_name))
             print(f"    Target ditambahkan: {cidr} -> {tfname}")
     else:
         # Manual input (CIDR, range, atau IP tunggal)
@@ -576,7 +576,7 @@ def main():
                     user_limit = None
 
         tfname = f"{SCAN_DIR}/cdnscan_{safe_name}.txt"
-        targets.append((input_str, input_str, user_limit, tfname, safe_name))
+        targets.append((input_str, input_str, user_limit, tfname, safe_name, "manual"))
 
     # Konfirmasi sebelum memulai scan
     print(f"\n[?] Akan memproses {len(targets)} target.")
@@ -587,7 +587,7 @@ def main():
 
     print("Memproses dengan threading...\n")
 
-    for label, cidr_str, user_limit, fname, safe_name in targets:
+    for label, cidr_str, user_limit, fname, safe_name, provider in targets:
         # Cek state resume + anti-duplikasi dari file output
         state = load_state(cidr_str)
         state_offset = state.get('scanned_count', 0) if state else 0
@@ -698,7 +698,9 @@ def main():
                     "ip": ip,
                     "ports": ports,
                     "cdn": cdn,
-                    "status": status
+                    "status": status,
+                    "target": cidr_str,
+                    "provider": provider
                 })
             try:
                 with open(jname, 'w') as f:

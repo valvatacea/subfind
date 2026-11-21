@@ -433,7 +433,8 @@ def main():
             "ip": ip,
             "ports": ports,
             "status": status,
-            "cdn": cdn
+            "cdn": cdn,
+            "target": domain
         })
     with open(jname, 'w') as f:
         json.dump(json_data, f, indent=2)
