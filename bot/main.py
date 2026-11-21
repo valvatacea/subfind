@@ -592,6 +592,9 @@ def get_sniscan_history():
                     first = data[0]
                     target = first.get("target", fname.replace("sniscan_", "").replace(".json", ""))
                     count = len(data)
+                elif isinstance(data, dict):
+                    target = data.get("target", data.get("domain", fname.replace("sniscan_", "").replace(".json", "")))
+                    count = len(data.get("results", []))
                 else:
                     target = fname.replace("sniscan_", "").replace(".json", "")
                     count = 0
