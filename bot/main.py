@@ -586,7 +586,10 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=N
         prev = back_target or {"subfind": "menu:subfind", "cdnscan": "menu:cdnscan", "d2ip": "menu:d2ip"}.get(mode, "menu:main")
         try:
             if edit:
-                bot.edit_message_text(text, chat_id, message_id, reply_markup=kb_back(prev))
+                _edit_queue.put((
+                    chat_id, message_id, text,
+                    {"reply_markup": kb_back(prev)}
+                ))
             else:
                 bot.send_message(chat_id, text, reply_markup=kb_back(prev))
         except Exception:
@@ -599,7 +602,10 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=N
         text = f"{info_text}\n\n{text}"
     try:
         if edit:
-            bot.edit_message_text(text, chat_id, message_id, reply_markup=kb_page(mode, page, total_pages, back_target=back_target))
+            _edit_queue.put((
+                chat_id, message_id, text,
+                {"reply_markup": kb_page(mode, page, total_pages, back_target=back_target)}
+            ))
         else:
             bot.send_message(chat_id, text, reply_markup=kb_page(mode, page, total_pages, back_target=back_target))
     except Exception:
@@ -881,22 +887,18 @@ def run_subfind(chat_id, message_id, domain):
     results, errors = enumerate_domain(domain, progress_callback=progress_callback)
 
     if errors:
-        try:
-            bot.edit_message_text(
-                f"[!] Provider gagal: {'; '.join(errors)}",
-                chat_id, message_id
-            )
-        except Exception:
-            pass
+        _edit_queue.put((
+            chat_id, message_id,
+            f"[!] Provider gagal: {'; '.join(errors)}",
+            {}
+        ))
 
     if not results:
-        try:
-            bot.edit_message_text(
-                f"⚠️ <b>SubFind</b>\nTidak ada subdomain ditemukan untuk <b>{esc(domain)}</b>.",
-                chat_id, message_id, reply_markup=kb_back("menu:subfind")
-            )
-        except Exception:
-            bot.send_message(chat_id, f"⚠️ Tidak ada subdomain ditemukan untuk <b>{esc(domain)}</b>.", reply_markup=kb_back("menu:subfind"))
+        _edit_queue.put((
+            chat_id, message_id,
+            f"⚠️ <b>SubFind</b>\nTidak ada subdomain ditemukan untuk <b>{esc(domain)}</b>.",
+            {"reply_markup": kb_back("menu:subfind")}
+        ))
         clear_state(chat_id)
         return
 
@@ -932,22 +934,18 @@ def run_sniscan(chat_id, message_id, domain):
     results, errors = enumerate_hosts(domain, progress_callback=progress_callback)
 
     if errors:
-        try:
-            bot.edit_message_text(
-                f"[!] Provider gagal: {'; '.join(errors)}",
-                chat_id, message_id
-            )
-        except Exception:
-            pass
+        _edit_queue.put((
+            chat_id, message_id,
+            f"[!] Provider gagal: {'; '.join(errors)}",
+            {}
+        ))
 
     if not results:
-        try:
-            bot.edit_message_text(
-                f"⚠️ <b>SNIScan</b>\nTidak ada SNI host ditemukan untuk <b>{esc(domain)}</b>.",
-                chat_id, message_id, reply_markup=kb_back("menu:sniscan")
-            )
-        except Exception:
-            bot.send_message(chat_id, f"⚠️ Tidak ada SNI host ditemukan untuk <b>{esc(domain)}</b>.", reply_markup=kb_back("menu:sniscan"))
+        _edit_queue.put((
+            chat_id, message_id,
+            f"⚠️ <b>SNIScan</b>\nTidak ada SNI host ditemukan untuk <b>{esc(domain)}</b>.",
+            {"reply_markup": kb_back("menu:sniscan")}
+        ))
         clear_state(chat_id)
         return
 
@@ -1336,13 +1334,11 @@ def run_cdnscan_target_batch(chat_id, message_id):
 
     if index >= len(targets):
         # Semua target selesai, tampilkan pesan selesai dan kembali ke menu
-        try:
-            bot.edit_message_text(
-                "✅ <b>CDNScan selesai</b>\nSemua target telah discan.",
-                chat_id, message_id, reply_markup=kb_back("menu:cdnscan")
-            )
-        except Exception:
-            pass
+        _edit_queue.put((
+            chat_id, message_id,
+            "✅ <b>CDNScan selesai</b>\nSemua target telah discan.",
+            {"reply_markup": kb_back("menu:cdnscan")}
+        ))
         clear_state(chat_id)
         return
 
@@ -1404,13 +1400,11 @@ def run_cdnscan_target_batch(chat_id, message_id):
                 results.append((ip, "-", "-", "-"))
             c += 1
             if c % 10 == 0 or c == len(ips):
-                try:
-                    bot.edit_message_text(
-                        f"🛡️ <b>CDNScan</b>\nTarget [{index + 1}/{len(targets)}]: <b>{esc(target)}</b>\nProgress: {c}/{len(ips)}",
-                        chat_id, message_id
-                    )
-                except Exception:
-                    pass
+                _edit_queue.put((
+                    chat_id, message_id,
+                    f"🛡️ <b>CDNScan</b>\nTarget [{index + 1}/{len(targets)}]: <b>{esc(target)}</b>\nProgress: {c}/{len(ips)}",
+                    {}
+                ))
 
     results.sort(key=lambda x: ipaddress.ip_address(x[0].split('/')[0] if '/' in x[0] else x[0]))
 
@@ -1435,14 +1429,12 @@ def run_cdnscan_target_batch(chat_id, message_id):
         st = get_state(chat_id)
         prev_menu = st.get("prev_menu", "menu:cdnscan")
         set_state(chat_id, cdn_target_index=index)
-        try:
-            bot.edit_message_text(
-                f"⏸️ <b>CDNScan jeda</b>\nTarget [{index + 1}/{len(targets)}]: <b>{esc(target)}</b>\n"
-                f"Sudah discan: {new_offset} IP, masih ada sisa.\nKlik Next untuk melanjutkan target ini.",
-                chat_id, message_id, reply_markup=kb_next_target(prev_menu)
-            )
-        except Exception:
-            bot.send_message(chat_id, f"⏸️ CDNScan jeda — target {esc(target)} masih ada sisa IP. Klik Next untuk melanjutkan.", reply_markup=kb_next_target(prev_menu))
+        _edit_queue.put((
+            chat_id, message_id,
+            f"⏸️ <b>CDNScan jeda</b>\nTarget [{index + 1}/{len(targets)}]: <b>{esc(target)}</b>\n"
+            f"Sudah discan: {new_offset} IP, masih ada sisa.\nKlik Next untuk melanjutkan target ini.",
+            {"reply_markup": kb_next_target(prev_menu)}
+        ))
         return
 
     # Target selesai, lanjut ke target berikutnya
@@ -1461,26 +1453,21 @@ def fetch_provider_ranges(chat_id, message_id, provider):
     """Unduh daftar rentang IP dari provider dan tampilkan untuk dipilih."""
     ips, err = get_provider_ips(provider)
     if err:
-        try:
-            bot.edit_message_text(
-                f"❌ <b>CDNScan</b>\nGagal unduh rentang {provider}: {esc(err)}",
-                chat_id, message_id, reply_markup=kb_back("menu:cdnscan")
-            )
-        except Exception:
-            bot.send_message(chat_id, f"❌ Gagal unduh rentang {provider}: {esc(err)}", reply_markup=kb_back("menu:cdnscan"))
+        _edit_queue.put((
+            chat_id, message_id,
+            f"❌ <b>CDNScan</b>\nGagal unduh rentang {provider}: {esc(err)}",
+            {"reply_markup": kb_back("menu:cdnscan")}
+        ))
         clear_state(chat_id)
         return
     ips = ips or []
 
     set_state(chat_id, cdn_ranges=ips, cdn_provider=provider, cdn_selected=[], cdn_range_page=1)
-    try:
-        bot.edit_message_text(
-            f"🛡️ <b>Pilih rentang IP — {provider}</b>\nDitemukan {len(ips)} rentang.\nPilih satu atau lebih:",
-            chat_id, message_id, reply_markup=kb_ranges(ips, page=1)
-        )
-    except Exception:
-        bot.send_message(chat_id, f"🛡️ Pilih rentang IP — {provider}\nDitemukan {len(ips)} rentang.", reply_markup=kb_ranges(ips, page=1))
-
+    _edit_queue.put((
+        chat_id, message_id,
+        f"🛡️ <b>Pilih rentang IP — {provider}</b>\nDitemukan {len(ips)} rentang.\nPilih satu atau lebih:",
+        {"reply_markup": kb_ranges(ips, page=1)}
+    ))
 
 @bot.message_handler(func=lambda message: True)
 def text_handler(message):
