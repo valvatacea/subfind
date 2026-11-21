@@ -151,7 +151,6 @@ def kb_limit(prev_menu="cdnscan:ranges:page"):
     m.add(
         InlineKeyboardButton("500", callback_data="cdnscan:limit:500"),
         InlineKeyboardButton("1000", callback_data="cdnscan:limit:1000"),
-        InlineKeyboardButton("Semua", callback_data="cdnscan:limit:0"),
         InlineKeyboardButton("🔢 Custom", callback_data="cdnscan:limit:custom"),
         InlineKeyboardButton("↩️ Batal", callback_data=f"back:{prev_menu}"),
     )
@@ -173,7 +172,7 @@ def kb_cdnscan_menu():
         m.add(InlineKeyboardButton(f"🌐 {PROVIDER_DISPLAY[name]}", callback_data=f"cdnscan:provider:{name}"))
     m.add(InlineKeyboardButton("✏️ Masukkan IP/CIDR sendiri", callback_data="cdnscan:manual"))
     m.add(InlineKeyboardButton("📜 Riwayat Scan", callback_data="cdnscan:history:1"))
-    m.add(InlineKeyboardButton("↩️ Batal", callback_data="menu:main"))
+    m.add(InlineKeyboardButton("↩️ Batal", callback_data="back:menu:main"))
     return m
 
 
