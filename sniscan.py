@@ -23,6 +23,14 @@ socket.setdefaulttimeout(10)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
+
+
+def esc(text):
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def pad_label(label, width=12):
+    return label + " " * max(0, width - len(label))
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 DOMAIN_RE = re.compile(r'^(?!\-)[A-Za-z0-9\-]{1,63}(?<!\\-)(\.[A-Za-z0-9\-]{1,63}(?<!\\-))*\.[A-Za-z]{2,}$')
@@ -241,11 +249,11 @@ def main():
     # Output teks format opsi B: blok key-value per SNI host
     for r in results:
         extra_str = ",".join(str(p) for p in r["extra_ports"]) if r["extra_ports"] else "-"
-        print(f"SNI Host  : {r['sni_host']}")
-        print(f"Direct IP : {r['ip']} ({r['response_time_ms']}ms)")
-        print(f"TLS/ALPN  : {r['tls_version']} | ALPN: {r['alpn']}")
-        print(f"Port TLS  : {r['tls_port']}({r['tls_version']})")
-        print(f"Port Lain : {extra_str}")
+        print(f"{pad_label('SNI Host', 12)}: {esc(r['sni_host'])}")
+        print(f"{pad_label('Direct IP', 12)}: {esc(r['ip'])} ({r['response_time_ms']}ms)")
+        print(f"{pad_label('TLS/ALPN', 12)}: {esc(r['tls_version'])} | ALPN: {esc(r['alpn'])}")
+        print(f"{pad_label('Port TLS', 12)}: {esc(r['tls_port'])}({esc(r['tls_version'])})")
+        print(f"{pad_label('Port Lain', 12)}: {esc(extra_str)}")
         print("----------------------------------------------")
 
     # Simpan teks
@@ -254,11 +262,11 @@ def main():
         f.write(f"═══ SNISCAN (TLS HANDSHAKE & MULTI-PORT): {domain} ═══\n\n")
         for r in results:
             extra_str = ",".join(str(p) for p in r["extra_ports"]) if r["extra_ports"] else "-"
-            f.write(f"SNI Host  : {r['sni_host']}\n")
-            f.write(f"Direct IP : {r['ip']} ({r['response_time_ms']}ms)\n")
-            f.write(f"TLS/ALPN  : {r['tls_version']} | ALPN: {r['alpn']}\n")
-            f.write(f"Port TLS  : {r['tls_port']}({r['tls_version']})\n")
-            f.write(f"Port Lain : {extra_str}\n")
+            f.write(f"{pad_label('SNI Host', 12)}: {esc(r['sni_host'])}\n")
+            f.write(f"{pad_label('Direct IP', 12)}: {esc(r['ip'])} ({r['response_time_ms']}ms)\n")
+            f.write(f"{pad_label('TLS/ALPN', 12)}: {esc(r['tls_version'])} | ALPN: {esc(r['alpn'])}\n")
+            f.write(f"{pad_label('Port TLS', 12)}: {esc(r['tls_port'])}({esc(r['tls_version'])})\n")
+            f.write(f"{pad_label('Port Lain', 12)}: {esc(extra_str)}\n")
             f.write("----------------------------------------------\n")
 
     # Simpan JSON dengan metadata
