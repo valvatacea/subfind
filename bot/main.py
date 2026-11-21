@@ -739,17 +739,15 @@ def run_cdnscan_target_batch(chat_id, message_id):
     index = st.get("cdn_target_index", 0)
 
     if index >= len(targets):
-        st = get_state(chat_id)
-        targets = st.get("cdn_targets", []) or []
-        set_state(chat_id, mode="cdnscan_limit", awaiting=None, cdn_limit=limit, cdn_targets=targets, cdn_target_index=0, prev_menu="cdnscan:ranges:page")
+        # Semua target selesai, tampilkan pesan selesai dan kembali ke menu
         try:
             bot.edit_message_text(
-                f"🔢 <b>Limit IP diset: {limit}</b>\nSedang memproses scan...",
-                chat_id, message_id
+                "✅ <b>CDNScan selesai</b>\nSemua target telah discan.",
+                chat_id, message_id, reply_markup=kb_back("menu:cdnscan")
             )
         except Exception:
             pass
-        threading.Thread(target=run_cdnscan_target_batch, args=(chat_id, None), daemon=True).start()
+        clear_state(chat_id)
         return
 
     target = targets[index]
@@ -765,9 +763,28 @@ def run_cdnscan_target_batch(chat_id, message_id):
     state = load_state(target)
     state_offset = state.get('scanned_count', 0) if state else 0
     if state and state.get('completed'):
-        # Sudah selesai, lanjut ke target berikutnya
-        set_state(chat_id, cdn_target_index=index + 1)
-        threading.Thread(target=run_cdnscan_target_batch, args=(chat_id, message_id), daemon=True).start()
+        # Sudah selesai, tampilkan hasil scan dari file JSON
+        OUT_DIR = os.path.join(BASE_DIR, "output")
+        safe_name = target.replace("/", "_").replace("-", "_").replace(".", "_")
+        jname = f"{OUT_DIR}/cdnscan_{safe_name}.json"
+        try:
+            with open(jname, 'r') as f:
+                saved = json.load(f)
+        except Exception:
+            saved = []
+
+        if saved and isinstance(saved, list):
+            results = [(item.get("ip", "-"), item.get("ports", "-"), item.get("cdn", "-"), item.get("status", "-")) for item in saved]
+            save_scan_state(chat_id, "cdnscan", target, results, "CDNScan", page=1)
+            show_scan_page(chat_id, message_id, edit=True)
+        else:
+            try:
+                bot.edit_message_text(
+                    f"🛡️ <b>CDNScan</b>\nTarget: <b>{esc(target)}</b>\nSudah discan sepenuhnya, tidak ada data yang tersimpan.",
+                    chat_id, message_id, reply_markup=kb_back("menu:cdnscan")
+                )
+            except Exception:
+                pass
         return
 
     ips = parse_ip_range(target, offset=state_offset, max_ips=limit if limit > 0 else None)
