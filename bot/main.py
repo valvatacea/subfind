@@ -120,6 +120,41 @@ def pad_label(label, width=12):
     return label
 
 
+# ===================== SPINNER & WAKTU =====================
+SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+
+
+def format_elapsed(seconds):
+    """Format durasi detik menjadi string yang mudah dibaca."""
+    if seconds < 60:
+        return f"{int(seconds)}s"
+    minutes = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{minutes}m {secs}s"
+
+
+def build_progress_text(title, target, current, total, start_time, spinner_idx):
+    """Bangun teks progres dengan spinner, bar, persentase, elapsed time, dan ETA."""
+    import time
+    elapsed = time.time() - start_time
+    if current > 0 and total > 0:
+        eta = (elapsed / current) * (total - current)
+    else:
+        eta = 0
+
+    # Progress bar: 10 blok
+    filled = int(current / total * 10) if total > 0 else 0
+    bar = "█" * filled + "░" * (10 - filled)
+    pct = int(current / total * 100) if total > 0 else 0
+
+    spinner = SPINNER[spinner_idx % len(SPINNER)]
+
+    return (f"{spinner} <b>{title}</b>\n"
+            f"Memindai <b>{esc(target)}</b>...\n"
+            f"{bar} {pct}% ({current}/{total})\n"
+            f"Elapsed: {format_elapsed(elapsed)} | ETA: {format_elapsed(eta)}")
+
+
 # ===================== KEYBOARD =====================
 def kb_main():
     m = InlineKeyboardMarkup(row_width=2)
@@ -876,11 +911,16 @@ def run_subfind(chat_id, message_id, domain):
     else:
         sent = type('obj', (object,), {'message_id': message_id})()
 
+    import time
+    start_time = time.time()
+    spinner_idx = [0]
+
     def progress_callback(current, total):
-        if current % 5 == 0 or current == total:
+        spinner_idx[0] += 1
+        if current % 2 == 0 or current == total:
             _edit_queue.put((
                 chat_id, message_id,
-                f"🔍 <b>SubFind</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...\nProgress: {current}/{total}",
+                build_progress_text("SubFind", domain, current, total, start_time, spinner_idx[0]),
                 {}
             ))
 
@@ -923,11 +963,16 @@ def run_sniscan(chat_id, message_id, domain):
     else:
         sent = type('obj', (object,), {'message_id': message_id})()
 
+    import time
+    start_time = time.time()
+    spinner_idx = [0]
+
     def progress_callback(current, total):
-        if current % 5 == 0 or current == total:
+        spinner_idx[0] += 1
+        if current % 2 == 0 or current == total:
             _edit_queue.put((
                 chat_id, message_id,
-                f"🔍 <b>SNIScan</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...\nProgress: {current}/{total}",
+                build_progress_text("SNIScan", domain, current, total, start_time, spinner_idx[0]),
                 {}
             ))
 
@@ -1343,11 +1388,15 @@ def run_cdnscan_target_batch(chat_id, message_id):
         return
 
     target = targets[index]
+    import time
+    start_time = time.time()
+    spinner_idx = [0]
     try:
-        bot.edit_message_text(
+        _edit_queue.put((
+            chat_id, message_id,
             f"🛡️ <b>CDNScan</b>\nTarget [{index + 1}/{len(targets)}]: <b>{esc(target)}</b>\nMemulai scan...",
-            chat_id, message_id
-        )
+            {}
+        ))
     except Exception:
         pass
 
@@ -1399,10 +1448,11 @@ def run_cdnscan_target_batch(chat_id, message_id):
             except Exception:
                 results.append((ip, "-", "-", "-"))
             c += 1
-            if c % 10 == 0 or c == len(ips):
+            spinner_idx[0] += 1
+            if c % 2 == 0 or c == len(ips):
                 _edit_queue.put((
                     chat_id, message_id,
-                    f"🛡️ <b>CDNScan</b>\nTarget [{index + 1}/{len(targets)}]: <b>{esc(target)}</b>\nProgress: {c}/{len(ips)}",
+                    build_progress_text("CDNScan", f"Target [{index + 1}/{len(targets)}]: {esc(target)}", c, len(ips), start_time, spinner_idx[0]),
                     {}
                 ))
 
