@@ -90,8 +90,6 @@ make_executable() {
     chmod +x "$INSTALL_DIR/etc/git-rebase.sh" 2>/dev/null || true
     chmod +x "$INSTALL_DIR/etc/update_subfind.sh" 2>/dev/null || true
     chmod +x "$INSTALL_DIR/bot/setup_profile.py" 2>/dev/null || true
-    chmod +x "$INSTALL_DIR/bot/setup_profile_photo.py" 2>/dev/null || true
-    chmod +x "$INSTALL_DIR/bot/setup_profile_photo_ptb.py" 2>/dev/null || true
     log_ok "File skrip dibuat executable"
 }
 
