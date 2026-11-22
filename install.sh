@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# =============================================================================
+# ============================================================================
 # subfind - Installer Script
-# Instalasi Subdomain & CDN Scanner Toolkit (CLI + Telegram Bot)
-# =============================================================================
+# Instalasi Subdomain & CDN Scanner Toolkit (CLI + Telegram Bot + Web UI)
+# ============================================================================
 set -euo pipefail
 
 REPO_URL="https://github.com/valvatacea/subfind.git"
@@ -69,13 +69,14 @@ setup_repo() {
 }
 
 # -----------------------------------------------------------------------------
-# Buat direktori output & states
+# Buat direktori output, states, dan web
 # -----------------------------------------------------------------------------
 setup_dirs() {
     mkdir -p "$INSTALL_DIR/output"
     mkdir -p "$INSTALL_DIR/output/states"
     mkdir -p "$INSTALL_DIR/output/ipranges"
-    log_ok "Direktori output siap di $INSTALL_DIR/output"
+    mkdir -p "$INSTALL_DIR/web"
+    log_ok "Direktori output dan web siap di $INSTALL_DIR"
 }
 
 # -----------------------------------------------------------------------------
@@ -88,6 +89,9 @@ make_executable() {
     chmod +x "$INSTALL_DIR/sniscan.py" 2>/dev/null || true
     chmod +x "$INSTALL_DIR/etc/git-rebase.sh" 2>/dev/null || true
     chmod +x "$INSTALL_DIR/etc/update_subfind.sh" 2>/dev/null || true
+    chmod +x "$INSTALL_DIR/bot/setup_profile.py" 2>/dev/null || true
+    chmod +x "$INSTALL_DIR/bot/setup_profile_photo.py" 2>/dev/null || true
+    chmod +x "$INSTALL_DIR/bot/setup_profile_photo_ptb.py" 2>/dev/null || true
     log_ok "File skrip dibuat executable"
 }
 
@@ -158,6 +162,27 @@ setup_bot() {
 
     echo ""
     echo "  Jalankan bot dengan: cd $INSTALL_DIR && python3 -m bot.main"
+    echo "  Setup profil bot:    python3 $INSTALL_DIR/bot/setup_profile.py"
+    echo ""
+}
+
+# -----------------------------------------------------------------------------
+# Setup web UI (opsional)
+# -----------------------------------------------------------------------------
+setup_web() {
+    local web_dir="$INSTALL_DIR/web"
+
+    if [ ! -d "$web_dir" ]; then
+        log_warn "Folder web/ tidak ditemukan, dilewati setup web"
+        return 0
+    fi
+
+    log_info "Folder web UI tersedia di $web_dir"
+    echo ""
+    echo "  Untuk menjalankan antarmuka web:"
+    echo "  cd $INSTALL_DIR/web"
+    echo "  php -S 0.0.0.0:8080"
+    echo "  Buka: http://<ip-vps>:8080"
     echo ""
 }
 
@@ -217,9 +242,13 @@ verify() {
         log_warn "Modul common gagal diuji (periksa struktur folder)"
     fi
 
-    # Cek folder output
+    # Cek folder output dan web
     if [ -d "$INSTALL_DIR/output" ]; then
         log_ok "Folder output siap"
+    fi
+
+    if [ -d "$INSTALL_DIR/web" ]; then
+        log_ok "Folder web UI siap"
     fi
 }
 
@@ -230,7 +259,7 @@ main() {
     echo ""
     echo "============================================================"
     echo "  subfind - Installer"
-    echo "  Subdomain & CDN Scanner Toolkit"
+    echo "  Subdomain & CDN Scanner Toolkit (CLI + Bot + Web UI)"
     echo "============================================================"
     echo ""
 
@@ -240,6 +269,7 @@ main() {
     make_executable
     create_symlinks
     setup_bot
+    setup_web
     check_path
     verify
 
@@ -256,10 +286,15 @@ main() {
     echo ""
     echo "Contoh penggunaan Bot Telegram:"
     echo "  cd $INSTALL_DIR && python3 -m bot.main"
+    echo "  python3 $INSTALL_DIR/bot/setup_profile.py"
+    echo ""
+    echo "Contoh Web UI:"
+    echo "  cd $INSTALL_DIR/web && php -S 0.0.0.0:8080"
     echo ""
     echo "Lokasi file:   $INSTALL_DIR"
     echo "Symlink:       $BIN_DIR"
     echo "Hasil scan:    $INSTALL_DIR/output/"
+    echo "Web UI:        $INSTALL_DIR/web/"
     echo "Bot env:       $INSTALL_DIR/bot/.env"
     echo ""
 }
