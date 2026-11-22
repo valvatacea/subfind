@@ -1615,6 +1615,27 @@ def cb_handler(call):
         limit = int(parts[2])
         st = get_state(chat_id)
         targets = st.get("cdn_targets", []) or []
+
+        # Verifikasi total IP per batch sebelum scan dimulai
+        total = count_total_batch_ips(targets, limit)
+        if total > MAX_TOTAL_BATCH:
+            set_state(chat_id, mode="cdnscan_limit", awaiting=None, cdn_limit=limit, cdn_targets=targets, cdn_target_index=0, prev_menu="cdnscan:ranges:page")
+            try:
+                bot.edit_message_text(
+                    f"⚠️ <b>Total IP melebihi batas</b>\n"
+                    f"Target: {len(targets)} rentang, total IP per batch: {total}\n"
+                    f"Batas maksimal: {MAX_TOTAL_BATCH} IP per batch.\n\n"
+                    f"Lanjutkan dengan membatasi ke {MAX_TOTAL_BATCH} IP?",
+                    chat_id, message_id,
+                    reply_markup=InlineKeyboardMarkup(row_width=2).add(
+                        InlineKeyboardButton("✅ Lanjutkan", callback_data=f"cdnscan:limit:confirm:{limit}"),
+                        InlineKeyboardButton("❌ Batal", callback_data="back:cdnscan:ranges:page")
+                    )
+                )
+            except Exception:
+                pass
+            return
+
         set_state(chat_id, mode="cdnscan_limit", awaiting=None, cdn_limit=limit, cdn_targets=targets, cdn_target_index=0, prev_menu="cdnscan:ranges:page")
         threading.Thread(target=run_cdnscan_target_batch, args=(chat_id, message_id), daemon=True).start()
 
