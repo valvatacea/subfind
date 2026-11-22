@@ -51,7 +51,18 @@ def fetch(url, timeout=15, retries=2):
     for attempt in range(retries):
         try:
             response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=timeout, impersonate="chrome152")
+            if response.status_code >= 500 and attempt < retries - 1:
+                time.sleep(1)
+                continue
+            if response.status_code >= 400:
+                return f"HTTP_ERROR_{response.status_code}"
             return response.text
+        except curl_requests.errors.ConnectTimeout as e:
+            return f"URL_ERROR_{e}"
+        except curl_requests.errors.ReadTimeout as e:
+            return f"URL_ERROR_{e}"
+        except curl_requests.errors.ConnectionError as e:
+            return f"URL_ERROR_{e}"
         except Exception as e:
             last_err = f"ERR_{type(e).__name__}"
             if attempt < retries - 1:

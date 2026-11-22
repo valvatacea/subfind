@@ -73,11 +73,30 @@ print_lock = threading.Lock()
 
 def fetch(url, timeout=15, progress_callback=None):
     try:
-        response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=timeout, impersonate="chrome152")
-        result = response.text
+        response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=timeout, impersonate="chrome152", stream=True)
+        total = int(response.headers.get('Content-Length', 0)) or None
+        downloaded = 0
+        chunks = []
+        last_update = 0
+        import time
+        for chunk in response.iter_content(chunk_size=8192):
+            if not chunk:
+                break
+            chunks.append(chunk)
+            downloaded += len(chunk)
+            now = time.time()
+            if progress_callback and now - last_update > 1.0:
+                progress_callback(downloaded, total)
+                last_update = now
+        return b''.join(chunks).decode('utf-8', errors='ignore')
+    except curl_requests.errors.ConnectTimeout as e:
+        return f"URL_ERROR_{e}"
+    except curl_requests.errors.ReadTimeout as e:
+        return f"URL_ERROR_{e}"
+    except curl_requests.errors.ConnectionError as e:
+        return f"URL_ERROR_{e}"
     except Exception as e:
         return f"ERR_{type(e).__name__}"
-    return result
 
 
 def fetch_headers(host, port=80, scheme="http", timeout=5):
