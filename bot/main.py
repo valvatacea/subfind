@@ -96,6 +96,8 @@ socket.setdefaulttimeout(10)
 MAX_MESSAGE = 3800  # batas aman per pesan Telegram
 ITEM_PER_PAGE = 10  # data per halaman untuk pagination
 CDN_LIMIT_DEFAULT = MAX_IPS_PER_SCAN  # 1000 dari CLI
+IP_OVERALL_TIMEOUT = 10  # detik maksimum per IP sebelum dianggap gagal
+MAX_TOTAL_BATCH = 2000  # batas total IP per batch multi-target
 
 # ===================== STATE USER =====================
 # user_state[chat_id] = {"mode": "...", "awaiting": "...", ...}
@@ -128,6 +130,24 @@ def esc(text):
 def pad_label(label, width=12):
     """Tanpa padding - label langsung diikuti titik dua."""
     return label
+
+
+def count_total_batch_ips(targets, limit):
+    """Hitung total IP yang akan discan dalam satu batch.
+
+    limit=0 berarti unlimited (ambil semua sisa IP per target).
+    """
+    total = 0
+    for t in targets:
+        t_state = load_state(t)
+        t_offset = t_state.get('scanned_count', 0) if t_state else 0
+        t_all_full = parse_ip_range(t)
+        t_total_full = len(t_all_full) if t_all_full else 0
+        t_sisa = max(0, t_total_full - t_offset)
+        if t_sisa > 0:
+            ips = min(limit, t_sisa) if limit > 0 else t_sisa
+            total += ips
+    return total
 
 
 # ===================== SPINNER & WAKTU =====================
@@ -401,6 +421,20 @@ FIELD_LABELS = {
     "tls_port": "Port TLS",
     "extra_ports": "Port Lain",
     "response_time_ms": "Response ms",
+}
+
+FIELD_FILTER_EXAMPLE = {
+    "subdomain": "google.com",
+    "ip": "1.2.3.4",
+    "ports": "80,443",
+    "status": "200",
+    "cdn": "Cloudflare",
+    "sni_host": "google.com",
+    "tls_version": "TLSv1.3",
+    "alpn": "h2",
+    "tls_port": "443",
+    "extra_ports": "8080",
+    "response_time_ms": "120",
 }
 
 
@@ -1551,15 +1585,65 @@ def cb_handler(call):
         limit = int(parts[2])
         st = get_state(chat_id)
         targets = st.get("cdn_targets", []) or []
+
+        # Verifikasi total IP per batch sebelum scan dimulai
+        total = count_total_batch_ips(targets, limit)
+        if total > MAX_TOTAL_BATCH:
+            set_state(chat_id, mode="cdnscan_limit", awaiting=None, cdn_limit=limit, cdn_targets=targets, cdn_target_index=0, prev_menu="cdnscan:ranges:page")
+            try:
+                bot.edit_message_text(
+                    f"⚠️ <b>Total IP melebihi batas</b>\n"
+                    f"Target: {len(targets)} rentang, total IP per batch: {total}\n"
+                    f"Batas maksimal: {MAX_TOTAL_BATCH} IP per batch.\n\n"
+                    f"Lanjutkan dengan membatasi ke {MAX_TOTAL_BATCH} IP?",
+                    chat_id, message_id,
+                    reply_markup=InlineKeyboardMarkup(row_width=2).add(
+                        InlineKeyboardButton("✅ Lanjutkan", callback_data=f"cdnscan:limit:confirm:{limit}"),
+                        InlineKeyboardButton("❌ Batal", callback_data="back:cdnscan:ranges:page")
+                    )
+                )
+            except Exception:
+                pass
+            return
+
         set_state(chat_id, mode="cdnscan_limit", awaiting=None, cdn_limit=limit, cdn_targets=targets, cdn_target_index=0, prev_menu="cdnscan:ranges:page")
         # Mulai scan target pertama
+        threading.Thread(target=run_cdnscan_target_batch, args=(chat_id, message_id), daemon=True).start()
+
+    elif data.startswith("cdnscan:limit:confirm:"):
+        parts = data.split(":")
+        limit = int(parts[2])
+        st = get_state(chat_id)
+        targets = st.get("cdn_targets", []) or []
+        set_state(chat_id, mode="cdnscan_limit", awaiting=None, cdn_limit=limit, cdn_targets=targets, cdn_target_index=0, prev_menu="cdnscan:ranges:page")
         threading.Thread(target=run_cdnscan_target_batch, args=(chat_id, message_id), daemon=True).start()
 
     elif data == "cdnscan:next":
         st = get_state(chat_id)
         targets = st.get("cdn_targets", []) or []
+        limit = st.get("cdn_limit", 0)
 
         if targets:
+            # Verifikasi total IP per batch sebelum scan dimulai
+            total = count_total_batch_ips(targets, limit)
+            if total > MAX_TOTAL_BATCH:
+                set_state(chat_id, mode="cdnscan_limit", awaiting=None, cdn_limit=limit, cdn_targets=targets, cdn_target_index=0, prev_menu="cdnscan:ranges:page")
+                try:
+                    bot.edit_message_text(
+                        f"⚠️ <b>Total IP melebihi batas</b>\n"
+                        f"Target: {len(targets)} rentang, total IP per batch: {total}\n"
+                        f"Batas maksimal: {MAX_TOTAL_BATCH} IP per batch.\n\n"
+                        f"Lanjutkan dengan membatasi ke {MAX_TOTAL_BATCH} IP?",
+                        chat_id, message_id,
+                        reply_markup=InlineKeyboardMarkup(row_width=2).add(
+                            InlineKeyboardButton("✅ Lanjutkan", callback_data=f"cdnscan:limit:confirm:{limit}"),
+                            InlineKeyboardButton("❌ Batal", callback_data="back:cdnscan:ranges:page")
+                        )
+                    )
+                except Exception:
+                    pass
+                return
+
             threading.Thread(target=run_cdnscan_target_batch, args=(chat_id, message_id), daemon=True).start()
         else:
             try:
@@ -1616,6 +1700,27 @@ def cb_handler(call):
     elif data.startswith("cdnscan:start:"):
         target = data.split(":", 2)[2]
         set_state(chat_id, mode="cdnscan", awaiting=None, cdn_targets=[target], cdn_limit=0, cdn_target_index=0, prev_menu="menu:cdnscan")
+
+        # Verifikasi total IP per batch sebelum scan dimulai (limit=0 = unlimited)
+        total = count_total_batch_ips([target], 0)
+        if total > MAX_TOTAL_BATCH:
+            set_state(chat_id, mode="cdnscan_limit", awaiting=None, cdn_limit=0, cdn_targets=[target], cdn_target_index=0, prev_menu="menu:cdnscan")
+            try:
+                bot.edit_message_text(
+                    f"⚠️ <b>Total IP melebihi batas</b>\n"
+                    f"Target: {target}, total IP: {total}\n"
+                    f"Batas maksimal: {MAX_TOTAL_BATCH} IP per batch.\n\n"
+                    f"Lanjutkan dengan membatasi ke {MAX_TOTAL_BATCH} IP?",
+                    chat_id, message_id,
+                    reply_markup=InlineKeyboardMarkup(row_width=2).add(
+                        InlineKeyboardButton("✅ Lanjutkan", callback_data="cdnscan:limit:confirm:2000"),
+                        InlineKeyboardButton("❌ Batal", callback_data="back:menu:cdnscan")
+                    )
+                )
+            except Exception:
+                pass
+            return
+
         threading.Thread(target=run_cdnscan_target_batch, args=(chat_id, message_id), daemon=True).start()
 
     elif data.startswith("page:"):
@@ -1666,7 +1771,7 @@ def cb_handler(call):
             set_state(chat_id, awaiting="filter_value", filter_mode=mode, filter_field=field_key)
             try:
                 bot.edit_message_text(
-                    f"🔍 <b>Masukkan nilai untuk {label}</b>\nContoh: 200",
+                    f"🔍 <b>Masukkan nilai untuk {label}</b>\nContoh: {FIELD_FILTER_EXAMPLE.get(field_key, '200')}",
                     chat_id, message_id,
                 )
             except Exception:
@@ -1901,20 +2006,41 @@ def run_cdnscan_target_batch(chat_id, message_id):
     try:
         with ThreadPoolExecutor(max_workers=min(30, len(batch_items))) as executor:
             futures = {executor.submit(process_ip, ip): (t, ip) for t, ip in batch_items}
-            for future in as_completed(futures):
-                t, ip = futures[future]
-                try:
-                    result = future.result()
-                except Exception:
-                    result = (ip, "-", "-", "-")
+            pending = set(futures.keys())
+            while pending:
+                done, pending = wait(
+                    pending, timeout=IP_OVERALL_TIMEOUT,
+                    return_when=FIRST_COMPLETED
+                )
+                for future in done:
+                    t, ip = futures[future]
+                    try:
+                        result = future.result()
+                    except Exception:
+                        result = (ip, "-", "-", "-")
 
-                if t not in target_results:
-                    target_results[t] = []
-                target_results[t].append(result)
+                    if t not in target_results:
+                        target_results[t] = []
+                    target_results[t].append(result)
 
-                c = scan_state["current"] + 1
-                with scan_lock:
-                    scan_state["current"] = c
+                    c = scan_state["current"] + 1
+                    with scan_lock:
+                        scan_state["current"] = c
+
+                # Jika tidak ada future yang selesai dalam batas waktu,
+                # lewati IP yang macet agar progres tidak nempel selamanya.
+                if not done and pending:
+                    skip_now = min(3, len(pending))
+                    for f in list(pending)[:skip_now]:
+                        t, ip = futures[f]
+                        if t not in target_results:
+                            target_results[t] = []
+                        target_results[t].append((ip, "-", "-", "-"))
+                        pending.discard(f)
+
+                        c = scan_state["current"] + 1
+                        with scan_lock:
+                            scan_state["current"] = c
 
     finally:
         # Matikan spinner dan elapsed thread
@@ -1988,7 +2114,26 @@ def run_cdnscan_target_batch(chat_id, message_id):
 
 def fetch_provider_ranges(chat_id, message_id, provider):
     """Unduh daftar rentang IP dari provider dan tampilkan untuk dipilih."""
-    ips, err = get_provider_ips(provider)
+    import time
+    last_update = [0]
+
+    def progress_cb(downloaded, total):
+        now = time.time()
+        if now - last_update[0] < 1.0:
+            return
+        last_update[0] = now
+        mb = downloaded / 1024 / 1024
+        if total:
+            mb_total = total / 1024 / 1024
+            text = f"🛡️ <b>CDNScan — Provider {provider}</b>\nMengunduh daftar rentang IP... | {mb:.1f} MB / {mb_total:.1f} MB"
+        else:
+            text = f"🛡️ <b>CDNScan — Provider {provider}</b>\nMengunduh daftar rentang IP... | {mb:.1f} MB"
+        try:
+            _edit_queue.put((chat_id, message_id, text, {}))
+        except Exception:
+            pass
+
+    ips, err = get_provider_ips(provider, progress_callback=progress_cb)
     if err:
         _edit_queue.put((
             chat_id, message_id,
@@ -2056,6 +2201,24 @@ def text_handler(message):
             return
         st = get_state(chat_id)
         targets = st.get("cdn_targets", []) or []
+
+        # Verifikasi total IP per batch sebelum scan dimulai
+        total = count_total_batch_ips(targets, limit)
+        if total > MAX_TOTAL_BATCH:
+            set_state(chat_id, mode="cdnscan_limit", awaiting=None, cdn_limit=limit, cdn_targets=targets, cdn_target_index=0, prev_menu="cdnscan:ranges:page")
+            bot.send_message(
+                chat_id,
+                f"⚠️ <b>Total IP melebihi batas</b>\n"
+                f"Target: {len(targets)} rentang, total IP per batch: {total}\n"
+                f"Batas maksimal: {MAX_TOTAL_BATCH} IP per batch.\n\n"
+                f"Lanjutkan dengan membatasi ke {MAX_TOTAL_BATCH} IP?",
+                reply_markup=InlineKeyboardMarkup(row_width=2).add(
+                    InlineKeyboardButton("✅ Lanjutkan", callback_data=f"cdnscan:limit:confirm:{limit}"),
+                    InlineKeyboardButton("❌ Batal", callback_data="back:cdnscan:ranges:page")
+                )
+            )
+            return
+
         set_state(chat_id, mode="cdnscan_limit", awaiting=None, cdn_limit=limit, cdn_targets=targets, cdn_target_index=0, prev_menu="cdnscan:ranges:page")
         sent = bot.send_message(
             chat_id,

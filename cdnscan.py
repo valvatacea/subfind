@@ -49,6 +49,9 @@ SCAN_PORTS = [
 # Batas maksimal IP yang akan di-scan per target
 MAX_IPS_PER_SCAN = 1000
 
+# Batas total IP per batch untuk multi-target
+MAX_TOTAL_BATCH = 2000
+
 # Konfirmasi otomatis (di-set dari argumen CLI -y)
 AUTO_CONFIRM = False
 
@@ -72,11 +75,27 @@ SCAN_CACHE_MAX_AGE_SECONDS = 604800  # 7 hari untuk skip scan ulang
 print_lock = threading.Lock()
 
 
-def fetch(url, timeout=15):
+def fetch(url, timeout=15, progress_callback=None):
     try:
         req = urllib.request.Request(url, headers=HEADERS)
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.read().decode('utf-8', errors='ignore')
+            total = r.headers.get('Content-Length')
+            total = int(total) if total else None
+            downloaded = 0
+            chunks = []
+            last_update = 0
+            import time
+            while True:
+                chunk = r.read(8192)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                downloaded += len(chunk)
+                now = time.time()
+                if progress_callback and now - last_update > 1.0:
+                    progress_callback(downloaded, total)
+                    last_update = now
+            return b''.join(chunks).decode('utf-8', errors='ignore')
     except urllib.error.HTTPError as e:
         return f"HTTP_ERROR_{e.code}"
     except urllib.error.URLError as e:
@@ -247,7 +266,7 @@ def parse_ip_range(input_str, offset=0, max_ips=None):
         return ips
 
 
-def get_provider_ips(provider_name):
+def get_provider_ips(provider_name, progress_callback=None):
     """Ambil daftar IP dari provider, dengan cache 7 hari"""
     provider_name = provider_name.lower()
     if provider_name not in PROVIDER_URLS:
@@ -271,7 +290,7 @@ def get_provider_ips(provider_name):
     # Fetch dari provider
     url = PROVIDER_URLS[provider_name]
     print(f"[*] Mengunduh IP range {provider_name} dari {url} ...")
-    result = fetch(url, timeout=30)
+    result = fetch(url, timeout=30, progress_callback=progress_callback)
     if result is None or result.startswith(("HTTP_ERROR_", "URL_ERROR_", "ERR_")):
         return None, f"Gagal mengunduh {provider_name}: {result}"
 
@@ -386,6 +405,25 @@ def count_existing_ips(fname):
         return count
     except Exception:
         return 0
+
+
+def count_total_batch_ips_cli(targets):
+    """Hitung total IP yang akan discan dalam satu batch dari daftar targets CLI.
+
+    targets: list of (label, cidr_str, user_limit, tfname, safe_name, provider)
+    user_limit None berarti unlimited (ambil semua sisa IP per target).
+    """
+    total = 0
+    for label, cidr_str, user_limit, tfname, safe_name, provider in targets:
+        state = load_state(cidr_str)
+        offset = state.get('scanned_count', 0) if state else 0
+        all_full = parse_ip_range(cidr_str)
+        total_full = len(all_full) if all_full else 0
+        sisa = max(0, total_full - offset)
+        if sisa > 0:
+            ips = min(user_limit, sisa) if user_limit else sisa
+            total += ips
+    return total
 
 
 def select_ranges(ranges):
@@ -562,6 +600,16 @@ def main():
 
     # Konfirmasi sebelum memulai scan
     print(f"\n[?] Akan memproses {len(targets)} target.")
+
+    # Verifikasi total IP per batch sebelum scan dimulai
+    total = count_total_batch_ips_cli(targets)
+    if total > MAX_TOTAL_BATCH:
+        print(f"\n[!] Total IP melebihi batas: {total} IP (maksimal {MAX_TOTAL_BATCH} IP per batch)")
+        konfirmasi_total = safe_input(f"    Lanjutkan scan dengan membatasi ke {MAX_TOTAL_BATCH} IP? (y/N): ")
+        if konfirmasi_total != 'y':
+            print("    Dibatalkan.")
+            sys.exit(0)
+
     konfirmasi = safe_input("    Lanjutkan scan? (y/N): ")
     if konfirmasi != 'y':
         print("    Dibatalkan.")
