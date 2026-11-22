@@ -38,7 +38,7 @@ from subfind import (
     CACHE_MAX_AGE_SECONDS as SUBFIND_CACHE_AGE,
     get_cache_path, load_cache, save_cache,
     scan_ports_summary, COMMON_PORTS as SUBFIND_PORTS,
-    CF_PREFIXES as SUBFIND_CF_PREFIXES, detect_cdn as subfind_detect_cdn,
+    detect_cdn as subfind_detect_cdn,
 )
 from common.validators import validate_domain
 from common.nsfw_filter import is_blocked, blocked_message
