@@ -1,13 +1,14 @@
 #!/system/bin/sh
-# update_subfind.sh - Update subfind.py dari GitHub via wget atau curl
+# update_subfind.sh - Update seluruh repo subfind dari GitHub via zip
 # Cocok untuk Termux (J5) dan OpenWrt (STB)
 
-REPO_RAW="https://raw.githubusercontent.com/valvatacea/subfind/main/subfind.py"
-TARGET="$HOME/subfind/subfind.py"
+REPO_ZIP="https://github.com/valvatacea/subfind/archive/refs/heads/main.zip"
+TARGET_DIR="$HOME/subfind"
 BACKUP_DIR="$HOME/subfind/backup"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP="$BACKUP_DIR/subfind_${TIMESTAMP}.py"
-TMP="$HOME/subfind/subfind.py.tmp"
+BACKUP="$BACKUP_DIR/subfind_${TIMESTAMP}"
+TMP_ZIP="$HOME/subfind/subfind_update.zip"
+TMP_DIR="$HOME/subfind/subfind_update_tmp"
 
 # Cek tool download (wget atau curl)
 if command -v wget >/dev/null 2>&1; then
@@ -19,51 +20,64 @@ else
     exit 1
 fi
 
-echo "[INFO] Mengecek update subfind.py ..."
+# Cek tool unzip
+if ! command -v unzip >/dev/null 2>&1; then
+    echo "[ERR] unzip tidak ditemukan. Install unzip dulu."
+    exit 1
+fi
+
+echo "[INFO] Mengunduh zip repo subfind ..."
 
 mkdir -p "$BACKUP_DIR"
 
-# Unduh ke file sementara
 if [ "$DOWNLOAD" = "wget" ]; then
-    wget -q -O "$TMP" "$REPO_RAW"
+    wget -q -O "$TMP_ZIP" "$REPO_ZIP"
 else
-    curl -s -L -o "$TMP" "$REPO_RAW"
+    curl -s -L -o "$TMP_ZIP" "$REPO_ZIP"
 fi
 
-if [ ! -s "$TMP" ]; then
-    echo "[ERR] Gagal mengunduh file (kosong atau error jaringan)."
-    rm -f "$TMP"
+if [ ! -s "$TMP_ZIP" ]; then
+    echo "[ERR] Gagal mengunduh zip (kosong atau error jaringan)."
+    rm -f "$TMP_ZIP"
     exit 1
 fi
 
-# Jika target belum ada, langsung pakai yang baru
-if [ ! -f "$TARGET" ]; then
-    mv "$TMP" "$TARGET"
-    chmod +x "$TARGET"
-    echo "[OK] subfind.py dibuat baru di: $TARGET"
-    echo "[Selesai] Jalankan dengan: python3 $TARGET <domain>"
-    exit 0
-fi
+# Ekstrak ke direktori sementara
+rm -rf "$TMP_DIR"
+mkdir -p "$TMP_DIR"
+unzip -q -o "$TMP_ZIP" -d "$TMP_DIR"
 
-# Bandingkan isi file remote dengan lokal
-if cmp -s "$TMP" "$TARGET"; then
-    echo "[INFO] subfind.py sudah terbaru, tidak ada perubahan."
-    rm -f "$TMP"
-    exit 0
-fi
-
-# File berbeda: backup, verifikasi sintaks, lalu ganti
-cp "$TARGET" "$BACKUP"
-echo "[INFO] Backup lama disimpan ke: $BACKUP"
-
-if python3 -m py_compile "$TMP" >/dev/null 2>&1; then
-    mv "$TMP" "$TARGET"
-    chmod +x "$TARGET"
-    echo "[OK] subfind.py berhasil diperbarui di: $TARGET"
-else
-    echo "[ERR] File yang diunduh tidak valid (sintaks Python error)."
-    rm -f "$TMP"
+# Folder hasil unzip biasanya subfind-main/
+EXTRACTED_DIR=$(ls -d "$TMP_DIR"/subfind-* 2>/dev/null | head -1)
+if [ -z "$EXTRACTED_DIR" ]; then
+    echo "[ERR] Struktur zip tidak dikenal (tidak ada folder subfind-*)."
+    rm -rf "$TMP_DIR" "$TMP_ZIP"
     exit 1
 fi
 
-echo "[Selesai] Jalankan dengan: python3 $TARGET <domain>"
+# Backup direktori target jika ada
+if [ -d "$TARGET_DIR" ]; then
+    cp -a "$TARGET_DIR" "$BACKUP"
+    echo "[INFO] Backup lama disimpan ke: $BACKUP"
+fi
+
+# Salin file baru (kecuali .git, .venv, output, backup, __pycache__, .gitignore, bot.log)
+echo "[INFO] Menyalin file baru ke $TARGET_DIR ..."
+for item in "$EXTRACTED_DIR"/*; do
+    name=$(basename "$item")
+    case "$name" in
+        .git|.venv|output|backup|__pycache__|.gitignore|bot.log)
+            echo "[SKIP] $name"
+            ;;
+        *)
+            rm -rf "$TARGET_DIR/$name"
+            cp -a "$item" "$TARGET_DIR/"
+            ;;
+    esac
+done
+
+# Bersihkan
+rm -rf "$TMP_DIR" "$TMP_ZIP"
+
+echo "[OK] Repo subfind berhasil diperbarui di: $TARGET_DIR"
+echo "[Selesai] Jalankan dengan: python3 $TARGET_DIR/bot/main.py"
