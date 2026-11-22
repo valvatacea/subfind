@@ -1949,6 +1949,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
     - Jika masih ada sisa IP di mana-mana target → tampilkan "Lihat" + "Next"
     - Jika semua target 100% selesai → tampilkan hanya "Lihat"
     """
+    global ACTIVE_SCANS
     st = get_state(chat_id)
     targets = st.get("cdn_targets", []) or []
     limit = st.get("cdn_limit", 0)
