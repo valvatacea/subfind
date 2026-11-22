@@ -1683,6 +1683,24 @@ def cb_handler(call):
         # Tampilkan hasil gabungan dari semua target yang sudah discan
         st = get_state(chat_id)
         targets = st.get("cdn_targets", []) or []
+
+        # Jika cdn_targets tidak ada di state, coba baca dari file JSON di output/
+        if not targets:
+            import glob, os
+            out_dir = os.path.join(BASE_DIR, "output")
+            json_files = glob.glob(os.path.join(out_dir, "cdnscan_*.json"))
+            targets = []
+            for jf in json_files:
+                fname = os.path.basename(jf)
+                # Ubah nama file kembali ke CIDR: cdnscan_1_1_1_0_24.json -> 1.1.1.0/24
+                name = fname.replace("cdnscan_", "").replace(".json", "")
+                # Untuk CIDR, format adalah a_b_c_d_e -> a.b.c.d/e
+                parts = name.split("_")
+                if len(parts) == 5:
+                    targets.append(f"{parts[0]}.{parts[1]}.{parts[2]}.{parts[3]}/{parts[4]}")
+                else:
+                    targets.append(name)
+
         all_results = []
         for t in targets:
             safe_name = t.replace("/", "_").replace("-", "_").replace(".", "_")
@@ -1704,11 +1722,11 @@ def cb_handler(call):
         if not all_results:
             try:
                 bot.edit_message_text(
-                    "❌ <b>Tidak ada hasil scan</b>\nBelum ada data yang tersimpan.",
+                    "❌ <b>Tidak ada hasil scan</b>\nBelum ada data yang tersimpan.\n\nCoba jalankan scan CDNScan terlebih dahulu.",
                     chat_id, message_id, reply_markup=kb_back("menu:cdnscan")
                 )
             except Exception:
-                bot.send_message(chat_id, "❌ Tidak ada hasil scan.", reply_markup=kb_back("menu:cdnscan"))
+                bot.send_message(chat_id, "❌ Tidak ada hasil scan. Coba jalankan scan CDNScan terlebih dahulu.", reply_markup=kb_back("menu:cdnscan"))
             return
 
         # Simpan hasil gabungan dan tampilkan via pagination
