@@ -1,0 +1,216 @@
+/* style.css - Dark theme untuk CDNScan Web */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background: #121212;
+    color: #e0e0e0;
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+h1 {
+    color: #4CAF50;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+}
+
+.tab {
+    background: #2a2a2a;
+    border: 1px solid #333;
+    color: #e0e0e0;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.tab:hover {
+    background: #333;
+    border-color: #4CAF50;
+}
+
+.tab.active {
+    background: #4CAF50;
+    color: white;
+    border-color: #4CAF50;
+}
+
+.tab-panel {
+    display: none;
+    animation: fadeIn 0.3s;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+form {
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 25px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #bbb;
+}
+
+input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    background: #0a0a0a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 14px;
+    box-sizing: border-box;
+    margin-bottom: 12px;
+}
+
+input[type="text"]:focus {
+    outline: none;
+    border-color: #4CAF50;
+}
+
+button[type="submit"] {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+button[type="submit"]:hover {
+    background: #45a049;
+}
+
+button[type="submit"]:disabled {
+    background: #666;
+    cursor: not-allowed;
+}
+
+.result-area {
+    margin-top: 20px;
+    min-height: 50px;
+}
+
+.spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #333;
+    border-top: 3px solid #4CAF50;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.status-text {
+    font-size: 14px;
+    color: #888;
+    vertical-align: middle;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    background: #1e1e1e;
+}
+
+th, td {
+    border: 1px solid #333;
+    padding: 10px;
+    text-align: left;
+    font-size: 13px;
+}
+
+th {
+    background: #2a2a2a;
+    color: #4CAF50;
+}
+
+tr:nth-child(even) {
+    background: #252525;
+}
+
+tr:hover {
+    background: #2a2a2a;
+}
+
+pre {
+    background: #0a0a0a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 15px;
+    overflow-x: auto;
+    font-size: 12px;
+    color: #bbb;
+    margin-top: 10px;
+}
+
+.error {
+    color: #ff6b6b;
+    margin-top: 10px;
+    font-size: 13px;
+}
+
+.success {
+    color: #4CAF50;
+    margin-top: 10px;
+    font-size: 13px;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-running {
+    background: #ff9800;
+    color: white;
+}
+
+.status-completed {
+    background: #4CAF50;
+    color: white;
+}
+
+.status-error {
+    background: #f44336;
+    color: white;
+}
