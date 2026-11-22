@@ -197,9 +197,10 @@ def process_host(sub):
     }
 
 
-def enumerate_hosts(domain, progress_callback=None):
+def enumerate_hosts(domain, progress_callback=None, stop_event=None):
     """Enumerasi SNI host untuk domain, return (results, errors).
     progress_callback: fungsi dipanggil dengan (current, total) setelah setiap host selesai diproses.
+    stop_event: threading.Event; jika di-set, loop scan akan dihentikan secepatnya.
     """
     if not validate_domain(domain):
         return [], [f"Domain tidak valid: {domain}"]
@@ -257,6 +258,10 @@ def enumerate_hosts(domain, progress_callback=None):
                     })
                 if progress_callback:
                     progress_callback(len(results), len(sorted_subs))
+
+            # Cek stop_event setelah setiap batch selesai diproses
+            if stop_event and stop_event.is_set():
+                break
 
     results.sort(key=lambda x: x["sni_host"])
     return results, errors

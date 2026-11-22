@@ -63,8 +63,57 @@ if not BOT_TOKEN:
 # ===================== BATASAN SCAN SIMULTAN =====================
 MAX_ACTIVE_SCANS = 3          # Maksimal scan berjalan bersamaan di seluruh bot
 ACTIVE_SCANS = 0              # Counter scan aktif saat ini
-MAX_CONCURRENT_SCANS_PER_CHAT = 1  # Maksimal scan per chat
+MAX_CONCURRENT_SCANS_PER_CHAT = 1  # Maksimal 1 scan per chat (kecuali d2ip)
 # =================================================================
+
+# Registry scan aktif untuk tombol Stop (chat_id -> scan_state dict)
+ACTIVE_SCAN_STATES = {}
+SCAN_STATE_LOCK = threading.Lock()
+
+
+def register_scan_state(chat_id, scan_state):
+    """Daftarkan scan_state ke registry agar handler scan:stop dapat mengaksesnya."""
+    with SCAN_STATE_LOCK:
+        ACTIVE_SCAN_STATES[chat_id] = scan_state
+
+
+def unregister_scan_state(chat_id):
+    """Hapus scan_state dari registry setelah scan selesai/dihentikan."""
+    with SCAN_STATE_LOCK:
+        ACTIVE_SCAN_STATES.pop(chat_id, None)
+
+
+def request_scan_stop(chat_id):
+    """Set stop_requested=True dan active=False pada scan_state chat_id.
+    Return True jika scan_state ditemukan dan di-stop."""
+    with SCAN_STATE_LOCK:
+        scan_state = ACTIVE_SCAN_STATES.get(chat_id)
+        if not scan_state:
+            return False
+        scan_state["stop_requested"] = True
+        scan_state["active"] = False
+        return True
+
+
+def cek_slot_scan(chat_id):
+    """Cek apakah chat boleh mulai scan (1 scan per chat).
+    Return True jika slot tersedia dan sudah ditandai scanning=True."""
+    st = get_state(chat_id)
+    if st.get("scanning"):
+        return False
+    global ACTIVE_SCANS
+    if ACTIVE_SCANS >= MAX_ACTIVE_SCANS:
+        return False
+    ACTIVE_SCANS += 1
+    set_state(chat_id, scanning=True)
+    return True
+
+
+def bebaskan_slot_scan(chat_id):
+    """Lepas slot scan setelah selesai (atau gagal)."""
+    global ACTIVE_SCANS
+    ACTIVE_SCANS = max(0, ACTIVE_SCANS - 1)
+    set_state(chat_id, scanning=False)
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
@@ -103,7 +152,7 @@ MAX_MESSAGE = 3800  # batas aman per pesan Telegram
 ITEM_PER_PAGE = 10  # data per halaman untuk pagination
 CDN_LIMIT_DEFAULT = MAX_IPS_PER_SCAN  # 1000 dari CLI
 IP_OVERALL_TIMEOUT = 10  # detik maksimum per IP sebelum dianggap gagal
-MAX_TOTAL_BATCH = 2000  # batas total IP per batch multi-target
+MAX_TOTAL_BATCH = 1500  # batas total IP per batch multi-target
 
 # ===================== STATE USER =====================
 # user_state[chat_id] = {"mode": "...", "awaiting": "...", ...}
@@ -351,7 +400,7 @@ def build_page_text(results, page, mode, title):
             lines.append(f"{pad_label('TLS/ALPN', 12)}: {esc(r[2])} | ALPN: {esc(r[3])}")
             lines.append(f"{pad_label('Port TLS', 12)}: {esc(r[4])}({esc(r[2])})")
             lines.append(f"{pad_label('Port Lain', 12)}: {esc(r[5])}")
-            lines.append(f"{pad_label('CDN', 12)}: {esc(r[8])}")
+            lines.append(f"{pad_label('CDN', 12)}: -")
             lines.append(f"{pad_label('Status', 12)}: {esc(r[7])}")
             lines.append("----------------------------------------------")
     elif mode == "d2ip":
@@ -805,7 +854,7 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=N
         text = f"⚠️ <b>{title}</b>\nTidak ada data yang cocok dengan filter."
         if info_text:
             text = f"{info_text}\n\n{text}"
-        prev = back_target or {"subfind": "menu:subfind", "cdnscan": "menu:cdnscan", "d2ip": "menu:d2ip"}.get(mode, "menu:main")
+        prev = back_target or st.get("scan_back_target") or {"subfind": "menu:subfind", "cdnscan": "menu:cdnscan", "d2ip": "menu:d2ip"}.get(mode, "menu:main")
         try:
             if edit:
                 _edit_queue.put((
@@ -837,14 +886,14 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=N
         if edit:
             _edit_queue.put((
                 chat_id, message_id, text,
-                {"reply_markup": kb_page(mode, page, total_pages, back_target=back_target,
+                {"reply_markup": kb_page(mode, page, total_pages, back_target=back_target or st.get("scan_back_target"),
                                          filter_active=bool(filters), filter_count=len(filters))}
             ))
         else:
-            bot.send_message(chat_id, text, reply_markup=kb_page(mode, page, total_pages, back_target=back_target,
+            bot.send_message(chat_id, text, reply_markup=kb_page(mode, page, total_pages, back_target=back_target or st.get("scan_back_target"),
                                                                  filter_active=bool(filters), filter_count=len(filters)))
     except Exception:
-        bot.send_message(chat_id, text, reply_markup=kb_page(mode, page, total_pages, back_target=back_target,
+        bot.send_message(chat_id, text, reply_markup=kb_page(mode, page, total_pages, back_target=back_target or st.get("scan_back_target"),
                                                              filter_active=bool(filters), filter_count=len(filters)))
 
 def get_sniscan_history():
@@ -1132,8 +1181,17 @@ def run_subfind(chat_id, message_id, domain):
         "spinner_idx": 0,
         "elapsed": 0,
         "eta": 0,
+        "stop_requested": False,
+        "scan_type": "subfind",
     }
     scan_lock = threading.Lock()
+
+    # Register ke registry agar tombol Stop dapat mengakses scan_state ini
+    register_scan_state(chat_id, scan_state)
+
+    # Event untuk sinyalisasi stop dari tombol Stop ke enumerate_domain
+    stop_event = threading.Event()
+    scan_state["stop_event"] = stop_event
 
     def _spinner_loop():
         """Thread mandiri: memutar spinner dan mengupdate progres ke antrian (setiap 0.5 detik)."""
@@ -1149,7 +1207,11 @@ def run_subfind(chat_id, message_id, domain):
                 state["start_time"],
                 elapsed=state["elapsed"], eta=state["eta"],
             )
-            _edit_queue.put((state["chat_id"], state["message_id"], text, {}))
+            # Tambah tombol Stop saat scan masih aktif
+            kb = InlineKeyboardMarkup(row_width=1)
+            kb.add(InlineKeyboardButton("⏹️ Stop", callback_data="scan:stop"))
+            _edit_queue.put((state["chat_id"], state["message_id"], text,
+                             {"reply_markup": kb}))
 
             with scan_lock:
                 scan_state["spinner_idx"] += 1
@@ -1190,11 +1252,32 @@ def run_subfind(chat_id, message_id, domain):
             scan_state["current"] = current
             scan_state["total"] = total
 
-    results, errors = enumerate_domain(domain, progress_callback=progress_callback)
+    results, errors = enumerate_domain(domain, progress_callback=progress_callback, stop_event=stop_event)
 
     # Matikan spinner dan elapsed thread
     with scan_lock:
         scan_state["active"] = False
+
+    # Unregister dari registry
+    unregister_scan_state(chat_id)
+
+    # Jika dihentikan paksa, simpan hasil partikel dan tampilkan
+    if stop_event.is_set():
+        OUT_DIR = os.path.join(BASE_DIR, "output")
+        os.makedirs(OUT_DIR, exist_ok=True)
+        jname = f"{OUT_DIR}/subfind_{domain}.json"
+        json_data = [{"subdomain": r[0], "ip": r[1], "ports": r[2], "status": r[3], "cdn": r[4], "target": domain} for r in results]
+        with open(jname, 'w') as f:
+            json.dump(json_data, f, indent=2)
+        save_scan_state(chat_id, "subfind", domain, results, "SubFind")
+        _edit_queue.put((
+            chat_id, message_id,
+            f"⏹️ <b>SubFind dihentikan</b>\n"
+            f"Ditemukan: {len(results)} subdomain.\n"
+            f"Hasil yang tersimpan dapat dilihat melalui tombol Lihat.",
+            {"reply_markup": kb_back("menu:subfind")}
+        ))
+        return
 
     if errors:
         _edit_queue.put((
@@ -1250,8 +1333,17 @@ def run_sniscan(chat_id, message_id, domain):
         "spinner_idx": 0,
         "elapsed": 0,
         "eta": 0,
+        "stop_requested": False,
+        "scan_type": "sniscan",
     }
     scan_lock = threading.Lock()
+
+    # Register ke registry agar tombol Stop dapat mengakses scan_state ini
+    register_scan_state(chat_id, scan_state)
+
+    # Event untuk sinyalisasi stop dari tombol Stop ke enumerate_hosts
+    stop_event = threading.Event()
+    scan_state["stop_event"] = stop_event
 
     def _spinner_loop():
         """Thread mandiri: memutar spinner dan mengupdate progres ke antrian (setiap 0.5 detik)."""
@@ -1267,7 +1359,11 @@ def run_sniscan(chat_id, message_id, domain):
                 state["start_time"],
                 elapsed=state["elapsed"], eta=state["eta"],
             )
-            _edit_queue.put((state["chat_id"], state["message_id"], text, {}))
+            # Tambah tombol Stop saat scan masih aktif
+            kb = InlineKeyboardMarkup(row_width=1)
+            kb.add(InlineKeyboardButton("⏹️ Stop", callback_data="scan:stop"))
+            _edit_queue.put((state["chat_id"], state["message_id"], text,
+                             {"reply_markup": kb}))
 
             with scan_lock:
                 scan_state["spinner_idx"] += 1
@@ -1308,12 +1404,61 @@ def run_sniscan(chat_id, message_id, domain):
             scan_state["current"] = current
             scan_state["total"] = total
 
-    results, errors = enumerate_hosts(domain, progress_callback=progress_callback)
+    results, errors = enumerate_hosts(domain, progress_callback=progress_callback, stop_event=stop_event)
     log.debug("SNIScan selesai: domain=%s results=%d errors=%d", domain, len(results), len(errors))
 
     # Matikan spinner dan elapsed thread
     with scan_lock:
         scan_state["active"] = False
+
+    # Unregister dari registry
+    unregister_scan_state(chat_id)
+
+    # Jika dihentikan paksa, simpan hasil partikel dan tampilkan
+    if stop_event.is_set():
+        OUT_DIR = os.path.join(BASE_DIR, "output")
+        os.makedirs(OUT_DIR, exist_ok=True)
+        jname = f"{OUT_DIR}/sniscan_{domain}.json"
+        json_data = [
+            {
+                "sni_host": r["sni_host"],
+                "ip": r["ip"],
+                "response_time_ms": r["response_time_ms"],
+                "tls_version": r["tls_version"],
+                "alpn": r["alpn"],
+                "tls_port": r["tls_port"],
+                "extra_ports": r["extra_ports"],
+                "target": domain
+            }
+            for r in results
+        ]
+        with open(jname, 'w') as f:
+            json.dump(json_data, f, indent=2)
+
+        # Konversi ke tuple untuk pagination
+        results_tuples = [
+            (
+                r["sni_host"],
+                r["ip"],
+                r["tls_version"],
+                r["alpn"],
+                r["tls_port"],
+                ",".join(str(p) for p in r["extra_ports"]) if r["extra_ports"] else "-",
+                r["response_time_ms"],
+                r["status"],
+                r["cdn"],
+            )
+            for r in results
+        ]
+        save_scan_state(chat_id, "sniscan", domain, results_tuples, "SNIScan")
+        _edit_queue.put((
+            chat_id, message_id,
+            f"⏹️ <b>SNIScan dihentikan</b>\n"
+            f"Ditemukan: {len(results)} SNI host.\n"
+            f"Hasil yang tersimpan dapat dilihat melalui tombol Lihat.",
+            {"reply_markup": kb_back("menu:sniscan")}
+        ))
+        return
 
     if errors:
         log.debug("SNIScan provider errors: %s", '; '.join(errors))
@@ -1372,6 +1517,23 @@ def run_sniscan(chat_id, message_id, domain):
     save_scan_state(chat_id, "sniscan", domain, results_tuples, "SNIScan")
     show_scan_page(chat_id, sent.message_id, edit=True)
     log.info("SNIScan selesai: domain=%s total=%d", domain, len(results))
+
+
+# ===================== WRAPPER SLOT SCAN (subfind & sniscan) ====================
+def _run_subfind_with_slot(chat_id, message_id, domain):
+    """Jalankan SubFind dengan slot scan per chat; lepas slot di finally."""
+    try:
+        run_subfind(chat_id, message_id, domain)
+    finally:
+        bebaskan_slot_scan(chat_id)
+
+
+def _run_sniscan_with_slot(chat_id, message_id, domain):
+    """Jalankan SNIScan dengan slot scan per chat; lepas slot di finally."""
+    try:
+        run_sniscan(chat_id, message_id, domain)
+    finally:
+        bebaskan_slot_scan(chat_id)
 
 
 # ===================== HELP =====================
@@ -1873,6 +2035,17 @@ def cb_handler(call):
             # Kembali ke halaman hasil scan (bukan ulang ke field selection)
             show_scan_page(chat_id, message_id, edit=True)
 
+    elif data == "scan:stop":
+        # Tombol Stop ditekan saat scan sedang berjalan
+        stopped = request_scan_stop(chat_id)
+        try:
+            if stopped:
+                bot.answer_callback_query(call.id, "⏹️ Scan dihentikan, menyimpan hasil...")
+            else:
+                bot.answer_callback_query(call.id, "Tidak ada scan yang berjalan.")
+        except Exception:
+            pass
+
     elif data.startswith("back:"):
         prev_menu = data.split(":", 1)[1]
         st = get_state(chat_id)
@@ -1957,6 +2130,21 @@ def run_cdnscan_target_batch(chat_id, message_id):
     - Jika masih ada sisa IP di mana-mana target → tampilkan "Lihat" + "Next"
     - Jika semua target 100% selesai → tampilkan hanya "Lihat"
     """
+    # Cek slot scan per chat (1 scan per chat; d2ip dikecualikan)
+    if not cek_slot_scan(chat_id):
+        try:
+            bot.edit_message_text(
+                "⚠️ <b>Scan sedang berjalan di chat ini</b>\nTunggu selesai sebelum scan baru.",
+                chat_id, message_id, reply_markup=kb_back("menu:cdnscan"),
+            )
+        except Exception:
+            bot.send_message(
+                chat_id,
+                "⚠️ <b>Scan sedang berjalan di chat ini</b>\nTunggu selesai sebelum scan baru.",
+                reply_markup=kb_back("menu:cdnscan"),
+            )
+        return
+
     global ACTIVE_SCANS
     try:
         st = get_state(chat_id)
@@ -2004,7 +2192,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
             _edit_queue.put((
                 chat_id, message_id,
                 "✅ <b>CDNScan selesai</b>\nSemua target telah discan.",
-                {"reply_markup": kb_next_target("menu:cdnscan", show_view=True, show_next=False)}
+                {"reply_markup": kb_next_target("menu:cdnscan", show_view=False, show_next=False)}
             ))
             # JANGAN clear_state: cdn_targets dibutuhkan oleh tombol "Lihat" (cdnscan:view).
             ACTIVE_SCANS = max(0, ACTIVE_SCANS - 1)
@@ -2026,8 +2214,13 @@ def run_cdnscan_target_batch(chat_id, message_id):
             "spinner_idx": 0,
             "elapsed": 0,
             "eta": 0,
+            "stop_requested": False,
+            "scan_type": "cdnscan",
         }
         scan_lock = threading.Lock()
+
+        # Register ke registry agar tombol Stop dapat mengakses scan_state ini
+        register_scan_state(chat_id, scan_state)
 
         try:
             _edit_queue.put((
@@ -2039,7 +2232,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
             pass
 
         def _spinner_loop():
-            """Thread mandiri: memutar spinner dan mengupdate progres ke antrian (setiap 0.5 detik)."""
+            """Thread mandiri: memutar spinner dan mengupdate progres ke antrian (setiap 1 detik)."""
             while True:
                 with scan_lock:
                     if not scan_state["active"]:
@@ -2052,12 +2245,16 @@ def run_cdnscan_target_batch(chat_id, message_id):
                     state_copy["start_time"],
                     elapsed=state_copy["elapsed"], eta=state_copy["eta"],
                 )
-                _edit_queue.put((state_copy["chat_id"], state_copy["message_id"], text, {}))
+                # Tambah tombol Stop saat scan masih aktif
+                kb = InlineKeyboardMarkup(row_width=1)
+                kb.add(InlineKeyboardButton("⏹️ Stop", callback_data="scan:stop"))
+                _edit_queue.put((state_copy["chat_id"], state_copy["message_id"], text,
+                                 {"reply_markup": kb}))
 
                 with scan_lock:
                     scan_state["spinner_idx"] += 1
 
-                time.sleep(0.5)
+                time.sleep(1.0)
 
         def _elapsed_loop():
             """Thread mandiri: menghitung elapsed time dan ETA (setiap 1 detik)."""
@@ -2089,8 +2286,11 @@ def run_cdnscan_target_batch(chat_id, message_id):
         # Simpan hasil per-target
         target_results = {}  # target -> list of results
 
+        # Tandai apakah scan dihentikan paksa (untuk Fase 3/4)
+        scan_dihentikan = False
+
         try:
-            with ThreadPoolExecutor(max_workers=min(10, len(batch_items))) as executor:
+            with ThreadPoolExecutor(max_workers=min(15, len(batch_items))) as executor:
                 futures = {executor.submit(process_ip, ip): (t, ip) for t, ip in batch_items}
                 pending = set(futures.keys())
                 while pending:
@@ -2128,10 +2328,19 @@ def run_cdnscan_target_batch(chat_id, message_id):
                             with scan_lock:
                                 scan_state["current"] = c
 
+                    # Cek apakah user menekan tombol Stop
+                    with scan_lock:
+                        if scan_state["stop_requested"]:
+                            scan_dihentikan = True
+                            break
+
         finally:
             # Matikan spinner dan elapsed thread
             with scan_lock:
                 scan_state["active"] = False
+
+            # Unregister dari registry (slot scan dilepas oleh outer finally)
+            unregister_scan_state(chat_id)
 
         # Fase 3: Simpan hasil per-target dan update state
         any_has_sisa = False
@@ -2194,6 +2403,20 @@ def run_cdnscan_target_batch(chat_id, message_id):
             except Exception:
                 pass
 
+        has_data = len(all_results) > 0
+
+        # Scan dihentikan paksa via tombol Stop
+        if scan_dihentikan:
+            save_scan_state(chat_id, "cdnscan", targets[-1] if targets else [], all_results, "CDNScan")
+            _edit_queue.put((
+                chat_id, message_id,
+                f"⏹️ <b>CDNScan dihentikan</b>\n"
+                f"Discan: {scan_state['current']} / {scan_state['total']} IP.\n"
+                f"Hasil yang tersimpan dapat dilihat melalui tombol Lihat.",
+                {"reply_markup": kb_next_target("menu:cdnscan", show_view=has_data, show_next=False)}
+            ))
+            return
+
         if any_has_sisa:
             # Masih ada sisa IP di mana-mana target → tampilkan "Lihat" + "Next"
             set_state(chat_id, cdn_target_index=0)  # Reset index, next akan hitung ulang sisa
@@ -2203,7 +2426,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
                 f"Discan: {total_batch_ips} IP dari {len(targets)} target.\n"
                 f"Masih ada sisa IP di beberapa target.\n"
                 f"Klik Next untuk batch berikutnya, atau Lihat untuk hasil gabungan.",
-                {"reply_markup": kb_next_target("menu:cdnscan", show_view=True)}
+                {"reply_markup": kb_next_target("menu:cdnscan", show_view=has_data)}
             ))
         else:
             # Semua target 100% selesai → hanya "Lihat"
@@ -2212,14 +2435,13 @@ def run_cdnscan_target_batch(chat_id, message_id):
             _edit_queue.put((
                 chat_id, message_id,
                 "✅ <b>CDNScan selesai</b>\nSemua target telah discan.",
-                {"reply_markup": kb_next_target("menu:cdnscan", show_view=True, show_next=False)}
+                {"reply_markup": kb_next_target("menu:cdnscan", show_view=has_data, show_next=False)}
             ))
             # JANGAN clear_state: cdn_targets dibutuhkan oleh tombol "Lihat" (cdnscan:view).
             ACTIVE_SCANS = max(0, ACTIVE_SCANS - 1)
             set_state(chat_id, scanning=False)
             return
     finally:
-        global ACTIVE_SCANS
         ACTIVE_SCANS = max(0, ACTIVE_SCANS - 1)
         set_state(chat_id, scanning=False)
 
@@ -2298,8 +2520,15 @@ def text_handler(message):
         if blocked:
             bot.send_message(chat_id, blocked_message(domain, kata))
             return
+        if not cek_slot_scan(chat_id):
+            bot.send_message(
+                chat_id,
+                "⚠️ <b>Scan sedang berjalan di chat ini</b>\nTunggu selesai sebelum scan baru.",
+                reply_markup=kb_back("menu:subfind"),
+            )
+            return
         set_state(chat_id, mode="subfind", awaiting=None)
-        threading.Thread(target=run_subfind, args=(chat_id, None, domain), daemon=True).start()
+        threading.Thread(target=_run_subfind_with_slot, args=(chat_id, None, domain), daemon=True).start()
         return
 
     if mode == "cdnscan_limit" and awaiting == "custom_limit":
@@ -2364,8 +2593,15 @@ def text_handler(message):
         if blocked:
             bot.send_message(chat_id, blocked_message(domain, kata))
             return
+        if not cek_slot_scan(chat_id):
+            bot.send_message(
+                chat_id,
+                "⚠️ <b>Scan sedang berjalan di chat ini</b>\nTunggu selesai sebelum scan baru.",
+                reply_markup=kb_back("menu:sniscan"),
+            )
+            return
         set_state(chat_id, mode="sniscan", awaiting=None)
-        threading.Thread(target=run_sniscan, args=(chat_id, None, domain), daemon=True).start()
+        threading.Thread(target=_run_sniscan_with_slot, args=(chat_id, None, domain), daemon=True).start()
         return
 
     if awaiting == "filter_value":

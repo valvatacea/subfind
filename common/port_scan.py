@@ -2,6 +2,9 @@
 # Digunakan oleh cdnscan.py, subfind.py, dan sniscan.py
 import socket
 
+# Daftar port terpadu untuk semua scan (subfind, cdnscan, sniscan)
+COMMON_PORTS = [80, 443]
+
 
 def scan_ports(ip, ports, timeout=1.5):
     """Scan daftar port pada IP, return daftar angka port terbuka.

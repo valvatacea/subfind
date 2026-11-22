@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from common.progress import build_progress_text
 from common.http_status import get_http_status_multi
 from common.cdn_detect import detect_cdn
-from common.port_scan import scan_ports
+from common.port_scan import scan_ports, COMMON_PORTS as SCAN_PORTS
 from datetime import datetime
 
 from common.http_status import HEADERS_WITHOUT_COMPRESSION
@@ -37,10 +37,7 @@ def pad_label(label, width=12):
 # Folder dasar berdasarkan lokasi file ini
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Port yang di-scan untuk deteksi CDN (hanya port umum web)
-SCAN_PORTS = [
-    80, 443
-]
+# Port diimpor dari common.port_scan (COMMON_PORTS = [80, 443])
 
 # Batas maksimal IP yang akan di-scan per target
 MAX_IPS_PER_SCAN = 1000

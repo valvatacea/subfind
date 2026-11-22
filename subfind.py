@@ -19,7 +19,7 @@ from common.nsfw_filter import is_blocked, blocked_message
 from common.http_status import get_http_status_multi
 from common.progress import build_progress_text
 from common.cdn_detect import detect_cdn as detect_cdn_common
-from common.port_scan import scan_ports
+from common.port_scan import scan_ports, COMMON_PORTS
 from common.http_status import HEADERS_WITHOUT_COMPRESSION
 
 
@@ -41,10 +41,7 @@ SUBFIND_CACHE_DIR = os.path.join(BASE_DIR, "output", "subfind_cache")
 # Validasi domain menggunakan common.validators.validate_domain
 CACHE_MAX_AGE_SECONDS = 2592000  # 30 hari
 
-# Port umum yang akan di-scan (hanya HTTP dan HTTPS)
-COMMON_PORTS = [
-    80, 443
-]
+# Port diimpor dari common.port_scan (COMMON_PORTS = [80, 443])
 
 # Lock untuk print dan counter thread-safe
 print_lock = threading.Lock()
@@ -221,11 +218,12 @@ def calc_widths(results):
     return w_sub, w_ip, w_ports, w_status, w_cdn
 
 
-def enumerate_domain(domain, progress_callback=None):
+def enumerate_domain(domain, progress_callback=None, stop_event=None):
     """Enumerasi subdomain untuk domain, return (results, errors).
     Digunakan baik oleh CLI main() maupun bot. Tidak mencetak ke stdout.
     Memakai cache per provider (30 hari) seperti CLI asli.
     progress_callback: fungsi dipanggil dengan (current, total) setelah setiap subdomain selesai diproses.
+    stop_event: threading.Event; jika di-set, loop scan akan dihentikan secepatnya.
     """
     if not validate_domain(domain):
         return [], [f"Domain tidak valid: {domain}"]
@@ -318,6 +316,10 @@ def enumerate_domain(domain, progress_callback=None):
                 results.append(result)
                 if progress_callback:
                     progress_callback(len(results), len(sorted_subs))
+
+            # Cek stop_event setelah setiap batch selesai diproses
+            if stop_event and stop_event.is_set():
+                break
 
     results.sort(key=lambda x: x[0])
     return results, errors
