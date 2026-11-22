@@ -2,9 +2,7 @@
 # Berisi fungsi untuk mengambil kode status HTTP dari host:port via GET request.
 # Tidak berubah tampilan output — hanya mengekstrak duplikasi kode dari
 # subfind.py, cdnscan.py, dan sniscan.py.
-
-import urllib.request
-import urllib.error
+from curl_cffi import requests as curl_requests
 
 HEADERS_WITH_COMPRESSION = {
     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -42,12 +40,9 @@ def get_http_status(host, port=80, scheme="http", timeout=5):
     """
     url = f"{scheme}://{host}:{port}"
     try:
-        req = urllib.request.Request(url, headers=HEADERS_WITH_COMPRESSION, method="GET")
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return str(r.status)
-    except urllib.error.HTTPError as e:
-        return str(e.code)
-    except (urllib.error.URLError, Exception):
+        response = curl_requests.get(url, headers=HEADERS_WITH_COMPRESSION, timeout=timeout, impersonate="chrome120")
+        return str(response.status_code)
+    except Exception:
         return "-"
 
 
@@ -65,11 +60,8 @@ def fetch_headers(host, port=80, scheme="http", timeout=5):
     """
     url = f"{scheme}://{host}:{port}/"
     try:
-        req = urllib.request.Request(url, headers=HEADERS_WITH_COMPRESSION, method="GET")
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return str(r.headers).lower(), r.status
-    except urllib.error.HTTPError as e:
-        return str(e.headers).lower() if e.headers else "", e.code
+        response = curl_requests.get(url, headers=HEADERS_WITH_COMPRESSION, timeout=timeout, impersonate="chrome120")
+        return str(response.headers).lower(), response.status_code
     except Exception:
         return "", None
 

@@ -2,14 +2,14 @@
 # subfind.py - Cari subdomain otomatis + IP + CDN + scan port + status HTTP
 # Penggunaan: python3 subfind.py <domain>
 
+from curl_cffi import requests as curl_requests
+
 import sys
 import os
 import re
 import socket
 import json
 import time
-import urllib.request
-import urllib.error
 import threading
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from datetime import datetime
@@ -55,19 +55,8 @@ def fetch(url, timeout=15, retries=2) -> str:
     last_err = ""
     for attempt in range(retries):
         try:
-            req = urllib.request.Request(url, headers=HEADERS_WITHOUT_COMPRESSION)
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return r.read().decode('utf-8', errors='ignore')
-        except urllib.error.HTTPError as e:
-            last_err = f"HTTP_ERROR_{e.code}"
-            # 5xx bisa dicoba ulang, 4xx langsung gagal
-            if 500 <= e.code < 600 and attempt < retries - 1:
-                time.sleep(1)
-                continue
-            return last_err
-        except urllib.error.URLError as e:
-            # DNS gagal / connection refused ngga akan berubah pada retry
-            return f"URL_ERROR_{e.reason}"
+            response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=timeout, impersonate="chrome120")
+            return response.text
         except Exception as e:
             last_err = f"ERR_{type(e).__name__}"
             if attempt < retries - 1:

@@ -9,13 +9,13 @@
 #   python3 cdnscan.py cloudflare
 #   python3 cdnscan.py cloudfront
 
+from curl_cffi import requests as curl_requests
+
 import sys
 import os
 import socket
 import json
 import ipaddress
-import urllib.request
-import urllib.error
 import threading
 import time
 import argparse
@@ -73,42 +73,19 @@ print_lock = threading.Lock()
 
 def fetch(url, timeout=15, progress_callback=None):
     try:
-        req = urllib.request.Request(url, headers=HEADERS_WITHOUT_COMPRESSION)
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            total = r.headers.get('Content-Length')
-            total = int(total) if total else None
-            downloaded = 0
-            chunks = []
-            last_update = 0
-            import time
-            while True:
-                chunk = r.read(8192)
-                if not chunk:
-                    break
-                chunks.append(chunk)
-                downloaded += len(chunk)
-                now = time.time()
-                if progress_callback and now - last_update > 1.0:
-                    progress_callback(downloaded, total)
-                    last_update = now
-            return b''.join(chunks).decode('utf-8', errors='ignore')
-    except urllib.error.HTTPError as e:
-        return f"HTTP_ERROR_{e.code}"
-    except urllib.error.URLError as e:
-        return f"URL_ERROR_{e.reason}"
+        response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=timeout, impersonate="chrome120")
+        result = response.text
     except Exception as e:
         return f"ERR_{type(e).__name__}"
+    return result
 
 
 def fetch_headers(host, port=80, scheme="http", timeout=5):
     """Ambil header response dari host:port via GET request."""
     try:
         url = f"{scheme}://{host}:{port}/"
-        req = urllib.request.Request(url, headers=HEADERS_WITHOUT_COMPRESSION, method="GET")
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return str(r.headers).lower(), r.status
-    except urllib.error.HTTPError as e:
-        return str(e.headers).lower() if e.headers else "", e.code
+        response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=timeout, impersonate="chrome120")
+        return str(response.headers).lower(), response.status_code
     except Exception:
         return "", None
 

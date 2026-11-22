@@ -5,8 +5,7 @@ import os
 import json
 import ipaddress
 import datetime
-import urllib.request
-import urllib.error
+from curl_cffi import requests as curl_requests
 
 from common.http_status import fetch_headers, HEADERS_WITHOUT_COMPRESSION
 
@@ -54,9 +53,8 @@ def get_provider_ips(provider_name, progress_callback=None):
     # Fetch dari provider
     url = PROVIDER_URLS[provider_name]
     try:
-        req = urllib.request.Request(url, headers=HEADERS_WITHOUT_COMPRESSION)
-        with urllib.request.urlopen(req, timeout=30) as r:
-            result = r.read().decode('utf-8', errors='ignore')
+        response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=30, impersonate="chrome120")
+        result = response.text
     except Exception as e:
         return None, f"Gagal mengunduh {provider_name}: {e}"
 

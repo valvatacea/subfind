@@ -3,9 +3,10 @@
 # dan gabungkan ke common/nsfw_blocklist.txt tanpa duplikasi.
 # Shallalist asli (shallalist.de) sudah tidak aktif; mirror ini gratis dan tetap tersedia.
 
+from curl_cffi import requests as curl_requests
+
 import os
 import sys
-import urllib.request
 import urllib.error
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -26,9 +27,8 @@ from common.http_status import HEADERS_WITHOUT_COMPRESSION
 def fetch_domains(url):
     """Ambil daftar domain dari URL. Return list string, atau [] jika gagal."""
     try:
-        req = urllib.request.Request(url, headers=HEADERS_WITHOUT_COMPRESSION)
-        with urllib.request.urlopen(req, timeout=30) as r:
-            text = r.read().decode('utf-8', errors='ignore')
+        response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=30, impersonate="chrome120")
+        text = response.text
     except Exception as e:
         print(f"[!] Gagal unduh {url}: {e}")
         return []
