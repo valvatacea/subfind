@@ -26,13 +26,7 @@ from common.cdn_detect import detect_cdn
 from common.port_scan import scan_ports
 from datetime import datetime
 
-HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.5',
-    'Connection': 'keep-alive',
-    'Upgrade-Insecure-Requests': '1',
-}
+from common.http_status import HEADERS_WITHOUT_COMPRESSION
 def esc(text):
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -79,7 +73,7 @@ print_lock = threading.Lock()
 
 def fetch(url, timeout=15, progress_callback=None):
     try:
-        req = urllib.request.Request(url, headers=HEADERS)
+        req = urllib.request.Request(url, headers=HEADERS_WITHOUT_COMPRESSION)
         with urllib.request.urlopen(req, timeout=timeout) as r:
             total = r.headers.get('Content-Length')
             total = int(total) if total else None
@@ -110,7 +104,7 @@ def fetch_headers(host, port=80, scheme="http", timeout=5):
     """Ambil header response dari host:port via GET request."""
     try:
         url = f"{scheme}://{host}:{port}/"
-        req = urllib.request.Request(url, headers=HEADERS, method="GET")
+        req = urllib.request.Request(url, headers=HEADERS_WITHOUT_COMPRESSION, method="GET")
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return str(r.headers).lower(), r.status
     except urllib.error.HTTPError as e:

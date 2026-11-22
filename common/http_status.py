@@ -6,7 +6,25 @@
 import urllib.request
 import urllib.error
 
-HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
+HEADERS_WITH_COMPRESSION = {
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+}
+
+HEADERS_WITHOUT_COMPRESSION = {
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+}
+
+# Backward compatibility alias
+HEADERS = HEADERS_WITHOUT_COMPRESSION
 
 
 def get_http_status(host, port=80, scheme="http", timeout=5):
@@ -24,7 +42,7 @@ def get_http_status(host, port=80, scheme="http", timeout=5):
     """
     url = f"{scheme}://{host}:{port}"
     try:
-        req = urllib.request.Request(url, headers=HEADERS, method="GET")
+        req = urllib.request.Request(url, headers=HEADERS_WITH_COMPRESSION, method="GET")
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return str(r.status)
     except urllib.error.HTTPError as e:
@@ -47,7 +65,7 @@ def fetch_headers(host, port=80, scheme="http", timeout=5):
     """
     url = f"{scheme}://{host}:{port}/"
     try:
-        req = urllib.request.Request(url, headers=HEADERS, method="GET")
+        req = urllib.request.Request(url, headers=HEADERS_WITH_COMPRESSION, method="GET")
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return str(r.headers).lower(), r.status
     except urllib.error.HTTPError as e:

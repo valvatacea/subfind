@@ -20,8 +20,8 @@ from common.http_status import get_http_status_multi
 from common.progress import build_progress_text
 from common.cdn_detect import detect_cdn as detect_cdn_common
 from common.port_scan import scan_ports
+from common.http_status import HEADERS_WITHOUT_COMPRESSION
 
-HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 
 # Timeout default untuk semua operasi socket (DNS, connect, vb.)
 socket.setdefaulttimeout(10)
@@ -55,7 +55,7 @@ def fetch(url, timeout=15, retries=2) -> str:
     last_err = ""
     for attempt in range(retries):
         try:
-            req = urllib.request.Request(url, headers=HEADERS)
+            req = urllib.request.Request(url, headers=HEADERS_WITHOUT_COMPRESSION)
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return r.read().decode('utf-8', errors='ignore')
         except urllib.error.HTTPError as e:

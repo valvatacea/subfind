@@ -20,13 +20,13 @@ SOURCES = {
     # "drugs":  "https://raw.githubusercontent.com/Azothyran/ShallalistMirror/master/drugs/domains",
 }
 
-HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64)'}
+from common.http_status import HEADERS_WITHOUT_COMPRESSION
 
 
 def fetch_domains(url):
     """Ambil daftar domain dari URL. Return list string, atau [] jika gagal."""
     try:
-        req = urllib.request.Request(url, headers=HEADERS)
+        req = urllib.request.Request(url, headers=HEADERS_WITHOUT_COMPRESSION)
         with urllib.request.urlopen(req, timeout=30) as r:
             text = r.read().decode('utf-8', errors='ignore')
     except Exception as e:
