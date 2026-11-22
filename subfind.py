@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from datetime import datetime
 
 from common.validators import validate_domain
+from common.nsfw_filter import is_blocked, blocked_message
 from common.http_status import get_http_status_multi
 from common.progress import build_progress_text
 
@@ -384,6 +385,10 @@ def main():
     domain = sys.argv[1].lower().strip()
     if not validate_domain(domain):
         print(f"Domain tidak valid: {domain}")
+        sys.exit(1)
+    blocked, kata = is_blocked(domain)
+    if blocked:
+        print(blocked_message(domain, kata))
         sys.exit(1)
     print(f"Scanning: {domain}\n")
 

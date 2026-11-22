@@ -1,0 +1,17 @@
+# Daftar kata kunci domain yang tidak diperbolehkan discan (NSFW / tidak pantas)
+# Satu entri per baris. Pencocokan case-insensitive substring.
+porno
+xxx
+sex
+nudes
+onlyfans
+hentai
+gore
+togel
+judi
+kasino
+casino
+narkoba
+shabu
+pedo
+loli

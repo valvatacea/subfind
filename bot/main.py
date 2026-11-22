@@ -10,6 +10,7 @@ import threading
 import queue
 import ipaddress
 import subprocess
+import logging
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED, as_completed
 
 # Folder root repo (induk folder bot/) — semua path dinamis dari lokasi file ini
@@ -18,6 +19,13 @@ BOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 from dotenv import load_dotenv
 load_dotenv(os.path.join(BOT_DIR, '.env'))
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
+log = logging.getLogger('surfinder')
 
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -33,6 +41,7 @@ from subfind import (
     CF_PREFIXES as SUBFIND_CF_PREFIXES, detect_cdn as subfind_detect_cdn,
 )
 from common.validators import validate_domain
+from common.nsfw_filter import is_blocked, blocked_message
 from common.progress import format_elapsed, calculate_eta, build_bar, SPINNER
 from sniscan import (
     enumerate_hosts,
@@ -125,15 +134,19 @@ def pad_label(label, width=12):
 # SPINNER, format_elapsed diimpor dari common.progress
 
 
-def build_progress_text(title, target, current, total, start_time, spinner_idx):
+def build_progress_text(spinner_idx, title, target, current, total, start_time,
+                        elapsed=None, eta=None):
     """Bangun teks progres dengan spinner, bar, persentase, elapsed time, dan ETA.
 
     Tidak ada rate limiting di sini — spinner thread mengontrol timing (setiap 0,4 detik).
     Output format HTML untuk Telegram, menggunakan emoji 🟦⬜ untuk progress bar.
+    elapsed/eta dapat dikirim oleh thread terpisah (elapsed_loop) agar spinner
+    tidak tergantung pada event penyelesaian item.
     """
     import time
     now = time.time()
-    elapsed = now - start_time
+    if elapsed is None:
+        elapsed = now - start_time
 
     # Clamp current dan pct agar tidak melebihi total (hindari >100%)
     if total > 0:
@@ -143,10 +156,11 @@ def build_progress_text(title, target, current, total, start_time, spinner_idx):
         current = 0
         pct = 0
 
-    if current > 0 and total > 0:
-        eta = calculate_eta(elapsed, current, total)
-    else:
-        eta = 0
+    if eta is None:
+        if current > 0 and total > 0 and elapsed > 0:
+            eta = calculate_eta(elapsed, current, total)
+        else:
+            eta = 0
 
     # Progress bar: 10 blok, emoji kotak biru terisi dan kosong
     bar = build_bar(current, total, width=10,
@@ -204,7 +218,7 @@ def kb_provider():
 
 def kb_ranges(ranges, page=1, per_page=8, selected=None):
     """Tombol pilihan rentang IP dari provider, dengan paginasi."""
-    m = InlineKeyboardMarkup(row_width=2)
+    m = InlineKeyboardMarkup(row_width=3)
     total = len(ranges)
     total_pages = max(1, (total + per_page - 1) // per_page)
     page = max(1, min(page, total_pages))
@@ -321,8 +335,8 @@ def build_page_text(results, page, mode, title):
     return "\n".join(lines), page, total_pages
 
 
-def kb_page(mode, page, total_pages, back_target=None):
-    """Tombol prev / halaman / next + kembali ke menu."""
+def kb_page(mode, page, total_pages, back_target=None, filter_active=False, filter_count=0):
+    """Tombol prev / halaman / next + filter + kembali ke menu."""
     m = InlineKeyboardMarkup(row_width=3)
     buttons = []
     if page > 1:
@@ -331,9 +345,113 @@ def kb_page(mode, page, total_pages, back_target=None):
     if page < total_pages:
         buttons.append(InlineKeyboardButton("Next ⏭️", callback_data=f"page:{mode}:{page + 1}"))
     m.add(*buttons)
+
+    # Tombol filter (hanya untuk mode yang punya hasil terstruktur, bukan d2ip)
+    if mode != "d2ip":
+        if filter_active:
+            buttons2 = [
+                InlineKeyboardButton("🔍 Tambah", callback_data=f"filter:{mode}"),
+                InlineKeyboardButton(f"🧹 Bersihkan ({filter_count})", callback_data=f"clearfilter:{mode}"),
+            ]
+        else:
+            buttons2 = [InlineKeyboardButton("🔍 Filter", callback_data=f"filter:{mode}")]
+        m.add(*buttons2)
+
     prev = back_target or {"subfind": "menu:subfind", "cdnscan": "menu:cdnscan", "d2ip": "menu:d2ip"}.get(mode, "menu:main")
     m.add(InlineKeyboardButton("↩️ Kembali", callback_data=f"back:{prev}"))
     return m
+
+
+# ===================== FILTER FIELD KEYBOARD =====================
+FILTER_FIELDS = {
+    "subfind": [
+        ("Subdomain", "subdomain"),
+        ("IP", "ip"),
+        ("Ports", "ports"),
+        ("Status", "status"),
+        ("CDN", "cdn"),
+    ],
+    "cdnscan": [
+        ("IP", "ip"),
+        ("Ports", "ports"),
+        ("CDN", "cdn"),
+        ("Status", "status"),
+    ],
+    "sniscan": [
+        ("SNI Host", "sni_host"),
+        ("IP", "ip"),
+        ("TLS/ALPN", "tls_version"),
+        ("ALPN", "alpn"),
+        ("Port TLS", "tls_port"),
+        ("Port Lain", "extra_ports"),
+        ("Status", "status"),
+        ("Response ms", "response_time_ms"),
+    ],
+}
+
+FIELD_LABELS = {
+    "subdomain": "Subdomain",
+    "ip": "IP",
+    "ports": "Ports",
+    "status": "Status",
+    "cdn": "CDN",
+    "sni_host": "SNI Host",
+    "tls_version": "TLS/ALPN",
+    "alpn": "ALPN",
+    "tls_port": "Port TLS",
+    "extra_ports": "Port Lain",
+    "response_time_ms": "Response ms",
+}
+
+
+def kb_filter_fields(mode):
+    """Keyboard pilih field yang akan difilter. Tidak tersedia untuk d2ip."""
+    fields = FILTER_FIELDS.get(mode, [])
+    m = InlineKeyboardMarkup(row_width=2)
+    buttons = [
+        InlineKeyboardButton(label, callback_data=f"filterfield:{mode}:{key}")
+        for label, key in fields
+    ]
+    if buttons:
+        m.add(*buttons)
+    m.add(InlineKeyboardButton("↩️ Kembali", callback_data=f"filterback:{mode}"))
+    return m
+
+def filter_matches(entry, filters):
+    """Cek entri (tuple) cocok semua filter. filters: dict {field_key: nilai}."""
+    if not filters:
+        return True
+    # Map field_key -> index pada tuple hasil scan per mode
+    # Index diambil dari hasil build_page_text / run_*:
+    # subfind: (sub, ip, ports, status, cdn) -> 0,1,2,3,4
+    # cdnscan: (ip, ports, cdn, status) -> 0,1,2,3
+    # sniscan: (sni_host, ip, tls_version, alpn, tls_port, extra_ports, response_time_ms, status) -> 0..7
+    index_map = {
+        "subfind": {
+            "subdomain": 0, "ip": 1, "ports": 2, "status": 3, "cdn": 4,
+        },
+        "cdnscan": {
+            "ip": 0, "ports": 1, "cdn": 2, "status": 3,
+        },
+        "sniscan": {
+            "sni_host": 0, "ip": 1, "tls_version": 2, "alpn": 3,
+            "tls_port": 4, "extra_ports": 5, "response_time_ms": 6, "status": 7,
+        },
+    }
+    # Dapatkan mode dari caller — tidak tersedia di sini, pakai heuristik berdasarkan panjang entry
+    # Fallback: cocokkan semua field yang tersedia di index_map mana pun yang indeksnya valid
+    for field_key, nilai in filters.items():
+        found = False
+        for mode_map in index_map.values():
+            idx = mode_map.get(field_key)
+            if idx is not None and idx < len(entry):
+                cell = str(entry[idx])
+                if nilai.lower() in cell.lower():
+                    found = True
+                    break
+        if not found:
+            return False
+    return True
 
 
 
@@ -400,6 +518,7 @@ def build_cdnscan_history_page(page=1, per_page=10):
 
 def show_cdnscan_history_page(chat_id, message_id, page, edit=True):
     """Tampilkan halaman riwayat CDNScan dengan tombol inline per entri."""
+    set_state(chat_id, cdn_history_page=page)
     text, page, total_pages = build_cdnscan_history_page(page)
     kb = InlineKeyboardMarkup(row_width=2)
 
@@ -470,7 +589,9 @@ def show_cdnscan_history_detail(chat_id, message_id, filename, edit=True):
     results = [(item.get("ip", "-"), item.get("ports", "-"), item.get("cdn", "-"), item.get("status", "-")) for item in data]
     save_scan_state(chat_id, "cdnscan", target, results, "CDNScan", page=1)
     info_text = f"✅ <b>Target sudah discan sebelumnya.</b>\nProvider: {provider}\nTotal: {len(data)} data"
-    show_scan_page(chat_id, message_id, edit=True, info_text=info_text, back_target="cdnscan:history:1")
+    st_hist = get_state(chat_id)
+    hist_page = st_hist.get("cdn_history_page", 1)
+    show_scan_page(chat_id, message_id, edit=True, info_text=info_text, back_target=f"cdnscan:history:{hist_page}")
 
 
 def get_subfind_history():
@@ -530,6 +651,7 @@ def build_subfind_history_page(page=1, per_page=10):
 
 def show_subfind_history_page(chat_id, message_id, page, edit=True):
     """Tampilkan halaman riwayat SubFind dengan tombol inline per entri."""
+    set_state(chat_id, subfind_history_page=page)
     text, page, total_pages = build_subfind_history_page(page)
     kb = InlineKeyboardMarkup(row_width=2)
 
@@ -599,7 +721,9 @@ def show_subfind_history_detail(chat_id, message_id, filename, edit=True):
     results = [(item.get("subdomain", "-"), item.get("ip", "-"), item.get("ports", "-"), item.get("status", "-"), item.get("cdn", "-")) for item in data]
     save_scan_state(chat_id, "subfind", target, results, "SubFind", page=1)
     info_text = f"✅ <b>Target sudah discan sebelumnya.</b>\nTotal: {len(data)} subdomain"
-    show_scan_page(chat_id, message_id, edit=True, info_text=info_text, back_target="subfind:history:1")
+    st_hist = get_state(chat_id)
+    hist_page = st_hist.get("subfind_history_page", 1)
+    show_scan_page(chat_id, message_id, edit=True, info_text=info_text, back_target=f"subfind:history:{hist_page}")
 
 
 def save_scan_state(chat_id, mode, target, results, title, page=1):
@@ -610,13 +734,15 @@ def save_scan_state(chat_id, mode, target, results, title, page=1):
               scan_target=target,
               scan_results=results,
               scan_page=page,
-              scan_title=title)
+              scan_title=title,
+              scan_filters={})
 
 
 def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=None):
     """Tampilkan halaman scan saat ini dari state.
     info_text: teks tambahan yang ditampilkan di atas tabel (misal "sudah discan").
     back_target: callback_data untuk tombol Kembali (override default).
+    Terapkan scan_filters (client-side) sebelum pagination.
     """
     st = get_state(chat_id)
     results = st.get("scan_results", [])
@@ -624,9 +750,17 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=N
     page = st.get("scan_page", 1)
     target = st.get("scan_target", "-")
     title = st.get("scan_title", "Hasil Scan")
+    filters = st.get("scan_filters", {}) or {}
+
+    # Terapkan filter client-side (tidak rescan)
+    if filters:
+        filtered = [r for r in results if filter_matches(r, filters)]
+    else:
+        filtered = results
+    results = filtered
 
     if not results:
-        text = f"⚠️ <b>{title}</b>\nTidak ada data untuk ditampilkan."
+        text = f"⚠️ <b>{title}</b>\nTidak ada data yang cocok dengan filter."
         if info_text:
             text = f"{info_text}\n\n{text}"
         prev = back_target or {"subfind": "menu:subfind", "cdnscan": "menu:cdnscan", "d2ip": "menu:d2ip"}.get(mode, "menu:main")
@@ -644,21 +778,33 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=N
 
     text, page, total_pages = build_page_text(results, page, mode, title)
     set_state(chat_id, scan_page=page)
+    if back_target:
+        set_state(chat_id, scan_back_target=back_target)
+
+    # Indikator filter di atas tabel
+    filter_line = ""
+    if filters:
+        parts = [f"{FIELD_LABELS.get(k, k)}={v}" for k, v in filters.items()]
+        filter_line = f"🔍 Filter: {', '.join(parts)}\n"
     if info_text:
         text = f"{info_text}\n\n{text}"
+    if filter_line:
+        text = f"{filter_line}{text}"
+
     try:
         if edit:
             _edit_queue.put((
                 chat_id, message_id, text,
-                {"reply_markup": kb_page(mode, page, total_pages, back_target=back_target)}
+                {"reply_markup": kb_page(mode, page, total_pages, back_target=back_target,
+                                         filter_active=bool(filters), filter_count=len(filters))}
             ))
         else:
-            bot.send_message(chat_id, text, reply_markup=kb_page(mode, page, total_pages, back_target=back_target))
+            bot.send_message(chat_id, text, reply_markup=kb_page(mode, page, total_pages, back_target=back_target,
+                                                                 filter_active=bool(filters), filter_count=len(filters)))
     except Exception:
-        bot.send_message(chat_id, text, reply_markup=kb_page(mode, page, total_pages, back_target=back_target))
+        bot.send_message(chat_id, text, reply_markup=kb_page(mode, page, total_pages, back_target=back_target,
+                                                             filter_active=bool(filters), filter_count=len(filters)))
 
-
-# ===================== SNISCAN HISTORY =====================
 def get_sniscan_history():
     """Baca daftar file hasil scan SNIScan JSON dari output/."""
     OUT_DIR = os.path.join(BASE_DIR, "output")
@@ -718,6 +864,7 @@ def build_sniscan_history_page(page=1, per_page=10):
 
 def show_sniscan_history_page(chat_id, message_id, page, edit=True):
     """Tampilkan halaman riwayat SNIScan dengan tombol inline per entri."""
+    set_state(chat_id, sniscan_history_page=page)
     text, page, total_pages = build_sniscan_history_page(page)
     kb = InlineKeyboardMarkup(row_width=2)
 
@@ -826,7 +973,9 @@ def show_sniscan_history_detail(chat_id, message_id, filename, edit=True):
 
     save_scan_state(chat_id, "sniscan", target, results, "SNIScan", page=1)
     info_text = f"✅ <b>Target sudah discan sebelumnya.</b>\nTotal: {len(results)} host"
-    show_scan_page(chat_id, message_id, edit=True, info_text=info_text, back_target="sniscan:history:1")
+    st_hist = get_state(chat_id)
+    hist_page = st_hist.get("sniscan_history_page", 1)
+    show_scan_page(chat_id, message_id, edit=True, info_text=info_text, back_target=f"sniscan:history:{hist_page}")
 
 
 # ===================== D2IP (dari d2ip.sh) =====================
@@ -912,7 +1061,8 @@ def run_d2ip(chat_id, message_id, domain):
               scan_target=domain,
               scan_results=lines,
               scan_page=1,
-              scan_title="D2IP")
+              scan_title="D2IP",
+              scan_filters={})
     show_scan_page(chat_id, message_id, edit=True)
 
 
@@ -1035,6 +1185,7 @@ def run_subfind(chat_id, message_id, domain):
 
 # ===================== SNISCAN (impor dari sniscan.py) =====================
 def run_sniscan(chat_id, message_id, domain):
+    log.info("SNIScan mulai: domain=%s chat_id=%s", domain, chat_id)
     if message_id is None:
         sent = bot.send_message(chat_id, f"🔍 <b>SNIScan</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...")
         message_id = sent.message_id
@@ -1116,12 +1267,14 @@ def run_sniscan(chat_id, message_id, domain):
             scan_state["total"] = total
 
     results, errors = enumerate_hosts(domain, progress_callback=progress_callback)
+    log.debug("SNIScan selesai: domain=%s results=%d errors=%d", domain, len(results), len(errors))
 
     # Matikan spinner dan elapsed thread
     with scan_lock:
         scan_state["active"] = False
 
     if errors:
+        log.debug("SNIScan provider errors: %s", '; '.join(errors))
         _edit_queue.put((
             chat_id, message_id,
             f"[!] Provider gagal: {'; '.join(errors)}",
@@ -1167,6 +1320,7 @@ def run_sniscan(chat_id, message_id, domain):
             r["tls_port"],
             ",".join(str(p) for p in r["extra_ports"]) if r["extra_ports"] else "-",
             r["response_time_ms"],
+            r["status"],
         )
         for r in results
     ]
@@ -1174,25 +1328,27 @@ def run_sniscan(chat_id, message_id, domain):
     # Simpan ke state dan tampilkan halaman 1 (pagination)
     save_scan_state(chat_id, "sniscan", domain, results_tuples, "SNIScan")
     show_scan_page(chat_id, sent.message_id, edit=True)
+    log.info("SNIScan selesai: domain=%s total=%d", domain, len(results))
 
 
 # ===================== HELP =====================
 HELP_TEXT = (
-    "🤖 <b>Surfinder — Panduan Singkat</b>\n\n"
-    "<b>Menu:</b>\n"
-    "🌐 D2IP — Resolve domain ke IP. Ketik domain (contoh: google.com).\n"
-    "🔍 SubFind — Cari subdomain + IP + port + status + CDN. Ketik domain (contoh: example.com).\n"
-    "🛡️ CDNScan — Deteksi CDN dari IP/CIDR/range atau provider (cloudflare/cloudfront).\n"
-    "🔍 SNIScan — Scan SNI host via TLS handshake + deteksi port. Ketik domain (contoh: instagram.com).\n\n"
+    "🤖 <b>Surfinder — Bot Scanner Jaringan</b>\n\n"
+    "<b>Fitur:</b>\n"
+    "• D2IP — Resolve domain ke IP\n"
+    "• SubFind — Enumerasi subdomain + IP + port + status + CDN\n"
+    "• CDNScan — Deteksi CDN dari IP/CIDR/range atau provider\n"
+    "• SNIScan — Scan SNI host via TLS handshake + deteksi port\n\n"
     "<b>Cara pakai:</b>\n"
-    "1. Klik tombol menu yang diinginkan (D2IP / SubFind / CDNScan / SNIScan)\n"
-    "2. Ketik domain atau IP/CIDR sesuai yang diminta\n"
+    "1. Pilih menu dari tombol inline\n"
+    "2. Masukkan domain atau IP/CIDR yang diminta\n"
     "3. Tunggu scan selesai\n"
-    "4. Lihat hasil per halaman dengan tombol Prev / Next\n\n"
+    "4. Lihat hasil per halaman dengan tombol Prev / Next\n"
+    "5. Gunakan Filter untuk menyaring hasil berdasarkan field tertentu\n\n"
     "<b>Perintah:</b>\n"
     "/start — Mulai bot & lihat menu\n"
     "/menu — Kembali ke menu utama\n"
-    "/help — Tampilkan bantuan ini\n"
+    "/help — Tampilkan panduan ini\n"
 )
 
 
@@ -1215,6 +1371,8 @@ def cb_handler(call):
     chat_id = call.message.chat.id
     message_id = call.message.message_id
     data = call.data
+
+    log.debug("callback: %s from chat %s", data, chat_id)
 
     # Jawab callback agar tombol tidak "loading" selamanya
     try:
@@ -1468,7 +1626,8 @@ def cb_handler(call):
             st = get_state(chat_id)
             if st.get("mode") == "scan_view" and st.get("scan_mode") == mode:
                 set_state(chat_id, scan_page=target_page)
-                show_scan_page(chat_id, message_id, edit=True)
+                back_target = st.get("scan_back_target", None)
+                show_scan_page(chat_id, message_id, edit=True, back_target=back_target)
             else:
                 try:
                     bot.answer_callback_query(call.id, "Sesi scan sudah kedaluwarsa.")
@@ -1479,6 +1638,55 @@ def cb_handler(call):
                 bot.answer_callback_query(call.id, "Tombol tidak dikenal.")
             except Exception:
                 pass
+
+    elif data.startswith("filter:"):
+        parts = data.split(":")
+        if len(parts) == 2:
+            mode = parts[1]
+            st = get_state(chat_id)
+            filters = st.get("scan_filters", {}) or {}
+            filter_line = ""
+            if filters:
+                parts_filter = [f"{FIELD_LABELS.get(k, k)}={v}" for k, v in filters.items()]
+                filter_line = f"\n\nFilter aktif: {', '.join(parts_filter)}"
+            try:
+                bot.edit_message_text(
+                    f"🔍 <b>Pilih field untuk difilter</b>{filter_line}\nPilih kolom yang ingin difilter:",
+                    chat_id, message_id, reply_markup=kb_filter_fields(mode)
+                )
+            except Exception:
+                bot.send_message(chat_id, "🔍 Pilih field untuk difilter:", reply_markup=kb_filter_fields(mode))
+
+    elif data.startswith("filterfield:"):
+        parts = data.split(":")
+        if len(parts) == 3:
+            mode = parts[1]
+            field_key = parts[2]
+            label = FIELD_LABELS.get(field_key, field_key)
+            set_state(chat_id, awaiting="filter_value", filter_mode=mode, filter_field=field_key)
+            try:
+                bot.edit_message_text(
+                    f"🔍 <b>Masukkan nilai untuk {label}</b>\nContoh: 200",
+                    chat_id, message_id,
+                )
+            except Exception:
+                bot.send_message(chat_id, f"🔍 Masukkan nilai untuk {label}:")
+
+    elif data.startswith("clearfilter:"):
+        parts = data.split(":")
+        if len(parts) == 2:
+            mode = parts[1]
+            set_state(chat_id, scan_filters={})
+            st = get_state(chat_id)
+            show_scan_page(chat_id, message_id, edit=True)
+
+    elif data.startswith("filterback:"):
+        parts = data.split(":")
+        if len(parts) == 2:
+            mode = parts[1]
+            st = get_state(chat_id)
+            # Kembali ke halaman hasil scan (bukan ulang ke field selection)
+            show_scan_page(chat_id, message_id, edit=True)
 
     elif data.startswith("back:"):
         prev_menu = data.split(":", 1)[1]
@@ -1609,7 +1817,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
             "✅ <b>CDNScan selesai</b>\nSemua target telah discan.",
             {"reply_markup": kb_next_target("menu:cdnscan", show_view=True, show_next=False)}
         ))
-        clear_state(chat_id)
+        # JANGAN clear_state: cdn_targets dibutuhkan oleh tombol "Lihat" (cdnscan:view).
         return
 
     # Fase 2: Scan semua IP gabungan dalam satu batch
@@ -1774,7 +1982,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
             "✅ <b>CDNScan selesai</b>\nSemua target telah discan.",
             {"reply_markup": kb_next_target("menu:cdnscan", show_view=True, show_next=False)}
         ))
-        clear_state(chat_id)
+        # JANGAN clear_state: cdn_targets dibutuhkan oleh tombol "Lihat" (cdnscan:view).
         return
 
 
@@ -1815,6 +2023,10 @@ def text_handler(message):
         if not validate_domain(domain):
             bot.send_message(chat_id, "Domain tidak valid. Coba lagi (contoh: google.com).")
             return
+        blocked, kata = is_blocked(domain)
+        if blocked:
+            bot.send_message(chat_id, blocked_message(domain, kata))
+            return
         sent = bot.send_message(chat_id, f"🌐 <b>D2IP</b>\nMeng-resolve <b>{esc(domain)}</b>...")
         set_state(chat_id, mode="d2ip", awaiting=None)
         threading.Thread(target=run_d2ip, args=(chat_id, sent.message_id, domain), daemon=True).start()
@@ -1824,6 +2036,10 @@ def text_handler(message):
         domain = text.lower().strip()
         if not validate_domain(domain):
             bot.send_message(chat_id, "Domain tidak valid. Coba lagi (contoh: example.com).")
+            return
+        blocked, kata = is_blocked(domain)
+        if blocked:
+            bot.send_message(chat_id, blocked_message(domain, kata))
             return
         set_state(chat_id, mode="subfind", awaiting=None)
         threading.Thread(target=run_subfind, args=(chat_id, None, domain), daemon=True).start()
@@ -1869,8 +2085,26 @@ def text_handler(message):
         if not validate_domain(domain):
             bot.send_message(chat_id, "Domain tidak valid. Coba lagi (contoh: instagram.com).")
             return
+        blocked, kata = is_blocked(domain)
+        if blocked:
+            bot.send_message(chat_id, blocked_message(domain, kata))
+            return
         set_state(chat_id, mode="sniscan", awaiting=None)
         threading.Thread(target=run_sniscan, args=(chat_id, None, domain), daemon=True).start()
+        return
+
+    if awaiting == "filter_value":
+        mode = st.get("filter_mode")
+        field_key = st.get("filter_field")
+        if not mode or not field_key:
+            bot.send_message(chat_id, "Sesi filter tidak valid. Pilih menu dulu dengan /start.", reply_markup=kb_main())
+            return
+        label = FIELD_LABELS.get(field_key, field_key)
+        filters = st.get("scan_filters", {}) or {}
+        filters[field_key] = text
+        set_state(chat_id, awaiting=None, filter_mode=None, filter_field=None, scan_filters=filters)
+        # Render ulang halaman 1 (edit pesan input user)
+        show_scan_page(chat_id, message.message_id, edit=False)
         return
 
     # Fallback
@@ -1879,5 +2113,5 @@ def text_handler(message):
 
 # ===================== MAIN =====================
 if __name__ == '__main__':
-    print("Surfinder Telegram Bot sedang berjalan...")
+    log.info("Surfinder Telegram Bot sedang berjalan...")
     bot.infinity_polling()

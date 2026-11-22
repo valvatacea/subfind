@@ -16,9 +16,10 @@ import urllib.request
 import urllib.error
 import threading
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED, as_completed
 
 from common.validators import validate_domain
+from common.nsfw_filter import is_blocked, blocked_message
 from common.http_status import get_http_status_multi
 from common.progress import build_progress_text
 
@@ -117,6 +118,7 @@ def tls_handshake(ip, sni_host, port=443, timeout=8):
 
         start = time.time()
         with socket.create_connection((ip, port), timeout=timeout) as sock:
+            sock.settimeout(timeout)
             with ctx.wrap_socket(sock, server_hostname=sni_host) as ssock:
                 elapsed_ms = int((time.time() - start) * 1000)
                 tls_version = ssock.version()
@@ -219,14 +221,38 @@ def enumerate_hosts(domain, progress_callback=None):
 
     with ThreadPoolExecutor(max_workers=min(20, len(sorted_subs))) as executor:
         futures = {executor.submit(process_host, sub): sub for sub in sorted_subs}
-        for future in as_completed(futures):
-            try:
-                result = future.result()
-                results.append(result)
+        pending = set(futures.keys())
+
+        while pending:
+            done, pending = wait(pending, timeout=60, return_when=FIRST_COMPLETED)
+            if not done:
+                # Semua host yang masih pending dianggap gagal/hang,
+                # agar progres tidak macet selamanya di satu host.
+                for future in list(pending):
+                    sub = futures[future]
+                    results.append({
+                        "sni_host": sub, "ip": "-", "response_time_ms": 0,
+                        "tls_version": "-", "alpn": "-", "tls_port": "-",
+                        "extra_ports": [], "status": "-",
+                    })
+                    if progress_callback:
+                        progress_callback(len(results), len(sorted_subs))
+                    future.cancel()
+                pending.clear()
+                break
+            for future in done:
+                sub = futures[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                except Exception:
+                    results.append({
+                        "sni_host": sub, "ip": "-", "response_time_ms": 0,
+                        "tls_version": "-", "alpn": "-", "tls_port": "-",
+                        "extra_ports": [], "status": "-",
+                    })
                 if progress_callback:
                     progress_callback(len(results), len(sorted_subs))
-            except Exception:
-                pass
 
     results.sort(key=lambda x: x["sni_host"])
     return results, errors
@@ -241,6 +267,10 @@ def main():
     domain = sys.argv[1].lower().strip()
     if not validate_domain(domain):
         print(f"Domain tidak valid: {domain}")
+        sys.exit(1)
+    blocked, kata = is_blocked(domain)
+    if blocked:
+        print(blocked_message(domain, kata))
         sys.exit(1)
 
     print(f"═══ SNISCAN (TLS HANDSHAKE & MULTI-PORT): {domain} ═══")
