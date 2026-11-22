@@ -20,12 +20,53 @@ PROVIDER_URLS = {
 
 # Header yang mencurigakan sebagai CDN + nilai yang mengindikasikannya
 CDN_HEADER_SIGNATURES = [
+    # Cloudflare
     (('cf-ray',), 'Cloudflare'),
     (('server',), 'cloudflare'),
+    # Amazon CloudFront
     (('via',), 'cloudfront'),
     (('x-cache',), 'cloudfront'),
+    # Akamai
     (('server',), 'AkamaiGHost'),
+    # Fastly
     (('server',), 'fastly'),
+    # KeyCDN
+    (('x-cache',), 'keycdn'),
+    (('server',), 'keycdn'),
+    # StackPath
+    (('server',), 'StackPath'),
+    # Imperva / Incapsula
+    (('x-incapsula',), 'Imperva'),
+    (('x-iinfo',), 'Imperva'),
+    # G-Core Labs
+    (('server',), 'gcore'),
+    # CDN77
+    (('server',), 'CDN77'),
+    # Azure CDN
+    (('x-azure-ref',), 'Azure CDN'),
+    (('server',), 'Windows-Azure-CDN'),
+    # Google Cloud CDN / GFE
+    (('server',), 'GFE'),
+    # QUIC.cloud
+    (('x-quic.cloud',), 'QUIC.cloud'),
+    # BunnyCDN
+    (('x-cache',), 'bunnycdn'),
+    (('server',), 'BunnyCDN'),
+    # Sucuri
+    (('x-sucuri-id',), 'Sucuri'),
+    (('server',), 'Sucuri/Cloudproxy'),
+    # ArvanCloud
+    (('x-arvancloud',), 'ArvanCloud'),
+    (('server',), 'ArvanCloud'),
+    # EdgeCast / Verizon Digital Media
+    (('ec-request-id',), 'EdgeCast'),
+    (('server',), 'ECS'),
+    # MaxCDN
+    (('x-cache',), 'maxcdn'),
+    # BelugaCDN
+    (('x-cache',), 'belugacdn'),
+    # Leaseweb CDN
+    (('x-cache',), 'leaseweb'),
 ]
 
 
