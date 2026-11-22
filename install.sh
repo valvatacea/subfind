@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # subfind - Installer Script
-# Instalasi skrip cdnscan.py, subfind.py, dan d2ip.sh ke sistem
+# Instalasi Subdomain & CDN Scanner Toolkit (CLI + Telegram Bot)
 # =============================================================================
 set -euo pipefail
 
@@ -28,7 +28,7 @@ log_error() { echo -e "${RED}[ERR]${NC}  $*" >&2; }
 check_python() {
     if ! command -v python3 >/dev/null 2>&1; then
         log_error "Python 3 tidak ditemukan. Silakan install terlebih dahulu:"
-        echo "  Debian/Ubuntu: sudo apt update && sudo apt install python3"
+        echo "  Debian/Ubuntu: sudo apt update && sudo apt install python3 python3-pip"
         echo "  Termux:        pkg install python"
         echo "  CentOS/RHEL:   sudo yum install python3"
         exit 1
@@ -79,12 +79,15 @@ setup_dirs() {
 }
 
 # -----------------------------------------------------------------------------
-# Buat executable
+# Buat file skrip executable
 # -----------------------------------------------------------------------------
 make_executable() {
-    chmod +x "$INSTALL_DIR/d2ip.sh"
+    chmod +x "$INSTALL_DIR/d2ip.sh" 2>/dev/null || true
     chmod +x "$INSTALL_DIR/cdnscan.py" 2>/dev/null || true
     chmod +x "$INSTALL_DIR/subfind.py" 2>/dev/null || true
+    chmod +x "$INSTALL_DIR/sniscan.py" 2>/dev/null || true
+    chmod +x "$INSTALL_DIR/etc/git-rebase.sh" 2>/dev/null || true
+    chmod +x "$INSTALL_DIR/etc/update_subfind.sh" 2>/dev/null || true
     log_ok "File skrip dibuat executable"
 }
 
@@ -94,26 +97,68 @@ make_executable() {
 create_symlinks() {
     mkdir -p "$BIN_DIR"
 
-    if [ ! -e "$BIN_DIR/cdnscan" ]; then
-        ln -sf "$INSTALL_DIR/cdnscan.py" "$BIN_DIR/cdnscan"
-        log_ok "Symlink cdnscan -> $BIN_DIR/cdnscan"
-    else
-        log_warn "$BIN_DIR/cdnscan sudah ada, dilewati"
+    local items=(
+        "cdnscan.py:cdnscan"
+        "subfind.py:subfind"
+        "d2ip.sh:d2ip"
+        "sniscan.py:sniscan"
+    )
+
+    for item in "${items[@]}"; do
+        local src="${item%%:*}"
+        local name="${item##*:}"
+        local src_path="$INSTALL_DIR/$src"
+        local link_path="$BIN_DIR/$name"
+
+        if [ ! -e "$src_path" ]; then
+            log_warn "$src_path tidak ditemukan, dilewati"
+            continue
+        fi
+
+        if [ -e "$link_path" ] || [ -L "$link_path" ]; then
+            log_warn "$BIN_DIR/$name sudah ada, dilewati"
+        else
+            ln -sf "$src_path" "$link_path"
+            log_ok "Symlink $name -> $BIN_DIR/$name"
+        fi
+    done
+}
+
+# -----------------------------------------------------------------------------
+# Setup bot (opsional)
+# -----------------------------------------------------------------------------
+setup_bot() {
+    local bot_dir="$INSTALL_DIR/bot"
+    local env_file="$bot_dir/.env"
+    local env_example="$bot_dir/.env.example"
+
+    if [ ! -d "$bot_dir" ]; then
+        log_warn "Folder bot/ tidak ditemukan, dilewati setup bot"
+        return 0
     fi
 
-    if [ ! -e "$BIN_DIR/subfind" ]; then
-        ln -sf "$INSTALL_DIR/subfind.py" "$BIN_DIR/subfind"
-        log_ok "Symlink subfind -> $BIN_DIR/subfind"
-    else
-        log_warn "$BIN_DIR/subfind sudah ada, dilewati"
+    # Buat .env dari contoh jika belum ada
+    if [ ! -f "$env_file" ] && [ -f "$env_example" ]; then
+        cp "$env_example" "$env_file"
+        log_ok "File bot/.env dibuat dari contoh (isi BOT_TOKEN Anda)"
+    elif [ ! -f "$env_file" ]; then
+        log_warn "bot/.env.example tidak ditemukan, buat bot/.env manual"
     fi
 
-    if [ ! -e "$BIN_DIR/d2ip" ]; then
-        ln -sf "$INSTALL_DIR/d2ip.sh" "$BIN_DIR/d2ip"
-        log_ok "Symlink d2ip -> $BIN_DIR/d2ip"
+    # Install dependensi bot jika pip tersedia
+    if command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
+        local pip_cmd
+        command -v pip3 >/dev/null 2>&1 && pip_cmd="pip3" || pip_cmd="pip"
+        log_info "Menginstal dependensi bot ($pip_cmd install -r bot/requirements.txt)..."
+        $pip_cmd install -r "$bot_dir/requirements.txt" >/dev/null 2>&1 && log_ok "Dependensi bot terinstal" || log_warn "Gagal instal dependensi bot (install manual)"
     else
-        log_warn "$BIN_DIR/d2ip sudah ada, dilewati"
+        log_warn "pip tidak ditemukan, install dependensi bot manual:"
+        echo "  pip3 install -r $bot_dir/requirements.txt"
     fi
+
+    echo ""
+    echo "  Jalankan bot dengan: cd $INSTALL_DIR && python3 -m bot.main"
+    echo ""
 }
 
 # -----------------------------------------------------------------------------
@@ -154,11 +199,25 @@ verify() {
         return 1
     fi
 
-    if bash "$INSTALL_DIR/d2ip.sh" 2>&1 | grep -qi "usage\|usage:" || true; then
+    if python3 "$INSTALL_DIR/sniscan.py" --help >/dev/null 2>&1; then
+        log_ok "sniscan.py berfungsi"
+    else
+        log_error "sniscan.py gagal diuji"
+        return 1
+    fi
+
+    if bash "$INSTALL_DIR/d2ip.sh" 2>&1 | grep -qi "usage" || true; then
         log_ok "d2ip.sh berfungsi"
     fi
 
-    # Cek file output
+    # Cek modul common
+    if python3 -c "import sys; sys.path.insert(0, '$INSTALL_DIR'); from common.validators import validate_domain; print('ok')" >/dev/null 2>&1; then
+        log_ok "Modul common berfungsi"
+    else
+        log_warn "Modul common gagal diuji (periksa struktur folder)"
+    fi
+
+    # Cek folder output
     if [ -d "$INSTALL_DIR/output" ]; then
         log_ok "Folder output siap"
     fi
@@ -180,6 +239,7 @@ main() {
     setup_dirs
     make_executable
     create_symlinks
+    setup_bot
     check_path
     verify
 
@@ -188,14 +248,19 @@ main() {
     echo "  Instalasi selesai!"
     echo "============================================================"
     echo ""
-    echo "Contoh penggunaan:"
+    echo "Contoh penggunaan CLI:"
     echo "  cdnscan.py 104.16.0.0/24 -l 100 -d 0.3 -y"
     echo "  subfind.py example.com"
+    echo "  sniscan.py instagram.com"
     echo "  d2ip example.com"
+    echo ""
+    echo "Contoh penggunaan Bot Telegram:"
+    echo "  cd $INSTALL_DIR && python3 -m bot.main"
     echo ""
     echo "Lokasi file:   $INSTALL_DIR"
     echo "Symlink:       $BIN_DIR"
     echo "Hasil scan:    $INSTALL_DIR/output/"
+    echo "Bot env:       $INSTALL_DIR/bot/.env"
     echo ""
 }
 
