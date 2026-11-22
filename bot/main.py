@@ -84,15 +84,27 @@ def unregister_scan_state(chat_id):
 
 
 def request_scan_stop(chat_id):
-    """Set stop_requested=True dan active=False pada scan_state chat_id.
-    Return True jika scan_state ditemukan dan di-stop."""
+    """Set stop_requested=True pada scan_state chat_id (active tetap True
+    biar spinner tetap jalan dan tombol Stop bisa di-animate).
+    Return True jika scan_state ditemukan."""
     with SCAN_STATE_LOCK:
         scan_state = ACTIVE_SCAN_STATES.get(chat_id)
         if not scan_state:
             return False
         scan_state["stop_requested"] = True
-        scan_state["active"] = False
         return True
+
+
+def kb_stop_button(stop_requested=False, spinner_idx=0):
+    """Tombol Stop dengan animasi saat stop_requested=True."""
+    if stop_requested:
+        dots = "." * (spinner_idx % 4)
+        label = f"⏳ Menghentikan{dots}"
+    else:
+        label = "⏹️ Stop"
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(InlineKeyboardButton(label, callback_data="scan:stop"))
+    return kb
 
 
 def cek_slot_scan(chat_id):
@@ -1207,11 +1219,12 @@ def run_subfind(chat_id, message_id, domain):
                 state["start_time"],
                 elapsed=state["elapsed"], eta=state["eta"],
             )
-            # Tambah tombol Stop saat scan masih aktif
-            kb = InlineKeyboardMarkup(row_width=1)
-            kb.add(InlineKeyboardButton("⏹️ Stop", callback_data="scan:stop"))
+            # Tambah tombol Stop saat scan masih aktif (SubFind)
             _edit_queue.put((state["chat_id"], state["message_id"], text,
-                             {"reply_markup": kb}))
+                             {"reply_markup": kb_stop_button(
+                                 stop_requested=state["stop_requested"],
+                                 spinner_idx=state["spinner_idx"],
+                             )}))
 
             with scan_lock:
                 scan_state["spinner_idx"] += 1
@@ -1359,11 +1372,12 @@ def run_sniscan(chat_id, message_id, domain):
                 state["start_time"],
                 elapsed=state["elapsed"], eta=state["eta"],
             )
-            # Tambah tombol Stop saat scan masih aktif
-            kb = InlineKeyboardMarkup(row_width=1)
-            kb.add(InlineKeyboardButton("⏹️ Stop", callback_data="scan:stop"))
+            # Tambah tombol Stop saat scan masih aktif (SubFind)
             _edit_queue.put((state["chat_id"], state["message_id"], text,
-                             {"reply_markup": kb}))
+                             {"reply_markup": kb_stop_button(
+                                 stop_requested=state["stop_requested"],
+                                 spinner_idx=state["spinner_idx"],
+                             )}))
 
             with scan_lock:
                 scan_state["spinner_idx"] += 1
@@ -2245,11 +2259,12 @@ def run_cdnscan_target_batch(chat_id, message_id):
                     state_copy["start_time"],
                     elapsed=state_copy["elapsed"], eta=state_copy["eta"],
                 )
-                # Tambah tombol Stop saat scan masih aktif
-                kb = InlineKeyboardMarkup(row_width=1)
-                kb.add(InlineKeyboardButton("⏹️ Stop", callback_data="scan:stop"))
+                # Tambah tombol Stop saat scan masih aktif (CDNScan)
                 _edit_queue.put((state_copy["chat_id"], state_copy["message_id"], text,
-                                 {"reply_markup": kb}))
+                                 {"reply_markup": kb_stop_button(
+                                     stop_requested=state_copy["stop_requested"],
+                                     spinner_idx=state_copy["spinner_idx"],
+                                 )}))
 
                 with scan_lock:
                     scan_state["spinner_idx"] += 1
