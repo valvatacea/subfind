@@ -5,13 +5,14 @@ import os
 import json
 import ipaddress
 import datetime
+import socket
 from curl_cffi import requests as curl_requests
 
 from common.http_status import fetch_headers, HEADERS_WITHOUT_COMPRESSION
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IPRANGE_DIR = os.path.join(BASE_DIR, "output", "ipranges")
-CACHE_MAX_AGE_SECONDS = 604800  # 7 hari
+CACHE_MAX_AGE_SECONDS = 2592000  # 30 hari
 
 PROVIDER_URLS = {
     'cloudflare': 'https://www.cloudflare.com/ips-v4',
@@ -71,6 +72,16 @@ CDN_HEADER_SIGNATURES = [
 ]
 
 
+def check_internet(timeout=5):
+    """Cek apakah ada koneksi internet dengan mencoba menghubungi 1.1.1.1:53."""
+    try:
+        socket.setdefaulttimeout(timeout)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect(("1.1.1.1", 53))
+        return True
+    except Exception:
+        return False
+
+
 def get_provider_ips(provider_name, progress_callback=None):
     """Unduh IP range dari provider, simpan cache, return daftar CIDR string."""
     provider_name = provider_name.lower()
@@ -91,6 +102,10 @@ def get_provider_ips(provider_name, progress_callback=None):
                 return cache.get('ips', []), None
         except Exception:
             pass  # Cache rusak, fetch ulang
+
+    # Cek koneksi internet sebelum fetch
+    if not check_internet():
+        return None, "Tidak ada koneksi internet. Tidak dapat mengunduh IP range provider."
 
     # Fetch dari provider
     url = PROVIDER_URLS[provider_name]
