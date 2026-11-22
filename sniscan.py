@@ -23,6 +23,7 @@ from common.nsfw_filter import is_blocked, blocked_message
 from common.http_status import get_http_status_multi
 from common.progress import build_progress_text
 from common.cdn_detect import detect_cdn
+from common.port_scan import scan_ports
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 socket.setdefaulttimeout(10)
@@ -141,11 +142,7 @@ def scan_port(ip, port, timeout=2):
 
 
 def scan_extra_ports(ip):
-    open_ports = []
-    for port in EXTRA_PORTS:
-        if scan_port(ip, port):
-            open_ports.append(port)
-    return open_ports
+    return scan_ports(ip, EXTRA_PORTS, timeout=2)
 
 
 def process_host(sub):

@@ -23,6 +23,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from common.progress import build_progress_text
 from common.http_status import get_http_status_multi
 from common.cdn_detect import detect_cdn
+from common.port_scan import scan_ports
 from datetime import datetime
 
 HEADERS = {
@@ -131,18 +132,8 @@ def detect_cdn_and_status(ip):
 
 def scan_open_ports(ip, ports=SCAN_PORTS, timeout=1.5):
     """Scan port terbuka pada IP, return daftar angka port saja"""
-    open_ports = []
-    for port in ports:
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(timeout)
-            result = s.connect_ex((ip, port))
-            if result == 0:
-                open_ports.append(str(port))
-            s.close()
-        except Exception:
-            pass
-    return ",".join(open_ports) if open_ports else "-"
+    open_ports = scan_ports(ip, ports, timeout=timeout)
+    return ",".join(str(p) for p in open_ports) if open_ports else "-"
 
 
 def format_ports(ports_str):

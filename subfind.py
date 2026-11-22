@@ -19,6 +19,7 @@ from common.nsfw_filter import is_blocked, blocked_message
 from common.http_status import get_http_status_multi
 from common.progress import build_progress_text
 from common.cdn_detect import detect_cdn as detect_cdn_common
+from common.port_scan import scan_ports
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 
@@ -175,21 +176,8 @@ def save_cache(domain, provider, subs):
 
 def scan_ports_summary(ip, ports=COMMON_PORTS, timeout=1.5):
     """Scan port terbuka pada IP, return daftar angka port saja"""
-    open_ports = []
-    for port in ports:
-        s = None
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(timeout)
-            result = s.connect_ex((ip, port))
-            if result == 0:
-                open_ports.append(str(port))
-        except Exception:
-            pass
-        finally:
-            if s:
-                s.close()
-    return ",".join(open_ports) if open_ports else "-"
+    open_ports = scan_ports(ip, ports, timeout=timeout)
+    return ",".join(str(p) for p in open_ports) if open_ports else "-"
 
 def detect_cdn(ip, host=None):
     """Deteksi CDN dari IP range cache atau header response HTTP.
