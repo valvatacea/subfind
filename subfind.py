@@ -18,7 +18,7 @@ from common.validators import validate_domain
 from common.nsfw_filter import is_blocked, blocked_message
 from common.http_status import get_http_status_multi
 from common.progress import build_progress_text
-from common.cdn_detect import detect_cdn
+from common.cdn_detect import detect_cdn as detect_cdn_common
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 
@@ -202,7 +202,7 @@ def detect_cdn(ip, host=None):
         ip: IP address string
         host: Nama host untuk header detection (opsional, default = ip)
     """
-    return detect_cdn(ip, host=host)
+    return detect_cdn_common(ip, host=host)
 
 def process_subdomain(sub):
     """Proses satu subdomain: resolve IP, scan port, status HTTP, CDN (sekali request per scheme)"""
