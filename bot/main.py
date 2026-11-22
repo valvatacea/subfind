@@ -1957,6 +1957,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
     - Jika masih ada sisa IP di mana-mana target → tampilkan "Lihat" + "Next"
     - Jika semua target 100% selesai → tampilkan hanya "Lihat"
     """
+    global ACTIVE_SCANS
     try:
         st = get_state(chat_id)
         targets = st.get("cdn_targets", []) or []
@@ -2174,6 +2175,25 @@ def run_cdnscan_target_batch(chat_id, message_id):
                 any_has_sisa = True
 
         # Fase 4: Tampilkan hasil
+        # Kumpulkan semua hasil dari file JSON untuk ditampilkan di "Lihat"
+        all_results = []
+        for t in targets:
+            safe_name = t.replace("/", "_").replace("-", "_").replace(".", "_")
+            jname = f"{OUT_DIR}/cdnscan_{safe_name}.json"
+            try:
+                with open(jname, 'r') as f:
+                    saved = json.load(f)
+                if saved and isinstance(saved, list):
+                    for item in saved:
+                        all_results.append((
+                            item.get("ip", "-"),
+                            item.get("ports", "-"),
+                            item.get("cdn", "-"),
+                            item.get("status", "-"),
+                        ))
+            except Exception:
+                pass
+
         if any_has_sisa:
             # Masih ada sisa IP di mana-mana target → tampilkan "Lihat" + "Next"
             set_state(chat_id, cdn_target_index=0)  # Reset index, next akan hitung ulang sisa
@@ -2188,23 +2208,6 @@ def run_cdnscan_target_batch(chat_id, message_id):
         else:
             # Semua target 100% selesai → hanya "Lihat"
             # Simpan hasil aktual ke state agar bisa dilihat melalui tombol "Lihat"
-            all_results = []
-            for t in targets:
-                safe_name = t.replace("/", "_").replace("-", "_").replace(".", "_")
-                jname = f"{OUT_DIR}/cdnscan_{safe_name}.json"
-                try:
-                    with open(jname, 'r') as f:
-                        saved = json.load(f)
-                    if saved and isinstance(saved, list):
-                        for item in saved:
-                            all_results.append((
-                                item.get("ip", "-"),
-                                item.get("ports", "-"),
-                                item.get("cdn", "-"),
-                                item.get("status", "-"),
-                            ))
-                except Exception:
-                    pass
             save_scan_state(chat_id, "cdnscan", targets[-1] if targets else [], all_results, "CDNScan")
             _edit_queue.put((
                 chat_id, message_id,
@@ -2216,8 +2219,10 @@ def run_cdnscan_target_batch(chat_id, message_id):
             set_state(chat_id, scanning=False)
             return
     finally:
+        global ACTIVE_SCANS
         ACTIVE_SCANS = max(0, ACTIVE_SCANS - 1)
         set_state(chat_id, scanning=False)
+
 
 def fetch_provider_ranges(chat_id, message_id, provider):
     """Unduh daftar rentang IP dari provider dan tampilkan untuk dipilih."""
