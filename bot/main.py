@@ -1998,7 +1998,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
             {"reply_markup": kb_next_target("menu:cdnscan", show_view=True, show_next=False)}
         ))
         # JANGAN clear_state: cdn_targets dibutuhkan oleh tombol "Lihat" (cdnscan:view).
-        global ACTIVE_SCANS
+
         ACTIVE_SCANS = max(0, ACTIVE_SCANS - 1)
         set_state(chat_id, scanning=False)
         return
