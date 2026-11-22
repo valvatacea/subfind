@@ -1700,10 +1700,18 @@ def cb_handler(call):
                 fname = os.path.basename(jf)
                 # Ubah nama file kembali ke CIDR: cdnscan_1_1_1_0_24.json -> 1.1.1.0/24
                 name = fname.replace("cdnscan_", "").replace(".json", "")
-                # Untuk CIDR, format adalah a_b_c_d_e -> a.b.c.d/e
                 parts = name.split("_")
                 if len(parts) == 5:
+                    # Format: a_b_c_d_e -> a.b.c.d/e (IPv4 CIDR)
                     targets.append(f"{parts[0]}.{parts[1]}.{parts[2]}.{parts[3]}/{parts[4]}")
+                elif len(parts) >= 8:
+                    # Format range: a_b_c_d-e_f_g_h -> a.b.c.d-e.f.g.h
+                    left = parts[:4]
+                    right = parts[4:]
+                    if len(left) == 4 and len(right) == 4:
+                        targets.append(f"{left[0]}.{left[1]}.{left[2]}.{left[3]}-{right[0]}.{right[1]}.{right[2]}.{right[3]}")
+                    else:
+                        targets.append(name)
                 else:
                     targets.append(name)
 
@@ -1950,246 +1958,269 @@ def run_cdnscan_target_batch(chat_id, message_id):
     - Jika semua target 100% selesai → tampilkan hanya "Lihat"
     """
     global ACTIVE_SCANS
-    st = get_state(chat_id)
-    targets = st.get("cdn_targets", []) or []
-    limit = st.get("cdn_limit", 0)
-
-    if not targets:
-        _edit_queue.put((
-            chat_id, message_id,
-            "❌ <b>CDNScan</b>\nTidak ada target yang dipilih.",
-            {"reply_markup": kb_back("menu:cdnscan")}
-        ))
-        clear_state(chat_id)
-        ACTIVE_SCANS = max(0, ACTIVE_SCANS - 1)
-        set_state(chat_id, scanning=False)
-        return
-
-    # Fase 1: Kumpulkan semua sisa IP per target dengan limit
-    batch_items = []  # list of (target, ip)
-    total_batch_ips = 0
-    target_info = {}  # target -> {"offset": int, "total_effective": int}
-
-    for t in targets:
-        t_state = load_state(t)
-        t_offset = t_state.get('scanned_count', 0) if t_state else 0
-
-        # Hitung total IP dalam range (tanpa limit) untuk mengetahui sisa sebenarnya
-        t_all_full = parse_ip_range(t)
-        t_total_full = len(t_all_full) if t_all_full else 0
-        t_sisa = max(0, t_total_full - t_offset)
-
-        if t_sisa > 0:
-            # Ambil IP sesuai limit dari offset untuk batch ini
-            ips = parse_ip_range(t, offset=t_offset, max_ips=limit if limit > 0 else None)
-            for ip in ips:
-                batch_items.append((t, ip))
-                total_batch_ips += 1
-            target_info[t] = {"offset": t_offset, "total_effective": t_total_full, "sisa": t_sisa}
-        else:
-            # Target sudah 100% selesai
-            target_info[t] = {"offset": t_offset, "total_effective": t_total_full, "sisa": 0}
-
-    if not batch_items:
-        # Semua target 100% selesai
-        _edit_queue.put((
-            chat_id, message_id,
-            "✅ <b>CDNScan selesai</b>\nSemua target telah discan.",
-            {"reply_markup": kb_next_target("menu:cdnscan", show_view=True, show_next=False)}
-        ))
-        # JANGAN clear_state: cdn_targets dibutuhkan oleh tombol "Lihat" (cdnscan:view).
-
-        ACTIVE_SCANS = max(0, ACTIVE_SCANS - 1)
-        set_state(chat_id, scanning=False)
-        return
-
-    # Fase 2: Scan semua IP gabungan dalam satu batch
-    import time
-    start_time = time.time()
-    scan_state = {
-        "active": True,
-        "chat_id": chat_id,
-        "message_id": message_id,
-        "title": "CDNScan",
-        "target": f"Multi-Target ({len(targets)} target)",
-        "current": 0,
-        "total": total_batch_ips,
-        "start_time": start_time,
-        "spinner_idx": 0,
-        "elapsed": 0,
-        "eta": 0,
-    }
-    scan_lock = threading.Lock()
-
     try:
-        _edit_queue.put((
-            chat_id, message_id,
-            f"🛡️ <b>CDNScan</b>\nScan gabungan {len(targets)} target...\nMemulai scan {total_batch_ips} IP...",
-            {}
-        ))
-    except Exception:
-        pass
+        st = get_state(chat_id)
+        targets = st.get("cdn_targets", []) or []
+        limit = st.get("cdn_limit", 0)
 
-    def _spinner_loop():
-        """Thread mandiri: memutar spinner dan mengupdate progres ke antrian (setiap 0.5 detik)."""
-        while True:
-            with scan_lock:
-                if not scan_state["active"]:
-                    break
-                state_copy = dict(scan_state)
+        if not targets:
+            _edit_queue.put((
+                chat_id, message_id,
+                "❌ <b>CDNScan</b>\nTidak ada target yang dipilih.",
+                {"reply_markup": kb_back("menu:cdnscan")}
+            ))
+            clear_state(chat_id)
+            ACTIVE_SCANS = max(0, ACTIVE_SCANS - 1)
+            set_state(chat_id, scanning=False)
+            return
 
-            text = build_progress_text(
-                state_copy["spinner_idx"], state_copy["title"], state_copy["target"],
-                state_copy["current"], state_copy["total"],
-                state_copy["start_time"],
-                elapsed=state_copy["elapsed"], eta=state_copy["eta"],
-            )
-            _edit_queue.put((state_copy["chat_id"], state_copy["message_id"], text, {}))
+        # Fase 1: Kumpulkan semua sisa IP per target dengan limit
+        batch_items = []  # list of (target, ip)
+        total_batch_ips = 0
+        target_info = {}  # target -> {"offset": int, "total_effective": int}
 
-            with scan_lock:
-                scan_state["spinner_idx"] += 1
+        for t in targets:
+            t_state = load_state(t)
+            t_offset = t_state.get('scanned_count', 0) if t_state else 0
 
-            time.sleep(0.5)
+            # Hitung total IP dalam range (tanpa limit) untuk mengetahui sisa sebenarnya
+            t_all_full = parse_ip_range(t)
+            t_total_full = len(t_all_full) if t_all_full else 0
+            t_sisa = max(0, t_total_full - t_offset)
 
-    def _elapsed_loop():
-        """Thread mandiri: menghitung elapsed time dan ETA (setiap 1 detik)."""
-        while True:
-            with scan_lock:
-                if not scan_state["active"]:
-                    break
-                state = dict(scan_state)
-
-            now = time.time()
-            elapsed = now - state["start_time"]
-            if state["current"] > 0 and state["total"] > 0 and elapsed > 0:
-                eta = (elapsed / state["current"]) * (state["total"] - state["current"])
+            if t_sisa > 0:
+                # Ambil IP sesuai limit dari offset untuk batch ini
+                ips = parse_ip_range(t, offset=t_offset, max_ips=limit if limit > 0 else None)
+                for ip in ips:
+                    batch_items.append((t, ip))
+                    total_batch_ips += 1
+                target_info[t] = {"offset": t_offset, "total_effective": t_total_full, "sisa": t_sisa}
             else:
-                eta = 0
+                # Target sudah 100% selesai
+                target_info[t] = {"offset": t_offset, "total_effective": t_total_full, "sisa": 0}
 
-            with scan_lock:
-                scan_state["elapsed"] = elapsed
-                scan_state["eta"] = eta
+        if not batch_items:
+            # Semua target 100% selesai
+            _edit_queue.put((
+                chat_id, message_id,
+                "✅ <b>CDNScan selesai</b>\nSemua target telah discan.",
+                {"reply_markup": kb_next_target("menu:cdnscan", show_view=True, show_next=False)}
+            ))
+            # JANGAN clear_state: cdn_targets dibutuhkan oleh tombol "Lihat" (cdnscan:view).
 
-            time.sleep(1.0)
+            ACTIVE_SCANS = max(0, ACTIVE_SCANS - 1)
+            set_state(chat_id, scanning=False)
+            return
 
-    spinner_thread = threading.Thread(target=_spinner_loop, daemon=True)
-    spinner_thread.start()
+        # Fase 2: Scan semua IP gabungan dalam satu batch
+        import time
+        start_time = time.time()
+        scan_state = {
+            "active": True,
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "title": "CDNScan",
+            "target": f"Multi-Target ({len(targets)} target)",
+            "current": 0,
+            "total": total_batch_ips,
+            "start_time": start_time,
+            "spinner_idx": 0,
+            "elapsed": 0,
+            "eta": 0,
+        }
+        scan_lock = threading.Lock()
 
-    elapsed_thread = threading.Thread(target=_elapsed_loop, daemon=True)
-    elapsed_thread.start()
+        try:
+            _edit_queue.put((
+                chat_id, message_id,
+                f"🛡️ <b>CDNScan</b>\nScan gabungan {len(targets)} target...\nMemulai scan {total_batch_ips} IP...",
+                {}
+            ))
+        except Exception:
+            pass
 
-    # Simpan hasil per-target
-    target_results = {}  # target -> list of results
+        def _spinner_loop():
+            """Thread mandiri: memutar spinner dan mengupdate progres ke antrian (setiap 0.5 detik)."""
+            while True:
+                with scan_lock:
+                    if not scan_state["active"]:
+                        break
+                    state_copy = dict(scan_state)
 
-    try:
-        with ThreadPoolExecutor(max_workers=min(10, len(batch_items))) as executor:
-            futures = {executor.submit(process_ip, ip): (t, ip) for t, ip in batch_items}
-            pending = set(futures.keys())
-            while pending:
-                done, pending = wait(
-                    pending, timeout=IP_OVERALL_TIMEOUT,
-                    return_when=FIRST_COMPLETED
+                text = build_progress_text(
+                    state_copy["spinner_idx"], state_copy["title"], state_copy["target"],
+                    state_copy["current"], state_copy["total"],
+                    state_copy["start_time"],
+                    elapsed=state_copy["elapsed"], eta=state_copy["eta"],
                 )
-                for future in done:
-                    t, ip = futures[future]
-                    try:
-                        result = future.result()
-                    except Exception:
-                        result = (ip, "-", "-", "-")
+                _edit_queue.put((state_copy["chat_id"], state_copy["message_id"], text, {}))
 
-                    if t not in target_results:
-                        target_results[t] = []
-                    target_results[t].append(result)
+                with scan_lock:
+                    scan_state["spinner_idx"] += 1
 
-                    c = scan_state["current"] + 1
-                    with scan_lock:
-                        scan_state["current"] = c
+                time.sleep(0.5)
 
-                # Jika tidak ada future yang selesai dalam batas waktu,
-                # lewati IP yang macet agar progres tidak nempel selamanya.
-                if not done and pending:
-                    skip_now = min(3, len(pending))
-                    for f in list(pending)[:skip_now]:
-                        t, ip = futures[f]
+        def _elapsed_loop():
+            """Thread mandiri: menghitung elapsed time dan ETA (setiap 1 detik)."""
+            while True:
+                with scan_lock:
+                    if not scan_state["active"]:
+                        break
+                    state = dict(scan_state)
+
+                now = time.time()
+                elapsed = now - state["start_time"]
+                if state["current"] > 0 and state["total"] > 0 and elapsed > 0:
+                    eta = (elapsed / state["current"]) * (state["total"] - state["current"])
+                else:
+                    eta = 0
+
+                with scan_lock:
+                    scan_state["elapsed"] = elapsed
+                    scan_state["eta"] = eta
+
+                time.sleep(1.0)
+
+        spinner_thread = threading.Thread(target=_spinner_loop, daemon=True)
+        spinner_thread.start()
+
+        elapsed_thread = threading.Thread(target=_elapsed_loop, daemon=True)
+        elapsed_thread.start()
+
+        # Simpan hasil per-target
+        target_results = {}  # target -> list of results
+
+        try:
+            with ThreadPoolExecutor(max_workers=min(10, len(batch_items))) as executor:
+                futures = {executor.submit(process_ip, ip): (t, ip) for t, ip in batch_items}
+                pending = set(futures.keys())
+                while pending:
+                    done, pending = wait(
+                        pending, timeout=IP_OVERALL_TIMEOUT,
+                        return_when=FIRST_COMPLETED
+                    )
+                    for future in done:
+                        t, ip = futures[future]
+                        try:
+                            result = future.result()
+                        except Exception:
+                            result = (ip, "-", "-", "-")
+
                         if t not in target_results:
                             target_results[t] = []
-                        target_results[t].append((ip, "-", "-", "-"))
-                        pending.discard(f)
+                        target_results[t].append(result)
 
                         c = scan_state["current"] + 1
                         with scan_lock:
                             scan_state["current"] = c
 
-    finally:
-        # Matikan spinner dan elapsed thread
-        with scan_lock:
-            scan_state["active"] = False
+                    # Jika tidak ada future yang selesai dalam batas waktu,
+                    # lewati IP yang macet agar progres tidak nempel selamanya.
+                    if not done and pending:
+                        skip_now = min(3, len(pending))
+                        for f in list(pending)[:skip_now]:
+                            t, ip = futures[f]
+                            if t not in target_results:
+                                target_results[t] = []
+                            target_results[t].append((ip, "-", "-", "-"))
+                            pending.discard(f)
 
-    # Fase 3: Simpan hasil per-target dan update state
-    any_has_sisa = False
-    for t in targets:
-        results = target_results.get(t, [])
-        info = target_info[t]
+                            c = scan_state["current"] + 1
+                            with scan_lock:
+                                scan_state["current"] = c
 
-        # Sortir hasil
-        results.sort(key=lambda x: ipaddress.ip_address(x[0].split('/')[0] if '/' in x[0] else x[0]))
+        finally:
+            # Matikan spinner dan elapsed thread
+            with scan_lock:
+                scan_state["active"] = False
 
-        # Simpan JSON per target
-        OUT_DIR = os.path.join(BASE_DIR, "output")
-        os.makedirs(OUT_DIR, exist_ok=True)
-        safe_name = t.replace("/", "_").replace("-", "_").replace(".", "_")
-        jname = f"{OUT_DIR}/cdnscan_{safe_name}.json"
+        # Fase 3: Simpan hasil per-target dan update state
+        any_has_sisa = False
+        for t in targets:
+            results = target_results.get(t, [])
+            info = target_info[t]
 
-        # Baca data lama jika ada
-        existing = []
-        try:
-            with open(jname, 'r') as f:
-                existing = json.load(f)
-        except Exception:
+            # Sortir hasil
+            results.sort(key=lambda x: ipaddress.ip_address(x[0].split('/')[0] if '/' in x[0] else x[0]))
+
+            # Simpan JSON per target
+            OUT_DIR = os.path.join(BASE_DIR, "output")
+            os.makedirs(OUT_DIR, exist_ok=True)
+            safe_name = t.replace("/", "_").replace("-", "_").replace(".", "_")
+            jname = f"{OUT_DIR}/cdnscan_{safe_name}.json"
+
+            # Baca data lama jika ada
             existing = []
+            try:
+                with open(jname, 'r') as f:
+                    existing = json.load(f)
+            except Exception:
+                existing = []
 
-        # Gabungkan data lama dengan baru
-        all_data = existing + [
-            {"ip": r[0], "ports": r[1], "cdn": r[2], "status": r[3], "target": t,
-             "provider": st.get("cdn_provider", "manual")}
-            for r in results
-        ]
-        with open(jname, 'w') as f:
-            json.dump(all_data, f, indent=2)
+            # Gabungkan data lama dengan baru
+            all_data = existing + [
+                {"ip": r[0], "ports": r[1], "cdn": r[2], "status": r[3], "target": t,
+                 "provider": st.get("cdn_provider", "manual")}
+                for r in results
+            ]
+            with open(jname, 'w') as f:
+                json.dump(all_data, f, indent=2)
 
-        # Update state resume
-        new_offset = info["offset"] + len(results)
-        next_check = parse_ip_range(t, offset=new_offset, max_ips=1)
-        completed = len(next_check) == 0
-        save_state(t, new_offset, completed)
+            # Update state resume
+            new_offset = info["offset"] + len(results)
+            next_check = parse_ip_range(t, offset=new_offset, max_ips=1)
+            completed = len(next_check) == 0
+            save_state(t, new_offset, completed)
 
-        if not completed:
-            any_has_sisa = True
+            if not completed:
+                any_has_sisa = True
 
-    # Fase 4: Tampilkan hasil
-    if any_has_sisa:
-        # Masih ada sisa IP di mana-mana target → tampilkan "Lihat" + "Next"
-        set_state(chat_id, cdn_target_index=0)  # Reset index, next akan hitung ulang sisa
-        _edit_queue.put((
-            chat_id, message_id,
-            f"✅ <b>CDNScan batch selesai</b>\n"
-            f"Discan: {total_batch_ips} IP dari {len(targets)} target.\n"
-            f"Masih ada sisa IP di beberapa target.\n"
-            f"Klik Next untuk batch berikutnya, atau Lihat untuk hasil gabungan.",
-            {"reply_markup": kb_next_target("menu:cdnscan", show_view=True)}
-        ))
-    else:
-        # Semua target 100% selesai → hanya "Lihat"
-        save_scan_state(chat_id, "cdnscan", targets[-1] if targets else [], [], "CDNScan")
-        _edit_queue.put((
-            chat_id, message_id,
-            "✅ <b>CDNScan selesai</b>\nSemua target telah discan.",
-            {"reply_markup": kb_next_target("menu:cdnscan", show_view=True, show_next=False)}
-        ))
-        # JANGAN clear_state: cdn_targets dibutuhkan oleh tombol "Lihat" (cdnscan:view).
+        # Fase 4: Tampilkan hasil
+        if any_has_sisa:
+            # Masih ada sisa IP di mana-mana target → tampilkan "Lihat" + "Next"
+            set_state(chat_id, cdn_target_index=0)  # Reset index, next akan hitung ulang sisa
+            _edit_queue.put((
+                chat_id, message_id,
+                f"✅ <b>CDNScan batch selesai</b>\n"
+                f"Discan: {total_batch_ips} IP dari {len(targets)} target.\n"
+                f"Masih ada sisa IP di beberapa target.\n"
+                f"Klik Next untuk batch berikutnya, atau Lihat untuk hasil gabungan.",
+                {"reply_markup": kb_next_target("menu:cdnscan", show_view=True)}
+            ))
+        else:
+            # Semua target 100% selesai → hanya "Lihat"
+            # Simpan hasil aktual ke state agar bisa dilihat melalui tombol "Lihat"
+            all_results = []
+            for t in targets:
+                safe_name = t.replace("/", "_").replace("-", "_").replace(".", "_")
+                jname = f"{OUT_DIR}/cdnscan_{safe_name}.json"
+                try:
+                    with open(jname, 'r') as f:
+                        saved = json.load(f)
+                    if saved and isinstance(saved, list):
+                        for item in saved:
+                            all_results.append((
+                                item.get("ip", "-"),
+                                item.get("ports", "-"),
+                                item.get("cdn", "-"),
+                                item.get("status", "-"),
+                            ))
+                except Exception:
+                    pass
+            save_scan_state(chat_id, "cdnscan", targets[-1] if targets else [], all_results, "CDNScan")
+            _edit_queue.put((
+                chat_id, message_id,
+                "✅ <b>CDNScan selesai</b>\nSemua target telah discan.",
+                {"reply_markup": kb_next_target("menu:cdnscan", show_view=True, show_next=False)}
+            ))
+            # JANGAN clear_state: cdn_targets dibutuhkan oleh tombol "Lihat" (cdnscan:view).
+            ACTIVE_SCANS = max(0, ACTIVE_SCANS - 1)
+            set_state(chat_id, scanning=False)
+            return
+    finally:
+        global ACTIVE_SCANS
         ACTIVE_SCANS = max(0, ACTIVE_SCANS - 1)
         set_state(chat_id, scanning=False)
-        return
 
 def fetch_provider_ranges(chat_id, message_id, provider):
     """Unduh daftar rentang IP dari provider dan tampilkan untuk dipilih."""
