@@ -53,7 +53,7 @@ def get_provider_ips(provider_name, progress_callback=None):
     # Fetch dari provider
     url = PROVIDER_URLS[provider_name]
     try:
-        response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=30, impersonate="chrome120")
+        response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=30, impersonate="chrome152")
         result = response.text
     except Exception as e:
         return None, f"Gagal mengunduh {provider_name}: {e}"

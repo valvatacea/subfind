@@ -27,7 +27,7 @@ from common.http_status import HEADERS_WITHOUT_COMPRESSION
 def fetch_domains(url):
     """Ambil daftar domain dari URL. Return list string, atau [] jika gagal."""
     try:
-        response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=30, impersonate="chrome120")
+        response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=30, impersonate="chrome152")
         text = response.text
     except Exception as e:
         print(f"[!] Gagal unduh {url}: {e}")

@@ -50,7 +50,7 @@ def fetch(url, timeout=15, retries=2):
     last_err = ""
     for attempt in range(retries):
         try:
-            response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=timeout, impersonate="chrome120")
+            response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=timeout, impersonate="chrome152")
             return response.text
         except Exception as e:
             last_err = f"ERR_{type(e).__name__}"

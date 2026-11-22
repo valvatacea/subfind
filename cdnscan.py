@@ -73,7 +73,7 @@ print_lock = threading.Lock()
 
 def fetch(url, timeout=15, progress_callback=None):
     try:
-        response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=timeout, impersonate="chrome120")
+        response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=timeout, impersonate="chrome152")
         result = response.text
     except Exception as e:
         return f"ERR_{type(e).__name__}"
@@ -84,7 +84,7 @@ def fetch_headers(host, port=80, scheme="http", timeout=5):
     """Ambil header response dari host:port via GET request."""
     try:
         url = f"{scheme}://{host}:{port}/"
-        response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=timeout, impersonate="chrome120")
+        response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=timeout, impersonate="chrome152")
         return str(response.headers).lower(), response.status_code
     except Exception:
         return "", None
