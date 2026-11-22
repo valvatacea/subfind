@@ -345,6 +345,7 @@ def build_page_text(results, page, mode, title):
             lines.append(f"{pad_label('TLS/ALPN', 12)}: {esc(r[2])} | ALPN: {esc(r[3])}")
             lines.append(f"{pad_label('Port TLS', 12)}: {esc(r[4])}({esc(r[2])})")
             lines.append(f"{pad_label('Port Lain', 12)}: {esc(r[5])}")
+            lines.append(f"{pad_label('CDN', 12)}: {esc(r[8])}")
             lines.append(f"{pad_label('Status', 12)}: {esc(r[7])}")
             lines.append("----------------------------------------------")
     elif mode == "d2ip":
@@ -406,6 +407,7 @@ FILTER_FIELDS = {
         ("Port Lain", "extra_ports"),
         ("Status", "status"),
         ("Response ms", "response_time_ms"),
+        ("CDN", "cdn"),
     ],
 }
 
@@ -469,7 +471,7 @@ def filter_matches(entry, filters):
         },
         "sniscan": {
             "sni_host": 0, "ip": 1, "tls_version": 2, "alpn": 3,
-            "tls_port": 4, "extra_ports": 5, "response_time_ms": 6, "status": 7,
+            "tls_port": 4, "extra_ports": 5, "response_time_ms": 6, "status": 7, "cdn": 8,
         },
     }
     # Dapatkan mode dari caller — tidak tersedia di sini, pakai heuristik berdasarkan panjang entry
@@ -1355,6 +1357,7 @@ def run_sniscan(chat_id, message_id, domain):
             ",".join(str(p) for p in r["extra_ports"]) if r["extra_ports"] else "-",
             r["response_time_ms"],
             r["status"],
+            r["cdn"],
         )
         for r in results
     ]
