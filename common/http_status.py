@@ -6,7 +6,6 @@
 import urllib.request
 import urllib.error
 
-
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 
 
@@ -32,6 +31,29 @@ def get_http_status(host, port=80, scheme="http", timeout=5):
         return str(e.code)
     except (urllib.error.URLError, Exception):
         return "-"
+
+
+def fetch_headers(host, port=80, scheme="http", timeout=5):
+    """Ambil header response HTTP dari host:port via GET request.
+
+    Args:
+        host: Nama domain atau alamat IP.
+        port: Port tujuan (default 80).
+        scheme: Skema URL (default "http", gunakan "https" untuk port 443).
+        timeout: Batas waktu dalam detik (default 5).
+
+    Returns:
+        Tuple (headers_string, status_code) atau ("", None) jika gagal.
+    """
+    url = f"{scheme}://{host}:{port}/"
+    try:
+        req = urllib.request.Request(url, headers=HEADERS, method="GET")
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return str(r.headers).lower(), r.status
+    except urllib.error.HTTPError as e:
+        return str(e.headers).lower() if e.headers else "", e.code
+    except Exception:
+        return "", None
 
 
 def get_http_status_multi(host, timeout=5):

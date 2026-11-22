@@ -22,6 +22,7 @@ from common.validators import validate_domain
 from common.nsfw_filter import is_blocked, blocked_message
 from common.http_status import get_http_status_multi
 from common.progress import build_progress_text
+from common.cdn_detect import detect_cdn
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'}
 socket.setdefaulttimeout(10)
@@ -162,9 +163,11 @@ def process_host(sub):
             "tls_port": "-",
             "extra_ports": [],
             "status": "-",
+            "cdn": "-",
         }
 
     status = get_http_status_multi(ip, timeout=5)
+    cdn = detect_cdn(ip, host=sub)
 
     tls, alpn, ok, elapsed_ms = tls_handshake(ip, sub)
     if not ok:
@@ -177,6 +180,7 @@ def process_host(sub):
             "tls_port": "-",
             "extra_ports": [],
             "status": status,
+            "cdn": cdn,
         }
 
     extra = scan_extra_ports(ip)
@@ -190,6 +194,7 @@ def process_host(sub):
         "tls_port": "443",
         "extra_ports": extra,
         "status": status,
+        "cdn": cdn,
     }
 
 
@@ -305,6 +310,7 @@ def main():
         print(f"{pad_label('TLS/ALPN', 12)}: {esc(r['tls_version'])} | ALPN: {esc(r['alpn'])}")
         print(f"{pad_label('Port TLS', 12)}: {esc(r['tls_port'])}({esc(r['tls_version'])})")
         print(f"{pad_label('Port Lain', 12)}: {esc(extra_str)}")
+        print(f"{pad_label('CDN', 12)}: {esc(r['cdn'])}")
         print("----------------------------------------------")
 
     # Simpan teks
@@ -318,6 +324,7 @@ def main():
             f.write(f"{pad_label('TLS/ALPN', 12)}: {esc(r['tls_version'])} | ALPN: {esc(r['alpn'])}\n")
             f.write(f"{pad_label('Port TLS', 12)}: {esc(r['tls_port'])}({esc(r['tls_version'])})\n")
             f.write(f"{pad_label('Port Lain', 12)}: {esc(extra_str)}\n")
+            f.write(f"{pad_label('CDN', 12)}: {esc(r['cdn'])}\n")
             f.write("----------------------------------------------\n")
 
     # Simpan JSON dengan metadata
@@ -335,6 +342,7 @@ def main():
                 "alpn": r["alpn"],
                 "tls_port": r["tls_port"],
                 "extra_ports": r["extra_ports"],
+                "cdn": r["cdn"],
             }
             for r in results
         ],
