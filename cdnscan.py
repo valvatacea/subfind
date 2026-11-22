@@ -52,7 +52,7 @@ MAX_TOTAL_BATCH = 2000
 AUTO_CONFIRM = False
 
 # Jeda antar IP dalam detik (rate limiting)
-SCAN_DELAY = 0.5
+SCAN_DELAY = 1.0
 
 # Provider yang menyediakan IP range secara publik
 PROVIDER_URLS = {

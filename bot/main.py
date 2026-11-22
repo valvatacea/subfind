@@ -60,6 +60,12 @@ if not BOT_TOKEN:
     print("BOT_TOKEN belum di-set. Buat .env dengan BOT_TOKEN=isi_token")
     sys.exit(1)
 
+# ===================== BATASAN SCAN SIMULTAN =====================
+MAX_ACTIVE_SCANS = 3          # Maksimal scan berjalan bersamaan di seluruh bot
+ACTIVE_SCANS = 0              # Counter scan aktif saat ini
+MAX_CONCURRENT_SCANS_PER_CHAT = 1  # Maksimal scan per chat
+# =================================================================
+
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
 # Antrian thread-safe untuk edit_message_text dari worker thread.
@@ -1763,6 +1769,30 @@ def cb_handler(call):
                 pass
             return
 
+        # Cek batas scan simultan
+        global ACTIVE_SCANS
+        if ACTIVE_SCANS >= MAX_ACTIVE_SCANS:
+            try:
+                bot.edit_message_text(
+                    "⚠️ <b>Server penuh</b>\nSedang ada scan berjalan di bot. Coba lagi beberapa saat.",
+                    chat_id, message_id, reply_markup=kb_back("menu:cdnscan")
+                )
+            except Exception:
+                pass
+            return
+        st = get_state(chat_id)
+        if st.get("scanning"):
+            try:
+                bot.edit_message_text(
+                    "⚠️ <b>Scan sedang berjalan di chat ini</b>\nTunggu selesai sebelum scan baru.",
+                    chat_id, message_id, reply_markup=kb_back("menu:cdnscan")
+                )
+            except Exception:
+                pass
+            return
+        ACTIVE_SCANS += 1
+        set_state(chat_id, scanning=True)
+
         threading.Thread(target=run_cdnscan_target_batch, args=(chat_id, message_id), daemon=True).start()
 
     elif data.startswith("page:"):
@@ -1930,6 +1960,9 @@ def run_cdnscan_target_batch(chat_id, message_id):
             {"reply_markup": kb_back("menu:cdnscan")}
         ))
         clear_state(chat_id)
+        global ACTIVE_SCANS
+        ACTIVE_SCANS = max(0, ACTIVE_SCANS - 1)
+        set_state(chat_id, scanning=False)
         return
 
     # Fase 1: Kumpulkan semua sisa IP per target dengan limit
@@ -1965,6 +1998,9 @@ def run_cdnscan_target_batch(chat_id, message_id):
             {"reply_markup": kb_next_target("menu:cdnscan", show_view=True, show_next=False)}
         ))
         # JANGAN clear_state: cdn_targets dibutuhkan oleh tombol "Lihat" (cdnscan:view).
+        global ACTIVE_SCANS
+        ACTIVE_SCANS = max(0, ACTIVE_SCANS - 1)
+        set_state(chat_id, scanning=False)
         return
 
     # Fase 2: Scan semua IP gabungan dalam satu batch
@@ -2046,7 +2082,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
     target_results = {}  # target -> list of results
 
     try:
-        with ThreadPoolExecutor(max_workers=min(30, len(batch_items))) as executor:
+        with ThreadPoolExecutor(max_workers=min(10, len(batch_items))) as executor:
             futures = {executor.submit(process_ip, ip): (t, ip) for t, ip in batch_items}
             pending = set(futures.keys())
             while pending:
@@ -2151,8 +2187,10 @@ def run_cdnscan_target_batch(chat_id, message_id):
             {"reply_markup": kb_next_target("menu:cdnscan", show_view=True, show_next=False)}
         ))
         # JANGAN clear_state: cdn_targets dibutuhkan oleh tombol "Lihat" (cdnscan:view).
+        global ACTIVE_SCANS
+        ACTIVE_SCANS = max(0, ACTIVE_SCANS - 1)
+        set_state(chat_id, scanning=False)
         return
-
 
 def fetch_provider_ranges(chat_id, message_id, provider):
     """Unduh daftar rentang IP dari provider dan tampilkan untuk dipilih."""
