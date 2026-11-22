@@ -3,4 +3,3 @@ __pycache__/
 .env
 .venv/
 bot.log
-nsfw_blocklist_shallalist.txt
