@@ -221,8 +221,4 @@ output/
     └── cloudfront.json              # Cache IP range provider (7 hari)
 ```
 
-## Lisensi
-
-Proprietari / Internal — untuk penggunaan pribadi dan bisnis terkait jasa VPN/SSH/OTP.
-
-Repo: [valvatacea/subfind](https://github.com/valvatacea/subfind) (private)
+## Repo: [valvatacea/subfind](https://github.com/valvatacea/subfind)
