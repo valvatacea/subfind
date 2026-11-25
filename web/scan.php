@@ -5,6 +5,7 @@ set_time_limit(0);
 
 $BASE_DIR = '/root/subfind';
 $OUTPUT_DIR = $BASE_DIR . '/output';
+$PYTHON = file_exists($BASE_DIR . '/.venv/bin/python') ? $BASE_DIR . '/.venv/bin/python' : 'python3';
 
 $action = $_POST['action'] ?? ($_GET['action'] ?? '');
 $target = $_POST['target'] ?? ($_GET['target'] ?? '');
@@ -100,7 +101,7 @@ if ($action === 'd2ip') {
         'cdnscan' => 'cdnscan.py',
         'sniscan' => 'sniscan.py',
     ];
-    $script = "python3 " . $script_map[$action] . " $target_escaped";
+    $script = "$PYTHON " . $script_map[$action] . " $target_escaped";
 }
 
 $command = "cd $BASE_DIR && nohup $script > $OUTPUT_DIR/scan_%d.txt 2>&1 & echo \$!";
