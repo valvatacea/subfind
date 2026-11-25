@@ -35,7 +35,7 @@ async function handleScan(event, action) {
     resultArea.innerHTML = `
         <div class="scanning" style="margin-top:15px;">
             <div class="spinner"></div>
-            <span class="status-text">Memulai scan... <span id="status-text-${action}">memproses</span></span>
+            <span class="status-text">Memulai scan... <span id="status-text-${action}">Memindai target.</span></span>
         </div>
     `;
 
@@ -72,9 +72,12 @@ async function handleScan(event, action) {
             }
 
             if (pollData.status === 'running') {
-                const dots = (statusText.dataset.dots || 0) + 1;
-                statusText.dataset.dots = dots > 3 ? 0 : dots;
-                statusText.textContent = 'Memproses' + '.'.repeat(dots);
+                const msgs = ['Memindai target', 'Mengumpulkan data', 'Memproses hasil', 'Hampir selesai'];
+                const idx = (statusText.dataset.idx || 0);
+                const next = (parseInt(idx) + 1) % msgs.length;
+                statusText.dataset.idx = next;
+                const dots = '.'.repeat((parseInt(idx) % 3) + 1);
+                statusText.textContent = msgs[idx % msgs.length] + dots;
                 return;
             }
 
