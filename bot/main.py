@@ -2266,7 +2266,7 @@ def cb_handler(call):
 
         # Jika cdn_targets tidak ada di state, coba baca dari file JSON di output/
         if not targets:
-            import glob, os
+            import glob
             out_dir = os.path.join(BASE_DIR, "output")
             json_files = glob.glob(os.path.join(out_dir, "cdnscan_*.json"))
             targets = []
