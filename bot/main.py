@@ -1106,13 +1106,12 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=N
     Terapkan scan_filters (client-side) sebelum pagination.
     """
     st = get_state(chat_id)
-    results = st.get("scan_results", [])
     mode = st.get("scan_mode", "subfind")
-    if not results:
-        target = st.get("scan_target", "-")
-        loaded = _load_scan_results_from_file(mode, target)
-        if loaded:
-            results = loaded
+    target = st.get("scan_target", "-")
+    if mode == "d2ip":
+        results = st.get("scan_results", []) or []
+    else:
+        results = _load_scan_results_from_file(mode, target) or []
     page = _scan_page_get(chat_id)
     target = st.get("scan_target", "-")
     title = st.get("scan_title", "Hasil Scan")
@@ -1433,6 +1432,7 @@ def run_d2ip(chat_id, message_id, domain):
               mode="scan_view",
               scan_mode="d2ip",
               scan_target=domain,
+              scan_results=lines,
               scan_page=1,
               scan_title="D2IP")
     _cs_set(chat_id, "scan_filters", {})
