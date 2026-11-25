@@ -364,6 +364,7 @@ def main():
                 "alpn": r["alpn"],
                 "tls_port": r["tls_port"],
                 "extra_ports": r["extra_ports"],
+                "status": r.get("status", "-"),
                 "cdn": r["cdn"],
             }
             for r in results
