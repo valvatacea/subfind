@@ -309,6 +309,34 @@ def _scan_back_target_set(chat_id, value):
         set_state(chat_id, scan_back_target=value)
 
 
+# Subsystem 3 (Fase 3): filter state -> chat_state.settings
+def _cs_get(chat_id, key, default=None):
+    if _ss is not None:
+        try:
+            settings = _ss.get_chat_settings(chat_id)
+            if key in settings:
+                return settings.get(key, default)
+        except Exception:
+            pass
+    return get_state(chat_id).get(key, default)
+
+
+def _cs_set(chat_id, key, value):
+    if _ss is not None:
+        try:
+            st = _ss.get_chat_settings(chat_id)
+            if value is None:
+                st.pop(key, None)
+            else:
+                st[key] = value
+            _ss.set_chat_settings(chat_id, st)
+            return
+        except Exception:
+            pass
+    if value is not None:
+        set_state(chat_id, **{key: value})
+
+
 # ===================== ESCAPE HTML =====================
 def esc(text):
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -957,8 +985,8 @@ def save_scan_state(chat_id, mode, target, results, title, page=1):
               scan_target=target,
               scan_results=results,
               scan_page=page,
-              scan_title=title,
-              scan_filters={})
+              scan_title=title)
+    _cs_set(chat_id, "scan_filters", {})
 
 
 def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=None):
@@ -973,7 +1001,7 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=N
     page = _scan_page_get(chat_id)
     target = st.get("scan_target", "-")
     title = st.get("scan_title", "Hasil Scan")
-    filters = st.get("scan_filters", {}) or {}
+    filters = _cs_get(chat_id, "scan_filters", {}) or {}
 
     # Terapkan filter client-side (tidak rescan)
     if filters:
@@ -1284,8 +1312,8 @@ def run_d2ip(chat_id, message_id, domain):
               scan_target=domain,
               scan_results=lines,
               scan_page=1,
-              scan_title="D2IP",
-              scan_filters={})
+              scan_title="D2IP")
+    _cs_set(chat_id, "scan_filters", {})
     show_scan_page(chat_id, message_id, edit=True)
 
 
@@ -2190,7 +2218,7 @@ def cb_handler(call):
         if len(parts) == 2:
             mode = parts[1]
             st = get_state(chat_id)
-            filters = st.get("scan_filters", {}) or {}
+            filters = _cs_get(chat_id, "scan_filters", {}) or {}
             filter_line = ""
             if filters:
                 parts_filter = [f"{FIELD_LABELS.get(k, k)}={v}" for k, v in filters.items()]
@@ -2209,7 +2237,9 @@ def cb_handler(call):
             mode = parts[1]
             field_key = parts[2]
             label = FIELD_LABELS.get(field_key, field_key)
-            set_state(chat_id, awaiting="filter_value", filter_mode=mode, filter_field=field_key)
+            set_state(chat_id, awaiting="filter_value")
+            _cs_set(chat_id, "filter_mode", mode)
+            _cs_set(chat_id, "filter_field", field_key)
             try:
                 bot.edit_message_text(
                     f"🔍 <b>Masukkan nilai untuk {label}</b>\nContoh: {FIELD_FILTER_EXAMPLE.get(field_key, '200')}",
@@ -2222,7 +2252,7 @@ def cb_handler(call):
         parts = data.split(":")
         if len(parts) == 2:
             mode = parts[1]
-            set_state(chat_id, scan_filters={})
+            _cs_set(chat_id, "scan_filters", {})
             st = get_state(chat_id)
             show_scan_page(chat_id, message_id, edit=True)
 
@@ -2829,15 +2859,18 @@ def text_handler(message):
         return
 
     if awaiting == "filter_value":
-        mode = st.get("filter_mode")
-        field_key = st.get("filter_field")
+        mode = _cs_get(chat_id, "filter_mode")
+        field_key = _cs_get(chat_id, "filter_field")
         if not mode or not field_key:
             bot.send_message(chat_id, "Sesi filter tidak valid. Pilih menu dulu dengan /start.", reply_markup=kb_main())
             return
         label = FIELD_LABELS.get(field_key, field_key)
-        filters = st.get("scan_filters", {}) or {}
+        filters = _cs_get(chat_id, "scan_filters", {}) or {}
         filters[field_key] = text
-        set_state(chat_id, awaiting=None, filter_mode=None, filter_field=None, scan_filters=filters)
+        set_state(chat_id, awaiting=None)
+        _cs_set(chat_id, "filter_mode", None)
+        _cs_set(chat_id, "filter_field", None)
+        _cs_set(chat_id, "scan_filters", filters)
         # Render ulang halaman 1 (edit pesan input user)
         show_scan_page(chat_id, message.message_id, edit=False)
         return
