@@ -159,16 +159,25 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
                 if (pollData.json) {
                     renderJsonResults(resultArea, pollData.json, action);
                     if (_tableData) {
-                        _tableData.extraHtml = statusBadge + '<br><br>' + (_tableData.extraHtml || '');
+                        _tableData.prefixHtml = statusBadge + '<br><br>';
+                        _tableData.suffixHtml = '';
                         if (pollData.output) {
-                            _tableData.extraHtml += `<h3>Result:</h3><pre>${escapeHtml(pollData.output)}</pre>`;
+                            let out = pollData.output;
+                            if (out.length > 4000) {
+                                out = out.substring(0, 4000) + '\n... (dipotong, unduh file untuk lengkap)';
+                            }
+                            _tableData.suffixHtml = `<h3>Result:</h3><pre>${escapeHtml(out)}</pre>`;
                         }
                         renderTablePage(resultArea, 1);
                     }
                 } else {
                     resultArea.innerHTML = statusBadge + '<br><br>';
                     if (pollData.output) {
-                        resultArea.innerHTML += `<h3>Result:</h3><pre>${escapeHtml(pollData.output)}</pre>`;
+                        let out = pollData.output;
+                        if (out.length > 4000) {
+                            out = out.substring(0, 4000) + '\n... (dipotong, unduh file untuk lengkap)';
+                        }
+                        resultArea.innerHTML += `<h3>Result:</h3><pre>${escapeHtml(out)}</pre>`;
                     }
                 }
             }
@@ -222,7 +231,9 @@ function renderTablePage(container, page) {
 
     // Render ke container yang disimpan
     const c = _tableData.container || container;
-    if (c) c.innerHTML = (_tableData.extraHtml || '') + html;
+    const prefix = (_tableData.prefixHtml || '');
+    const suffix = (_tableData.suffixHtml || '');
+    if (c) c.innerHTML = prefix + html + suffix;
 }
 
 function renderJsonResults(container, jsonData, action) {
@@ -295,7 +306,7 @@ function renderJsonResults(container, jsonData, action) {
     }
 
     // Simpan data untuk pagination
-    _tableData = { columns, rows, action, container, extraHtml: '' };
+    _tableData = { columns, rows, action, container, prefixHtml: '', suffixHtml: '', extraHtml: '' };
     _tableData.container = container;
     renderTablePage(container, 1);
 }
