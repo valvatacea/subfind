@@ -305,7 +305,7 @@ def enumerate_domain(domain, progress_callback=None, stop_event=None):
         pending = set(futures.keys())
 
         while pending:
-            done, pending = wait(pending, timeout=5, return_when=FIRST_COMPLETED)
+            done, pending = wait(pending, timeout=30, return_when=FIRST_COMPLETED)
             if not done:
                 for future in list(pending):
                     sub = futures[future]
