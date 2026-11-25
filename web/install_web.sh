@@ -211,6 +211,24 @@ setup_ssl() {
         return 0
     fi
 
+    # Periksa idn (untuk domain internasional), tiru natssh
+    if ! command -v idn >/dev/null 2>&1; then
+        log_info "idn belum terpasang, memasang..."
+        if command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq >/dev/null 2>&1 || true
+            apt-get install -y idn >/dev/null 2>&1 || true
+        elif command -v dnf >/dev/null 2>&1; then
+            dnf install -y idn >/dev/null 2>&1 || true
+        elif command -v yum >/dev/null 2>&1; then
+            yum install -y idn >/dev/null 2>&1 || true
+        fi
+    fi
+    if ! command -v idn >/dev/null 2>&1; then
+        log_warn "idn tidak tersedia; sertifikat untuk domain IDN mungkin gagal."
+    else
+        log_ok "idn siap."
+    fi
+
     # Install acme.sh jika belum ada
     if [ ! -x "$HOME/.acme.sh/acme.sh" ]; then
         log_info "Memasang acme.sh..."
