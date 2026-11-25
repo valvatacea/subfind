@@ -1961,7 +1961,7 @@ HELP_TEXT = (
     "4. Lihat hasil per halaman dengan tombol Prev / Next\n"
     "5. Gunakan Filter untuk menyaring hasil berdasarkan field tertentu\n"
     "6. Gunakan tombol Limit (500/1000/Custom) untuk batasi jumlah IP di CDNScan\n\n"
-    "<b>Web UI:</b> https://surfnder.kkkumanami.my.id/\n\n"
+    "<b>Web UI:</b> https://surfinder.kkkumanami.my.id/\n\n"
     "<b>Perintah:</b>\n"
     "/start — Mulai bot & lihat menu\n"
     "/menu — Kembali ke menu utama\n"
