@@ -342,12 +342,12 @@ def main():
         f.write(f"═══ SNISCAN (TLS HANDSHAKE & MULTI-PORT): {domain} ═══\n\n")
         for r in results:
             extra_str = ",".join(str(p) for p in r["extra_ports"]) if r["extra_ports"] else "-"
-            f.write(f"{pad_label('SNI Host', 12)}: {esc(r['sni_host'])}\n")
-            f.write(f"{pad_label('Direct IP', 12)}: {esc(r['ip'])} ({r['response_time_ms']}ms)\n")
-            f.write(f"{pad_label('TLS/ALPN', 12)}: {esc(r['tls_version'])} | ALPN: {esc(r['alpn'])}\n")
-            f.write(f"{pad_label('Port TLS', 12)}: {esc(r['tls_port'])}({esc(r['tls_version'])})\n")
-            f.write(f"{pad_label('Port Lain', 12)}: {esc(extra_str)}\n")
-            f.write(f"{pad_label('CDN', 12)}: {esc(r['cdn'])}\n")
+            f.write(f"{pad_label('SNI Host', 12)}: {r['sni_host']}\n")
+            f.write(f"{pad_label('Direct IP', 12)}: {r['ip']} ({r['response_time_ms']}ms)\n")
+            f.write(f"{pad_label('TLS/ALPN', 12)}: {r['tls_version']} | ALPN: {r['alpn']}\n")
+            f.write(f"{pad_label('Port TLS', 12)}: {r['tls_port']}({r['tls_version']})\n")
+            f.write(f"{pad_label('Port Lain', 12)}: {extra_str}\n")
+            f.write(f"{pad_label('CDN', 12)}: {r['cdn']}\n")
             f.write("----------------------------------------------\n")
 
     # Simpan JSON dengan metadata
