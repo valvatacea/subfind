@@ -27,13 +27,43 @@ async function loadCdnRanges(provider) {
         let html = `<h3>IP Range ${escapeHtml(provider)} (${ranges.length})</h3>`;
         html += `<div style="margin-bottom:8px;">`;
         ranges.forEach(r => {
-            html += `<button type="button" class="range-btn" onclick="handleScanDirect('cdnscan','${escapeHtml(r)}')">${escapeHtml(r)}</button> `;
+            html += `<button type="button" class="range-btn" onclick="selectCdnTarget('${escapeHtml(r)}')">${escapeHtml(r)}</button> `;
         });
         html += `</div>`;
+        html += `<div id="cdnscan-limit-picker" style="margin-top:10px;"></div>`;
         container.innerHTML = html;
     } catch (err) {
         container.innerHTML = `<div class="error">Error: ${escapeHtml(err.message)}</div>`;
     }
+}
+
+function selectCdnTarget(target) {
+    const picker = document.getElementById('cdnscan-limit-picker');
+    if (!picker) return;
+    picker.innerHTML = `
+        <div class="limit-picker">
+            <b>Target:</b> ${escapeHtml(target)}<br>
+            <b>Pilih limit IP (maks 1000):</b><br>
+            <button type="button" onclick="handleScanDirect('cdnscan','${escapeHtml(target)}',500)">500</button>
+            <button type="button" onclick="handleScanDirect('cdnscan','${escapeHtml(target)}',1000)">1000</button>
+            <button type="button" onclick="showCustomLimit('${escapeHtml(target)}')">Custom</button>
+            <button type="button" onclick="document.getElementById('cdnscan-limit-picker').innerHTML=''">Batal</button>
+        </div>
+    `;
+}
+
+function showCustomLimit(target) {
+    const picker = document.getElementById('cdnscan-limit-picker');
+    if (!picker) return;
+    picker.innerHTML = `
+        <div class="limit-picker">
+            <b>Target:</b> ${escapeHtml(target)}<br>
+            <label>Limit (1-1000):</label>
+            <input type="number" id="cdnscan-custom-limit" min="1" max="1000" value="500" style="width:80px;">
+            <button type="button" onclick="const v=document.getElementById('cdnscan-custom-limit').value; if(v<1||v>1000){alert('Limit 1-1000');return;} handleScanDirect('cdnscan','${escapeHtml(target)}', v)">Scan</button>
+            <button type="button" onclick="document.getElementById('cdnscan-limit-picker').innerHTML=''">Batal</button>
+        </div>
+    `;
 }
 
 async function handleScan(event, action, targetOverride = null, limitOverride = null) {
