@@ -637,6 +637,9 @@ def kb_page(mode, page, total_pages, back_target=None, filter_active=False, filt
             buttons2 = [InlineKeyboardButton("🔍 Filter", callback_data=f"filter:{mode}")]
         m.add(*buttons2)
 
+    # Tombol unduh .txt (di bawah filter)
+    m.add(InlineKeyboardButton("📥 Unduh .txt", callback_data="download:txt"))
+
     prev = back_target or {"subfind": "menu:subfind", "cdnscan": "menu:cdnscan", "d2ip": "menu:d2ip"}.get(mode, "menu:main")
     m.add(InlineKeyboardButton("↩️ Kembali", callback_data=f"back:{prev}"))
     return m
@@ -2006,6 +2009,63 @@ def cb_handler(call):
 
     elif data == "admin:hapus_riwayat:cancel":
         bot.edit_message_text("Dibatalkan.", chat_id, message_id, reply_markup=kb_main(user_id=chat_id))
+
+    elif data == "download:txt":
+        st = get_state(chat_id)
+        mode = st.get("scan_mode", "subfind")
+        target = st.get("scan_target", "-")
+        if mode == "d2ip":
+            results = st.get("scan_results", []) or []
+            content = "\n".join(str(x) for x in results)
+        else:
+            results = _load_scan_results_from_file(mode, target) or []
+            lines = []
+            if mode == "subfind":
+                for r in results:
+                    lines.append(f"Subdomain: {r[0]}")
+                    lines.append(f"IP: {r[1]}")
+                    lines.append(f"PORTS: {r[2]}")
+                    lines.append(f"Status: {r[3]}")
+                    lines.append(f"CDN: {r[4]}")
+                    lines.append("-" * 40)
+            elif mode == "cdnscan":
+                for r in results:
+                    lines.append(f"IP: {r[0]}")
+                    lines.append(f"PORTS: {r[1]}")
+                    lines.append(f"CDN: {r[2]}")
+                    lines.append(f"Status: {r[3]}")
+                    lines.append("-" * 40)
+            elif mode == "sniscan":
+                for r in results:
+                    lines.append(f"SNI Host: {r[0]}")
+                    lines.append(f"Direct IP: {r[1]} ({r[6]}ms)")
+                    lines.append(f"TLS/ALPN: {r[2]} | ALPN: {r[3]}")
+                    lines.append(f"Port TLS: {r[4]}")
+                    lines.append(f"Port Lain: {r[5]}")
+                    lines.append(f"CDN: {r[8]}")
+                    lines.append(f"Status: {r[7]}")
+                    lines.append("-" * 40)
+            content = "\n".join(lines)
+        if not content.strip():
+            try:
+                bot.answer_callback_query(call.id, "Tidak ada data untuk diunduh.", show_alert=True)
+            except Exception:
+                pass
+            return
+        safe_target = str(target).replace("/", "_").replace(":", "_")
+        fname = f"{mode}_{safe_target}.txt"
+        fpath = os.path.join(BASE_DIR, "output", fname)
+        try:
+            with open(fpath, "w") as f:
+                f.write(content)
+            with open(fpath, "rb") as f:
+                bot.send_document(chat_id, f, caption=f"📥 {fname}")
+        except Exception as e:
+            log.error("download failed: %s", e)
+            try:
+                bot.send_message(chat_id, f"❌ Gagal mengunduh: {esc(str(e))}")
+            except Exception:
+                pass
 
     elif data == "menu:d2ip":
         set_state(chat_id, mode="d2ip", awaiting="domain", prev_menu="menu:main")
