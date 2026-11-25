@@ -132,7 +132,7 @@ create_symlinks() {
 setup_bot() {
     local bot_dir="$INSTALL_DIR/bot"
     local env_file="$INSTALL_DIR/.env"
-    local env_example="$bot_dir/.env.example"
+    local env_example="$INSTALL_DIR/.env.example"
 
     if [ ! -d "$bot_dir" ]; then
         log_warn "Folder bot/ tidak ditemukan, dilewati setup bot"

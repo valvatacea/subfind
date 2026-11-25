@@ -68,8 +68,8 @@ setup_venv() {
 }
 
 setup_env() {
-    if [ ! -f "$ENV_FILE" ] && [ -f "$BOT_DIR/.env.example" ]; then
-        cp "$BOT_DIR/.env.example" "$ENV_FILE"
+    if [ ! -f "$ENV_FILE" ] && [ -f "$INSTALL_DIR/.env.example" ]; then
+        cp "$INSTALL_DIR/.env.example" "$ENV_FILE"
         log_ok ".env dibuat dari .env.example"
     fi
 
