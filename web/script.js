@@ -157,20 +157,15 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
                 // Tampilkan hasil
                 const statusBadge = `<span class="status-badge status-completed">Selesai</span>`;
                 if (pollData.json) {
+                    // Ada tabel: tampilkan proses (badge) + tabel saja, tanpa output mentah
                     renderJsonResults(resultArea, pollData.json, action);
                     if (_tableData) {
                         _tableData.prefixHtml = statusBadge + '<br><br>';
                         _tableData.suffixHtml = '';
-                        if (pollData.output) {
-                            let out = pollData.output;
-                            if (out.length > 4000) {
-                                out = out.substring(0, 4000) + '\n... (dipotong, unduh file untuk lengkap)';
-                            }
-                            _tableData.suffixHtml = `<h3>Result:</h3><pre>${escapeHtml(out)}</pre>`;
-                        }
                         renderTablePage(resultArea, 1);
                     }
                 } else {
+                    // Tidak ada tabel: tampilkan output mentah (dipotong agar tidak terlalu panjang)
                     resultArea.innerHTML = statusBadge + '<br><br>';
                     if (pollData.output) {
                         let out = pollData.output;
