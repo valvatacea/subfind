@@ -2780,7 +2780,7 @@ def run_cdnscan_target_batch(chat_id, message_id):
         try:
             _edit_queue.put((
                 chat_id, message_id,
-                f"🛡️ <b>CDNScan</b>\nScan gabungan {len(targets)} target...\nMemulai scan {total_batch_ips} IP...",
+                f"🛡️ <b>CDNScan</b>\nScan gabungan {len(targets)} target...\nMemindai scan {total_batch_ips} IP...", 
                 {}
             ))
         except Exception:

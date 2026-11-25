@@ -119,7 +119,7 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
     resultArea.innerHTML = `
         <div class="scanning" style="margin-top:15px;">
             <div class="spinner"></div>
-            <span class="status-text"><span id="status-text-${action}">Memulai...</span></span>
+            <span class="status-text"><span id="status-text-${action}">Memindai...</span></span>
             <div class="progress-wrap">
                 <div class="progress-bar indeterminate"></div>
             </div>

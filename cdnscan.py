@@ -597,7 +597,7 @@ def main():
             save_state(cidr_str, offset, True)
             continue
 
-        print(f"\n    Memulai scan target: {label} ({len(ips)} IP, offset={offset})")
+        print(f"\n    Memindai scan target: {label} ({len(ips)} IP, offset={offset})\n")
         print("    Memproses dengan threading...")
 
         results = []
