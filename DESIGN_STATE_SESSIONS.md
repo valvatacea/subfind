@@ -12,7 +12,7 @@
 - Semua tombol progress membawa `session_id` di `callback_data` (8 char hex).
 - In-memory cache tetap dipakai untuk hot path; DB = source of truth + recovery.
 
-## 3. Skema SQLite (file: `output/state.db`, WAL mode)
+## 3. Skema SQLite (file: `bot/state.db`, WAL mode)
 
 ```sql
 PRAGMA journal_mode = WAL;
@@ -113,12 +113,12 @@ IDLE (chat_state.active_session=NULL)
 - `bot/main.py`: semua `set_state`/`get_state`/`clear_state` (90 refs), `cmd_start`, `cb_handler` (router), `run_subfind`, `run_cdnscan_target_batch`, `run_sniscan`, `show_scan_page`, history pages.
 - Baru: `bot/session_store.py` (CRUD, cache, pruning).
 - `bot/__init__.py` tidak berubah.
-- Tambah `output/state.db` ke `.gitignore` (sudah output/ biasanya ignored).
+- Tambah `bot/state.db*` ke `.gitignore`.
 
 ## 9. Rollback Plan
 
 - Fase 1-2: reversible (dict lama masih primary/mirror).
-- Fase 3+: butuh restore dari backup git (sebelum Fase 3 commit) + restore `state.db` backup.
+- Fase 3+: butuh restore dari backup git (sebelum Fase 3 commit) + restore `bot/state.db` backup.
 - Selalu commit per fase; jangan gabung.
 
 ## 10. Risiko & Mitigasi
@@ -160,7 +160,7 @@ Let me write this file.<|end|><|start|> startX <|constrain|>xml<|message|><rfl:p
 - Semua tombol progress membawa `session_id` di `callback_data` (8 char hex).
 - In-memory cache tetap dipakai untuk hot path; DB = source of truth + recovery.
 
-## 3. Skema SQLite (file: `output/state.db`, WAL mode)
+## 3. Skema SQLite (file: `bot/state.db`, WAL mode)
 
 ```sql
 PRAGMA journal_mode = WAL;
@@ -261,12 +261,12 @@ IDLE (chat_state.active_session=NULL)
 - `bot/main.py`: semua `set_state`/`get_state`/`clear_state` (90 refs), `cmd_start`, `cb_handler` (router), `run_subfind`, `run_cdnscan_target_batch`, `run_sniscan`, `show_scan_page`, history pages.
 - Baru: `bot/session_store.py` (CRUD, cache, pruning).
 - `bot/__init__.py` tidak berubah.
-- Tambah `output/state.db` ke `.gitignore` (sudah output/ biasanya ignored).
+- Tambah `bot/state.db*` ke `.gitignore`.
 
 ## 9. Rollback Plan
 
 - Fase 1-2: reversible (dict lama masih primary/mirror).
-- Fase 3+: butuh restore dari backup git (sebelum Fase 3 commit) + restore `state.db` backup.
+- Fase 3+: butuh restore dari backup git (sebelum Fase 3 commit) + restore `bot/state.db` backup.
 - Selalu commit per fase; jangan gabung.
 
 ## 10. Risiko & Mitigasi

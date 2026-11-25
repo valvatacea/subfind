@@ -61,6 +61,14 @@ if [ -d "$TARGET_DIR" ]; then
     echo "[INFO] Backup lama disimpan ke: $BACKUP"
 fi
 
+# Cadangkan bot/state.db (state persisten) agar tidak ikut terhapus saat update
+STATE_DB_BACKUP=""
+if [ -f "$TARGET_DIR/bot/state.db" ]; then
+    STATE_DB_BACKUP="$BACKUP_DIR/state_${TIMESTAMP}.db"
+    cp -a "$TARGET_DIR/bot/state.db" "$STATE_DB_BACKUP"
+    echo "[INFO] Cadangkan bot/state.db ke: $STATE_DB_BACKUP"
+fi
+
 # Salin file baru (kecuali .git, .venv, output, backup, __pycache__, .gitignore, bot.log)
 echo "[INFO] Menyalin file baru ke $TARGET_DIR ..."
 for item in "$EXTRACTED_DIR"/*; do
@@ -75,6 +83,13 @@ for item in "$EXTRACTED_DIR"/*; do
             ;;
     esac
 done
+
+# Pulihkan bot/state.db jika ada backup
+if [ -n "$STATE_DB_BACKUP" ] && [ -f "$STATE_DB_BACKUP" ]; then
+    mkdir -p "$TARGET_DIR/bot"
+    cp -a "$STATE_DB_BACKUP" "$TARGET_DIR/bot/state.db"
+    echo "[INFO] Pulihkan bot/state.db dari backup"
+fi
 
 # Bersihkan
 rm -rf "$TMP_DIR" "$TMP_ZIP"
