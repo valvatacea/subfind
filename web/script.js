@@ -35,7 +35,7 @@ async function handleScan(event, action) {
     resultArea.innerHTML = `
         <div class="scanning" style="margin-top:15px;">
             <div class="spinner"></div>
-            <span class="status-text"><span id="status-text-${action}">Memindai target.</span></span>
+            <span class="status-text"><span id="status-text-${action}">Memulai...</span></span>
         </div>
     `;
 
@@ -72,7 +72,14 @@ async function handleScan(event, action) {
             }
 
             if (pollData.status === 'running') {
-                const msgs = ['Memindai target', 'Mengumpulkan data', 'Memproses hasil', 'Hampir selesai'];
+                const msgMap = {
+                    'd2ip': ['Resolve domain', 'Query DNS', 'Mengumpulkan IP'],
+                    'subfind': ['Enumerasi subdomain', 'Resolve IP', 'Scan port', 'Deteksi CDN'],
+                    'cdnscan': ['Parse IP range', 'Deteksi CDN', 'Scan port'],
+                    'sniscan': ['TLS handshake', 'Scan port', 'Deteksi CDN'],
+                    'rdns': ['Reverse DNS lookup', 'Query PTR'],
+                };
+                const msgs = msgMap[action] || ['Memindai target', 'Mengumpulkan data', 'Memproses hasil'];
                 const idx = (statusText.dataset.idx || 0);
                 const next = (parseInt(idx) + 1) % msgs.length;
                 statusText.dataset.idx = next;
