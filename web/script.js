@@ -60,7 +60,7 @@ async function handleScan(event, action) {
         // 2. Polling setiap 2 detik
         const statusText = document.getElementById('status-text-' + action);
         const pollInterval = setInterval(async () => {
-            const pollResp = await fetch(`scan.php?poll=${pid}`);
+            const pollResp = await fetch(`scan.php?poll=${pid}&action=${encodeURIComponent(action)}&target=${encodeURIComponent(target)}`);
             const pollData = await pollResp.json();
 
             if (!pollData.success) {

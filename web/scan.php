@@ -6,8 +6,8 @@ set_time_limit(0);
 $BASE_DIR = '/root/subfind';
 $OUTPUT_DIR = $BASE_DIR . '/output';
 
-$action = $_POST['action'] ?? '';
-$target = $_POST['target'] ?? '';
+$action = $_POST['action'] ?? ($_GET['action'] ?? '');
+$target = $_POST['target'] ?? ($_GET['target'] ?? '');
 $poll = $_GET['poll'] ?? '';
 
 // Validasi action
@@ -29,7 +29,12 @@ if ($poll) {
     $running = shell_exec("ps -p $pid -o pid=");
     $running = trim($running);
 
-    $outFile = $OUTPUT_DIR . "/scan_$pid.txt";
+    if ($action !== '' && $target !== '') {
+        $safe_target = preg_replace('/[^a-zA-Z0-9._-]/', '_', $target);
+        $outFile = $OUTPUT_DIR . "/" . $action . "_" . $safe_target . ".txt";
+    } else {
+        $outFile = $OUTPUT_DIR . "/scan_$pid.txt";
+    }
     $jsonFile = null;
 
     // Tentukan file JSON output berdasarkan action dan target
@@ -37,6 +42,9 @@ if ($poll) {
         $jsonFile = $OUTPUT_DIR . "/subfind_$target.json";
     } elseif ($action === 'sniscan') {
         $jsonFile = $OUTPUT_DIR . "/sniscan_$target.json";
+    } elseif ($action === 'rdns') {
+        $safe = str_replace(':', '_', $target);
+        $jsonFile = $OUTPUT_DIR . "/rdns_$safe.json";
     } elseif ($action === 'cdnscan') {
         // CDNScan menyimpan per range dengan safe name, cari file terbaru
         $files = glob($OUTPUT_DIR . '/cdnscan_*.json');
