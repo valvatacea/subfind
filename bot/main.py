@@ -43,6 +43,7 @@ from subfind import (
 from common.validators import validate_domain
 from common.nsfw_filter import is_blocked, blocked_message
 from common.progress import format_elapsed, calculate_eta, build_bar, SPINNER
+from rdns import reverse_lookup, validate_ip
 from sniscan import (
     enumerate_hosts,
 )
@@ -457,6 +458,7 @@ def kb_main(user_id=None):
     m = InlineKeyboardMarkup(row_width=2)
     m.add(
         InlineKeyboardButton("🌐 D2IP (Domain ➜ IP)", callback_data="menu:d2ip"),
+        InlineKeyboardButton("🔄 IP2Domain (IP ➜ Domain)", callback_data="menu:rdns"),
         InlineKeyboardButton("🔍 SubFind (Subdomain)", callback_data="menu:subfind"),
         InlineKeyboardButton("🛡️ CDNScan (CDN/IP)", callback_data="menu:cdnscan"),
         InlineKeyboardButton("🔍 SNIScan (TLS/IP)", callback_data="menu:sniscan"),
@@ -1472,6 +1474,41 @@ def run_d2ip(chat_id, message_id, domain):
     show_scan_page(chat_id, message_id, edit=True)
 
 
+# ===================== RDNS (reverse DNS) =====================
+def run_rdns(chat_id, message_id, ip):
+    names, err = reverse_lookup(ip)
+    if err:
+        bot.edit_message_text(
+            f"❌ <b>IP2Domain</b>\nIP: <code>{esc(ip)}</code>\n{esc(err)}",
+            chat_id, message_id, reply_markup=kb_back("menu:rdns")
+        )
+        return
+    lines = [f"🔄 <b>IP2Domain</b>\nIP: <code>{esc(ip)}</code>\n", "Hostname (PTR):"]
+    for n in names:
+        lines.append(f"  • {esc(n)}")
+    # simpan txt
+    out_dir = os.path.join(BASE_DIR, "output")
+    os.makedirs(out_dir, exist_ok=True)
+    fname = f"rdns_{ip}.txt"
+    fpath = os.path.join(out_dir, fname)
+    try:
+        with open(fpath, "w") as f:
+            f.write("\n".join(lines) + "\n")
+    except Exception:
+        pass
+    bot.edit_message_text(
+        "\n".join(lines),
+        chat_id, message_id, reply_markup=kb_back("menu:rdns")
+    )
+
+
+def _run_rdns_with_slot(chat_id, message_id, ip):
+    try:
+        run_rdns(chat_id, message_id, ip)
+    finally:
+        bebaskan_slot_scan(chat_id)
+
+
 # ===================== SUBFIND (impor dari subfind.py) =====================
 def run_subfind(chat_id, message_id, domain, session_id=None):
     if message_id is None:
@@ -2086,6 +2123,13 @@ def cb_handler(call):
         set_state(chat_id, mode="d2ip", awaiting="domain", prev_menu="menu:main")
         bot.edit_message_text(
             "🌐 <b>D2IP — Domain ➜ IP</b>\n\nKirim domain yang mau di-resolve (contoh: google.com).",
+            chat_id, message_id, reply_markup=kb_back("menu:main")
+        )
+
+    elif data == "menu:rdns":
+        set_state(chat_id, mode="rdns", awaiting="ip", prev_menu="menu:main")
+        bot.edit_message_text(
+            "🔄 <b>IP2Domain — IP ➜ Domain (Reverse DNS)</b>\n\nKirim IP yang mau di-resolve (contoh: 8.8.8.8).",
             chat_id, message_id, reply_markup=kb_back("menu:main")
         )
 
@@ -3032,6 +3076,23 @@ def text_handler(message):
         sent = bot.send_message(chat_id, f"🌐 <b>D2IP</b>\nMeng-resolve <b>{esc(domain)}</b>...")
         set_state(chat_id, mode="d2ip", awaiting=None)
         threading.Thread(target=_run_d2ip_with_slot, args=(chat_id, sent.message_id, domain), daemon=True).start()
+        return
+
+    if mode == "rdns" and awaiting == "ip":
+        ip = text.strip()
+        if not validate_ip(ip):
+            bot.send_message(chat_id, "IP tidak valid. Coba lagi (contoh: 8.8.8.8).")
+            return
+        if not cek_slot_scan(chat_id):
+            bot.send_message(
+                chat_id,
+                "⚠️ <b>Scan sedang berjalan di chat ini</b>\nTunggu selesai sebelum scan baru.",
+                reply_markup=kb_back("menu:rdns"),
+            )
+            return
+        sent = bot.send_message(chat_id, f"🔄 <b>IP2Domain</b>\nMeng-resolve <b>{esc(ip)}</b>...")
+        set_state(chat_id, mode="rdns", awaiting=None)
+        threading.Thread(target=_run_rdns_with_slot, args=(chat_id, sent.message_id, ip), daemon=True).start()
         return
 
     if mode == "subfind" and awaiting == "domain":
