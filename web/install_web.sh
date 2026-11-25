@@ -42,7 +42,7 @@ install_deps() {
     if command -v apt-get >/dev/null 2>&1; then
         log_info "Menginstal nginx + php-fpm via apt..."
         apt-get update -y >/dev/null 2>&1 || true
-        apt-get install -y nginx php-fpm php-cli php-curl php-json >/dev/null 2>&1 || true
+        apt-get install -y nginx php-fpm php-cli php-curl php-json acl >/dev/null 2>&1 || true
     elif command -v dnf >/dev/null 2>&1; then
         dnf install -y nginx php php-fpm php-cli >/dev/null 2>&1 || true
     elif command -v yum >/dev/null 2>&1; then
@@ -63,9 +63,28 @@ setup_dirs() {
     chown -R www-data:www-data "$WEB_DIR" 2>/dev/null || true
     chmod 755 "$WEB_DIR"
     chown -R www-data:www-data "$INSTALL_DIR/output" 2>/dev/null || true
-    # Pastikan www-data bisa traverse ke WEB_DIR (parent /root sering 700)
-    chmod 755 /root 2>/dev/null || true
-    chmod 755 "$INSTALL_DIR" 2>/dev/null || true
+    # Pastikan www-data bisa traverse ke WEB_DIR.
+    # Utamakan ACL (izin hanya untuk www-data) agar /root tetap 700.
+    if command -v setfacl >/dev/null 2>&1; then
+        setfacl -m u:www-data:rx /root 2>/dev/null || true
+        setfacl -m u:www-data:rx "$INSTALL_DIR" 2>/dev/null || true
+        chmod 700 /root 2>/dev/null || true
+        log_ok "ACL www-data:rx diterapkan (mode aman)"
+    else
+        if command -v apt-get >/dev/null 2>&1; then
+            apt-get install -y acl >/dev/null 2>&1 || true
+        fi
+        if command -v setfacl >/dev/null 2>&1; then
+            setfacl -m u:www-data:rx /root 2>/dev/null || true
+            setfacl -m u:www-data:rx "$INSTALL_DIR" 2>/dev/null || true
+            chmod 700 /root 2>/dev/null || true
+            log_ok "ACL www-data:rx diterapkan (mode aman)"
+        else
+            chmod 755 /root 2>/dev/null || true
+            chmod 755 "$INSTALL_DIR" 2>/dev/null || true
+            log_warn "acl tidak tersedia; fallback chmod 755 /root"
+        fi
+    fi
     # Pastikan www-data bisa eksekusi venv python (untuk scan.php)
     if [ -d "$INSTALL_DIR/.venv" ]; then
         chmod 755 "$INSTALL_DIR" "$INSTALL_DIR/.venv" "$INSTALL_DIR/.venv/bin" 2>/dev/null || true
