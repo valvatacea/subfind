@@ -55,12 +55,12 @@ async function handleScan(event, action) {
             return;
         }
 
-        const pid = startData.pid;
+        const scanId = startData.scan_id;
 
         // 2. Polling setiap 2 detik
         const statusText = document.getElementById('status-text-' + action);
         const pollInterval = setInterval(async () => {
-            const pollResp = await fetch(`scan.php?poll=${pid}&action=${encodeURIComponent(action)}&target=${encodeURIComponent(target)}`);
+            const pollResp = await fetch(`scan.php?scan_id=${encodeURIComponent(scanId)}&action=${encodeURIComponent(action)}&target=${encodeURIComponent(target)}`);
             const pollData = await pollResp.json();
 
             if (!pollData.success) {
@@ -109,6 +109,10 @@ function showError(container, message) {
 }
 
 function renderJsonResults(container, jsonData, action) {
+    // Normalisasi: CLI sniscan/cdnscan mungkin membungkus hasil di .results
+    if (jsonData && !Array.isArray(jsonData) && Array.isArray(jsonData.results)) {
+        jsonData = jsonData.results;
+    }
     if (!jsonData || (Array.isArray(jsonData) && jsonData.length === 0)) {
         container.innerHTML += `<div class="error">Tidak ada hasil ditemukan</div>`;
         return;
