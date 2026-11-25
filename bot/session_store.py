@@ -14,7 +14,8 @@ import logging
 log = logging.getLogger('surfinder.session_store')
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_DB_PATH = os.path.join(BASE_DIR, 'output', 'state.db')
+BOT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_DB_PATH = os.path.join(BOT_DIR, 'state.db')
 
 _lock = threading.RLock()
 _conn = None

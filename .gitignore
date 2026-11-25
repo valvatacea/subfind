@@ -3,3 +3,8 @@ __pycache__/
 .env
 .venv/
 bot.log
+
+# state db
+bot/state.db
+bot/state.db-shm
+bot/state.db-wal
