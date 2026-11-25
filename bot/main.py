@@ -1377,6 +1377,14 @@ def d2ip_resolve_multi(domain):
     return results
 
 
+def _run_d2ip_with_slot(chat_id, message_id, domain):
+    """Jalankan D2IP dengan slot scan per chat; lepas slot di finally."""
+    try:
+        run_d2ip(chat_id, message_id, domain)
+    finally:
+        bebaskan_slot_scan(chat_id)
+
+
 def run_d2ip(chat_id, message_id, domain):
     # Coba socket dulu (cepat)
     ip, err = socket.gethostbyname(domain), None
@@ -2852,9 +2860,16 @@ def text_handler(message):
         if blocked:
             bot.send_message(chat_id, blocked_message(domain, kata))
             return
+        if not cek_slot_scan(chat_id):
+            bot.send_message(
+                chat_id,
+                "⚠️ <b>Scan sedang berjalan di chat ini</b>\nTunggu selesai sebelum scan baru.",
+                reply_markup=kb_back("menu:d2ip"),
+            )
+            return
         sent = bot.send_message(chat_id, f"🌐 <b>D2IP</b>\nMeng-resolve <b>{esc(domain)}</b>...")
         set_state(chat_id, mode="d2ip", awaiting=None)
-        threading.Thread(target=run_d2ip, args=(chat_id, sent.message_id, domain), daemon=True).start()
+        threading.Thread(target=_run_d2ip_with_slot, args=(chat_id, sent.message_id, domain), daemon=True).start()
         return
 
     if mode == "subfind" and awaiting == "domain":
