@@ -458,7 +458,7 @@ def kb_main(user_id=None):
     m = InlineKeyboardMarkup(row_width=2)
     m.add(
         InlineKeyboardButton("🌐 D2IP (Domain ➜ IP)", callback_data="menu:d2ip"),
-        InlineKeyboardButton("🔄 IP2Domain (IP ➜ Domain)", callback_data="menu:rdns"),
+        InlineKeyboardButton("🔄 IP2D (IP ➜ Domain)", callback_data="menu:rdns"),
         InlineKeyboardButton("🔍 SubFind (Subdomain)", callback_data="menu:subfind"),
         InlineKeyboardButton("🛡️ CDNScan (CDN/IP)", callback_data="menu:cdnscan"),
         InlineKeyboardButton("🔍 SNIScan (TLS/IP)", callback_data="menu:sniscan"),
