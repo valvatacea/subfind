@@ -60,6 +60,19 @@ if not BOT_TOKEN:
     print("BOT_TOKEN belum di-set. Buat .env dengan BOT_TOKEN=isi_token")
     sys.exit(1)
 
+ADMIN_IDS = set()
+for part in (os.environ.get("ADMIN_IDS", "") or "").split(","):
+    part = part.strip()
+    if part.isdigit():
+        ADMIN_IDS.add(int(part))
+
+
+def is_admin(user_id):
+    try:
+        return int(user_id) in ADMIN_IDS
+    except (TypeError, ValueError):
+        return False
+
 # ===================== BATASAN SCAN SIMULTAN =====================
 MAX_ACTIVE_SCANS = 3          # Maksimal scan berjalan bersamaan di seluruh bot
 ACTIVE_SCANS = 0              # Counter scan aktif saat ini
@@ -440,15 +453,17 @@ def build_progress_text(spinner_idx, title, target, current, total, start_time,
 
 
 # ===================== KEYBOARD =====================
-def kb_main():
+def kb_main(user_id=None):
     m = InlineKeyboardMarkup(row_width=2)
     m.add(
         InlineKeyboardButton("🌐 D2IP (Domain ➜ IP)", callback_data="menu:d2ip"),
         InlineKeyboardButton("🔍 SubFind (Subdomain)", callback_data="menu:subfind"),
         InlineKeyboardButton("🛡️ CDNScan (CDN/IP)", callback_data="menu:cdnscan"),
         InlineKeyboardButton("🔍 SNIScan (TLS/IP)", callback_data="menu:sniscan"),
-        InlineKeyboardButton("❓ Bantuan", callback_data="menu:help"),
     )
+    if is_admin(user_id):
+        m.add(InlineKeyboardButton("🗑️ Hapus Riwayat", callback_data="admin:hapus_riwayat"))
+    m.add(InlineKeyboardButton("❓ Bantuan", callback_data="menu:help"))
     return m
 
 
@@ -1904,7 +1919,7 @@ def cmd_start(message):
     bot.send_message(
         message.chat.id,
         "👋 <b>Surfinder</b>\nPilih menu di bawah:",
-        reply_markup=kb_main()
+        reply_markup=kb_main(user_id=message.chat.id)
     )
 
 
@@ -1924,10 +1939,56 @@ def cb_handler(call):
 
     if data == "menu:main":
         clear_state(chat_id)
-        bot.edit_message_text("👋 <b>Surfinder</b>\nPilih menu di bawah:", chat_id, message_id, reply_markup=kb_main())
+        bot.edit_message_text("👋 <b>Surfinder</b>\nPilih menu di bawah:", chat_id, message_id, reply_markup=kb_main(user_id=chat_id))
 
     elif data == "menu:help":
         bot.edit_message_text(HELP_TEXT, chat_id, message_id, reply_markup=kb_back("menu:main"))
+
+    elif data == "admin:hapus_riwayat":
+        if not is_admin(chat_id):
+            try:
+                bot.answer_callback_query(call.id, "Tidak diizinkan", show_alert=True)
+            except Exception:
+                pass
+            return
+        kb = InlineKeyboardMarkup(row_width=2)
+        kb.add(
+            InlineKeyboardButton("✅ Ya, hapus semua", callback_data="admin:hapus_riwayat:confirm"),
+            InlineKeyboardButton("❌ Batal", callback_data="admin:hapus_riwayat:cancel"),
+        )
+        bot.edit_message_text(
+            "⚠️ <b>Hapus semua riwayat output?</b>\n"
+            "Semua file .txt dan .json di output/ akan dihapus (kecuali cache ipranges/).",
+            chat_id, message_id, reply_markup=kb
+        )
+
+    elif data == "admin:hapus_riwayat:confirm":
+        if not is_admin(chat_id):
+            try:
+                bot.answer_callback_query(call.id, "Tidak diizinkan", show_alert=True)
+            except Exception:
+                pass
+            return
+        deleted = 0
+        out_dir = os.path.join(BASE_DIR, "output")
+        for root, dirs, files in os.walk(out_dir):
+            # jangan hapus cache ipranges
+            if "ipranges" in root.split(os.sep):
+                continue
+            for fn in files:
+                if fn.endswith(".txt") or fn.endswith(".json"):
+                    try:
+                        os.remove(os.path.join(root, fn))
+                        deleted += 1
+                    except Exception:
+                        pass
+        bot.edit_message_text(
+            f"✅ {deleted} file output (.txt/.json) dihapus.\nCache ipranges/ tidak disentuh.",
+            chat_id, message_id, reply_markup=kb_main(user_id=chat_id)
+        )
+
+    elif data == "admin:hapus_riwayat:cancel":
+        bot.edit_message_text("Dibatalkan.", chat_id, message_id, reply_markup=kb_main(user_id=chat_id))
 
     elif data == "menu:d2ip":
         set_state(chat_id, mode="d2ip", awaiting="domain", prev_menu="menu:main")
@@ -2404,7 +2465,7 @@ def cb_handler(call):
         st = get_state(chat_id)
         if prev_menu == "menu:main":
             clear_state(chat_id)
-            bot.edit_message_text("👋 <b>Surfinder</b>\nPilih menu di bawah:", chat_id, message_id, reply_markup=kb_main())
+            bot.edit_message_text("👋 <b>Surfinder</b>\nPilih menu di bawah:", chat_id, message_id, reply_markup=kb_main(user_id=chat_id))
         elif prev_menu == "menu:d2ip":
             set_state(chat_id, mode="d2ip", awaiting="domain", prev_menu="menu:main")
             bot.edit_message_text(
@@ -2466,7 +2527,7 @@ def cb_handler(call):
         else:
             # Fallback ke menu utama
             clear_state(chat_id)
-            bot.edit_message_text("👋 <b>Surfinder</b>\nPilih menu di bawah:", chat_id, message_id, reply_markup=kb_main())
+            bot.edit_message_text("👋 <b>Surfinder</b>\nPilih menu di bawah:", chat_id, message_id, reply_markup=kb_main(user_id=chat_id))
 
     else:
         try:
@@ -2848,7 +2909,7 @@ def text_handler(message):
     awaiting = st.get("awaiting")
 
     if not mode or mode == "main":
-        bot.send_message(chat_id, "Pilih menu dulu dengan /start.", reply_markup=kb_main())
+        bot.send_message(chat_id, "Pilih menu dulu dengan /start.", reply_markup=kb_main(user_id=chat_id))
         return
 
     if mode == "d2ip" and awaiting == "domain":
@@ -2993,7 +3054,7 @@ def text_handler(message):
         mode = _cs_get(chat_id, "filter_mode")
         field_key = _cs_get(chat_id, "filter_field")
         if not mode or not field_key:
-            bot.send_message(chat_id, "Sesi filter tidak valid. Pilih menu dulu dengan /start.", reply_markup=kb_main())
+            bot.send_message(chat_id, "Sesi filter tidak valid. Pilih menu dulu dengan /start.", reply_markup=kb_main(user_id=chat_id))
             return
         label = FIELD_LABELS.get(field_key, field_key)
         filters = _cs_get(chat_id, "scan_filters", {}) or {}
@@ -3007,7 +3068,7 @@ def text_handler(message):
         return
 
     # Fallback
-    bot.send_message(chat_id, "Pilih menu dulu dengan /start.", reply_markup=kb_main())
+    bot.send_message(chat_id, "Pilih menu dulu dengan /start.", reply_markup=kb_main(user_id=chat_id))
 
 
 # ===================== MAIN =====================
