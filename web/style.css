@@ -118,6 +118,13 @@ button[type="submit"]:disabled {
     min-height: 50px;
 }
 
+.scanning {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 15px;
+}
+
 .spinner {
     display: inline-block;
     width: 20px;
