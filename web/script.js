@@ -305,7 +305,7 @@ function renderJsonResults(container, jsonData, action) {
             r.status || '-'
         ]);
     } else if (action === 'sniscan') {
-        columns = ['SNI Host', 'IP', 'TLS Version', 'ALPN', 'Port TLS', 'Extra Ports', 'Response Time', 'Status'];
+        columns = ['SNI Host', 'IP', 'TLS Version', 'ALPN', 'Port TLS', 'Extra Ports', 'Response Time', 'Status', 'CDN'];
         rows = jsonData.map(r => [
             r.sni_host || '-',
             r.ip || '-',
@@ -314,7 +314,8 @@ function renderJsonResults(container, jsonData, action) {
             r.tls_port || '-',
             r.extra_ports || '-',
             r.response_time_ms || '-',
-            r.status || '-'
+            r.status || '-',
+            r.cdn || '-'
         ]);
     } else if (action === 'd2ip') {
         // d2ip biasanya output teks, bukan JSON terstruktur

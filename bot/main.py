@@ -606,7 +606,7 @@ def build_page_text(results, page, mode, title):
             lines.append(f"{pad_label('TLS/ALPN', 12)}: {esc(r[2])} | ALPN: {esc(r[3])}")
             lines.append(f"{pad_label('Port TLS', 12)}: {esc(r[4])}({esc(r[2])})")
             lines.append(f"{pad_label('Port Lain', 12)}: {esc(r[5])}")
-            lines.append(f"{pad_label('CDN', 12)}: -")
+            lines.append(f"{pad_label('CDN', 12)}: {esc(r[8])}")
             lines.append(f"{pad_label('Status', 12)}: {esc(r[7])}")
             lines.append("----------------------------------------------")
     elif mode == "d2ip":
