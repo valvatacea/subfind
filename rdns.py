@@ -64,11 +64,13 @@ def main():
     tname = os.path.join(out_dir, f"rdns_{safe}.txt")
     if err:
         print(f"Error: {err}")
+        print()
         print("Selesai.")
         data = {"ip": ip, "hostnames": [], "error": err}
     else:
         for n in names:
             print(n)
+        print()
         print("Selesai.")
         data = {"ip": ip, "hostnames": names, "error": None}
     try:
