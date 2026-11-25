@@ -106,7 +106,7 @@ find_php_socket() {
 
 env_set() {
     local key="$1" val="$2"
-    local f="${SUBFIND_INSTALL_DIR:-/root/subfind}/bot/.env"
+    local f="${SUBFIND_INSTALL_DIR:-/root/subfind}/.env"
     touch "$f"
     if grep -q "^${key}=" "$f" 2>/dev/null; then
         sed -i "s|^${key}=.*|${key}=${val}|" "$f"
@@ -161,7 +161,7 @@ extract_root_domain() {
 
 setup_ssl() {
     # Muat .env yang sudah ada (subfind top-level atau bot/.env)
-    ENV_FILE="${SUBFIND_INSTALL_DIR:-/root/subfind}/bot/.env"
+    ENV_FILE="${SUBFIND_INSTALL_DIR:-/root/subfind}/.env"
     if [ -f "$ENV_FILE" ]; then
         set -a; . "$ENV_FILE"; set +a
         log_info "Memuat variabel dari $ENV_FILE"

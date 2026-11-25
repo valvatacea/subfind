@@ -131,7 +131,7 @@ create_symlinks() {
 # -----------------------------------------------------------------------------
 setup_bot() {
     local bot_dir="$INSTALL_DIR/bot"
-    local env_file="$bot_dir/.env"
+    local env_file="$INSTALL_DIR/.env"
     local env_example="$bot_dir/.env.example"
 
     if [ ! -d "$bot_dir" ]; then
@@ -142,9 +142,9 @@ setup_bot() {
     # Buat .env dari contoh jika belum ada
     if [ ! -f "$env_file" ] && [ -f "$env_example" ]; then
         cp "$env_example" "$env_file"
-        log_ok "File bot/.env dibuat dari contoh (isi BOT_TOKEN Anda)"
+        log_ok "File .env dibuat dari contoh (isi BOT_TOKEN Anda)"
     elif [ ! -f "$env_file" ]; then
-        log_warn "bot/.env.example tidak ditemukan, buat bot/.env manual"
+        log_warn ".env.example tidak ditemukan, buat .env manual"
     fi
 
     # Install dependensi bot jika pip tersedia
@@ -293,7 +293,7 @@ main() {
     echo "Symlink:       $BIN_DIR"
     echo "Hasil scan:    $INSTALL_DIR/output/"
     echo "Web UI:        $INSTALL_DIR/web/"
-    echo "Bot env:       $INSTALL_DIR/bot/.env"
+    echo "Bot env:       $INSTALL_DIR/.env"
     echo ""
 }
 

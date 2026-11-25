@@ -18,7 +18,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 from dotenv import load_dotenv
-load_dotenv(os.path.join(BOT_DIR, '.env'))
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 logging.basicConfig(
     level=logging.DEBUG,

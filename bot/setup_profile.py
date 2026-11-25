@@ -7,13 +7,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'))
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
 
 import telebot
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 if not BOT_TOKEN:
-    print("BOT_TOKEN belum di-set di bot/.env")
+    print("BOT_TOKEN belum di-set di .env")
     sys.exit(1)
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")

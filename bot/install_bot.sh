@@ -11,7 +11,7 @@ BOT_DIR="$INSTALL_DIR/bot"
 VENV_DIR="$INSTALL_DIR/.venv"
 SERVICE_NAME="subfind-bot"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
-ENV_FILE="$BOT_DIR/.env"
+ENV_FILE="$INSTALL_DIR/.env"
 REQ_FILE="$BOT_DIR/requirements.txt"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[1;34m'; NC='\033[0m'
@@ -70,7 +70,7 @@ setup_venv() {
 setup_env() {
     if [ ! -f "$ENV_FILE" ] && [ -f "$BOT_DIR/.env.example" ]; then
         cp "$BOT_DIR/.env.example" "$ENV_FILE"
-        log_ok "bot/.env dibuat dari .env.example"
+        log_ok ".env dibuat dari .env.example"
     fi
 
     # Pastikan BOT_TOKEN terisi
