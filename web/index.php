@@ -15,6 +15,7 @@
 
         <nav class="tabs">
             <button class="tab active" onclick="showTab('d2ip', this)">D2IP</button>
+            <button class="tab" onclick="showTab('rdns', this)">IP2D</button>
             <button class="tab" onclick="showTab('subfind', this)">SubFind</button>
             <button class="tab" onclick="showTab('cdnscan', this)">CDNScan</button>
             <button class="tab" onclick="showTab('sniscan', this)">SNIScan</button>
@@ -29,6 +30,16 @@
                     <button type="submit">Scan</button>
                 </form>
                 <div id="result-d2ip" class="result-area"></div>
+            </div>
+
+            <!-- IP2D -->
+            <div class="tab-panel" id="panel-rdns">
+                <form id="form-rdns" onsubmit="handleScan(event, 'rdns')">
+                    <label>IP:</label>
+                    <input type="text" name="target" placeholder="8.8.8.8" required>
+                    <button type="submit">Scan</button>
+                </form>
+                <div id="result-rdns" class="result-area"></div>
             </div>
 
             <!-- SubFind -->

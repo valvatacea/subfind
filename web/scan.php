@@ -12,7 +12,7 @@ $target = $_POST['target'] ?? ($_GET['target'] ?? '');
 $poll = $_GET['poll'] ?? '';
 
 // Validasi action
-$allowed_actions = ['d2ip', 'subfind', 'cdnscan', 'sniscan'];
+$allowed_actions = ['d2ip', 'subfind', 'cdnscan', 'sniscan', 'rdns'];
 if (!in_array($action, $allowed_actions)) {
     echo json_encode(['success' => false, 'error' => 'Aksi tidak valid']);
     exit;
@@ -100,6 +100,7 @@ if ($action === 'd2ip') {
         'subfind' => 'subfind.py',
         'cdnscan' => 'cdnscan.py',
         'sniscan' => 'sniscan.py',
+        'rdns' => 'rdns.py',
     ];
     $script = "$PYTHON " . $script_map[$action] . " $target_escaped";
 }

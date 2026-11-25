@@ -151,6 +151,21 @@ function renderJsonResults(container, jsonData, action) {
         // d2ip biasanya output teks, bukan JSON terstruktur
         container.innerHTML += `<h3>Hasil D2IP:</h3>`;
         return;
+    } else if (action === 'rdns') {
+        if (jsonData && jsonData.error) {
+            container.innerHTML += `<div class="error">${escapeHtml(jsonData.error)}</div>`;
+            return;
+        }
+        const names = (jsonData && jsonData.hostnames) || [];
+        if (names.length === 0) {
+            container.innerHTML += `<div class="error">Tidak ada PTR record</div>`;
+            return;
+        }
+        let html = `<h3>Hasil IP2D (${names.length} hostname)</h3><ul>`;
+        names.forEach(n => html += `<li>${escapeHtml(n)}</li>`);
+        html += `</ul>`;
+        container.innerHTML += html;
+        return;
     }
 
     if (rows.length === 0) {
