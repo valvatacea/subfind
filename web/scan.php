@@ -30,12 +30,7 @@ if ($poll) {
     $running = shell_exec("ps -p $pid -o pid=");
     $running = trim($running);
 
-    if ($action !== '' && $target !== '') {
-        $safe_target = preg_replace('/[^a-zA-Z0-9._-]/', '_', $target);
-        $outFile = $OUTPUT_DIR . "/" . $action . "_" . $safe_target . ".txt";
-    } else {
-        $outFile = $OUTPUT_DIR . "/scan_$pid.txt";
-    }
+    $outFile = $OUTPUT_DIR . "/scan_$pid.txt";
     $jsonFile = null;
 
     // Tentukan file JSON output berdasarkan action dan target
