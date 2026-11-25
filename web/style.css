@@ -253,3 +253,31 @@ pre {
     background: #252525;
     margin-top: 8px;
 }
+
+.limit-btn {
+    display: inline-block;
+    margin: 4px;
+    padding: 6px 14px;
+    border: 1px solid #2196F3;
+    border-radius: 4px;
+    background: #1e1e1e;
+    color: #2196F3;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: bold;
+}
+.limit-btn:hover {
+    background: #2196F3;
+    color: #fff;
+}
+.limit-picker b {
+    color: #eee;
+}
+.limit-picker input[type="number"] {
+    padding: 4px 6px;
+    border-radius: 4px;
+    border: 1px solid #555;
+    background: #1e1e1e;
+    color: #eee;
+    width: 70px;
+}

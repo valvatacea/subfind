@@ -44,10 +44,10 @@ function selectCdnTarget(target) {
         <div class="limit-picker">
             <b>Target:</b> ${escapeHtml(target)}<br>
             <b>Pilih limit IP (maks 1000):</b><br>
-            <button type="button" onclick="handleScanDirect('cdnscan','${escapeHtml(target)}',500)">500</button>
-            <button type="button" onclick="handleScanDirect('cdnscan','${escapeHtml(target)}',1000)">1000</button>
-            <button type="button" onclick="showCustomLimit('${escapeHtml(target)}')">Custom</button>
-            <button type="button" onclick="document.getElementById('cdnscan-limit-picker').innerHTML=''">Batal</button>
+            <button type="button" class="limit-btn" onclick="handleScanDirect('cdnscan','${escapeHtml(target)}',500)">500</button>
+            <button type="button" class="limit-btn" onclick="handleScanDirect('cdnscan','${escapeHtml(target)}',1000)">1000</button>
+            <button type="button" class="limit-btn" onclick="showCustomLimit('${escapeHtml(target)}')">Custom</button>
+            <button type="button" class="limit-btn" onclick="document.getElementById('cdnscan-limit-picker').innerHTML=''">Batal</button>
         </div>
     `;
 }
@@ -60,8 +60,8 @@ function showCustomLimit(target) {
             <b>Target:</b> ${escapeHtml(target)}<br>
             <label>Limit (1-1000):</label>
             <input type="number" id="cdnscan-custom-limit" min="1" max="1000" value="500" style="width:80px;">
-            <button type="button" onclick="const v=document.getElementById('cdnscan-custom-limit').value; if(v<1||v>1000){alert('Limit 1-1000');return;} handleScanDirect('cdnscan','${escapeHtml(target)}', v)">Scan</button>
-            <button type="button" onclick="document.getElementById('cdnscan-limit-picker').innerHTML=''">Batal</button>
+            <button type="button" class="limit-btn" onclick="const v=document.getElementById('cdnscan-custom-limit').value; if(v<1||v>1000){alert('Limit 1-1000');return;} handleScanDirect('cdnscan','${escapeHtml(target)}', v)">Scan</button>
+            <button type="button" class="limit-btn" onclick="document.getElementById('cdnscan-limit-picker').innerHTML=''">Batal</button>
         </div>
     `;
 }
