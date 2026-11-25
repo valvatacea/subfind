@@ -2019,6 +2019,21 @@ def cb_handler(call):
             content = "\n".join(str(x) for x in results)
         else:
             results = _load_scan_results_from_file(mode, target) or []
+            # Urutkan berdasarkan status (terkecil -> terbesar); non-numerik di akhir
+            def _status_key(r):
+                if mode == "subfind":
+                    val = r[3]
+                elif mode == "cdnscan":
+                    val = r[3]
+                elif mode == "sniscan":
+                    val = r[7]
+                else:
+                    val = "-"
+                try:
+                    return (0, int(val))
+                except (ValueError, TypeError):
+                    return (1, str(val))
+            results = sorted(results, key=_status_key)
             lines = []
             if mode == "subfind":
                 for r in results:
