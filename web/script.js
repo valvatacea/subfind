@@ -156,14 +156,20 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
 
                 // Tampilkan hasil
                 const statusBadge = `<span class="status-badge status-completed">Selesai</span>`;
-                resultArea.innerHTML = statusBadge + '<br><br>';
-
                 if (pollData.json) {
                     renderJsonResults(resultArea, pollData.json, action);
-                }
-
-                if (pollData.output) {
-                    resultArea.innerHTML += `<h3>Result:</h3><pre>${escapeHtml(pollData.output)}</pre>`;
+                    if (_tableData) {
+                        _tableData.extraHtml = statusBadge + '<br><br>' + (_tableData.extraHtml || '');
+                        if (pollData.output) {
+                            _tableData.extraHtml += `<h3>Result:</h3><pre>${escapeHtml(pollData.output)}</pre>`;
+                        }
+                        renderTablePage(resultArea, 1);
+                    }
+                } else {
+                    resultArea.innerHTML = statusBadge + '<br><br>';
+                    if (pollData.output) {
+                        resultArea.innerHTML += `<h3>Result:</h3><pre>${escapeHtml(pollData.output)}</pre>`;
+                    }
                 }
             }
         }, 2000);
@@ -177,6 +183,46 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
 
 function showError(container, message) {
     container.innerHTML = `<div class="error">&#128561; ${message}</div>`;
+}
+
+let _tableData = null;
+const TABLE_PER_PAGE = 20;
+
+function renderTablePageById(containerId, page) {
+    const c = document.getElementById(containerId);
+    if (c && _tableData) { _tableData.container = c; renderTablePage(c, page); }
+}
+
+function renderTablePage(container, page) {
+    if (!_tableData) return;
+    const { columns, rows, action } = _tableData;
+    const total = rows.length;
+    const totalPages = Math.max(1, Math.ceil(total / TABLE_PER_PAGE));
+    page = Math.max(1, Math.min(page, totalPages));
+    const start = (page - 1) * TABLE_PER_PAGE;
+    const chunk = rows.slice(start, start + TABLE_PER_PAGE);
+
+    let html = `<h3>Hasil Scan (${total} data) — Halaman ${page}/${totalPages}</h3>`;
+    html += `<table><thead><tr>`;
+    columns.forEach(col => html += `<th>${escapeHtml(col)}</th>`);
+    html += `</tr></thead><tbody>`;
+    chunk.forEach(row => {
+        html += `<tr>`;
+        row.forEach(cell => html += `<td>${escapeHtml(cell)}</td>`);
+        html += `</tr>`;
+    });
+    html += `</tbody></table>`;
+
+    // Navigasi
+    html += `<div style="margin-top:10px;">`;
+    if (page > 1) html += `<button type="button" onclick="renderTablePageById('${_tableData.container.id}', ${page-1})">⏮ Prev</button> `;
+    html += `<span style="margin:0 8px;">${page}/${totalPages}</span>`;
+    if (page < totalPages) html += ` <button type="button" onclick="renderTablePageById('${_tableData.container.id}', ${page+1})">Next ⏭️</button>`;
+    html += `</div>`;
+
+    // Render ke container yang disimpan
+    const c = _tableData.container || container;
+    if (c) c.innerHTML = (_tableData.extraHtml || '') + html;
 }
 
 function renderJsonResults(container, jsonData, action) {
@@ -248,18 +294,10 @@ function renderJsonResults(container, jsonData, action) {
         return;
     }
 
-    let html = `<h3>Hasil Scan (${rows.length} data)</h3>`;
-    html += `<table><thead><tr>`;
-    columns.forEach(col => html += `<th>${escapeHtml(col)}</th>`);
-    html += `</tr></thead><tbody>`;
-    rows.forEach(row => {
-        html += `<tr>`;
-        row.forEach(cell => html += `<td>${escapeHtml(cell)}</td>`);
-        html += `</tr>`;
-    });
-    html += `</tbody></table>`;
-
-    container.innerHTML += html;
+    // Simpan data untuk pagination
+    _tableData = { columns, rows, action, container, extraHtml: '' };
+    _tableData.container = container;
+    renderTablePage(container, 1);
 }
 
 function escapeHtml(text) {
