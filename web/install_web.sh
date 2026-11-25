@@ -64,26 +64,22 @@ setup_dirs() {
     chmod 755 "$WEB_DIR"
     chown -R www-data:www-data "$INSTALL_DIR/output" 2>/dev/null || true
     # Pastikan www-data bisa traverse ke WEB_DIR.
-    # Utamakan ACL (izin hanya untuk www-data) agar /root tetap 700.
-    if command -v setfacl >/dev/null 2>&1; then
-        setfacl -m u:www-data:rx /root 2>/dev/null || true
-        setfacl -m u:www-data:rx "$INSTALL_DIR" 2>/dev/null || true
-        chmod 700 /root 2>/dev/null || true
-        log_ok "ACL www-data:rx diterapkan (mode aman)"
-    else
+    # Utamakan ACL (izin hanya untuk www-data). Set mask r-x agar efektif.
+    if ! command -v setfacl >/dev/null 2>&1; then
         if command -v apt-get >/dev/null 2>&1; then
             apt-get install -y acl >/dev/null 2>&1 || true
         fi
-        if command -v setfacl >/dev/null 2>&1; then
-            setfacl -m u:www-data:rx /root 2>/dev/null || true
-            setfacl -m u:www-data:rx "$INSTALL_DIR" 2>/dev/null || true
-            chmod 700 /root 2>/dev/null || true
-            log_ok "ACL www-data:rx diterapkan (mode aman)"
-        else
-            chmod 755 /root 2>/dev/null || true
-            chmod 755 "$INSTALL_DIR" 2>/dev/null || true
-            log_warn "acl tidak tersedia; fallback chmod 755 /root"
-        fi
+    fi
+    if command -v setfacl >/dev/null 2>&1; then
+        setfacl -m u:www-data:rx,m::rx /root 2>/dev/null || true
+        setfacl -m u:www-data:rx,m::rx "$INSTALL_DIR" 2>/dev/null || true
+        chmod 750 /root 2>/dev/null || true
+        chmod 750 "$INSTALL_DIR" 2>/dev/null || true
+        log_ok "ACL www-data:rx diterapkan (mode aman, /root 750)"
+    else
+        chmod 755 /root 2>/dev/null || true
+        chmod 755 "$INSTALL_DIR" 2>/dev/null || true
+        log_warn "acl tidak tersedia; fallback chmod 755 /root"
     fi
     # Pastikan www-data bisa eksekusi venv python (untuk scan.php)
     if [ -d "$INSTALL_DIR/.venv" ]; then
