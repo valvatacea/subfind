@@ -126,11 +126,19 @@ def wordlist_fallback(domain):
             subs.add(host)
     return subs, None
 
-def resolve_ip(host):
-    try:
-        return socket.gethostbyname(host)
-    except Exception:
+def resolve_ip(host, timeout=5):
+    result = [None]
+    def _resolve():
+        try:
+            result[0] = socket.gethostbyname(host)
+        except Exception:
+            result[0] = None
+    t = threading.Thread(target=_resolve, daemon=True)
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
         return None
+    return result[0]
 
 
 def get_cache_path(domain, provider):
@@ -305,14 +313,10 @@ def enumerate_domain(domain, progress_callback=None, stop_event=None):
         pending = set(futures.keys())
 
         while pending:
-            done, pending = wait(pending, timeout=15, return_when=FIRST_COMPLETED)
+            done, pending = wait(pending, timeout=2, return_when=FIRST_COMPLETED)
             if not done:
-                for future in list(pending):
-                    sub = futures[future]
-                    results.append((sub, '-', '-', '-', '-'))
-                    future.cancel()
-                pending.clear()
-                break
+                # Tidak ada host selesai dalam 2s: jangan tandai gagal, lanjut loop.
+                pass
             for future in done:
                 sub = futures[future]
                 try:
@@ -327,6 +331,10 @@ def enumerate_domain(domain, progress_callback=None, stop_event=None):
             if stop_event and stop_event.is_set():
                 for f in list(pending):
                     f.cancel()
+                try:
+                    executor.shutdown(wait=False)
+                except Exception:
+                    pass
                 break
 
     results.sort(key=lambda x: x[0])

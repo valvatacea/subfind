@@ -107,11 +107,19 @@ def wordlist_fallback(domain):
     return subs, None
 
 
-def resolve_ip(host):
-    try:
-        return socket.gethostbyname(host)
-    except Exception:
+def resolve_ip(host, timeout=5):
+    result = [None]
+    def _resolve():
+        try:
+            result[0] = socket.gethostbyname(host)
+        except Exception:
+            result[0] = None
+    t = threading.Thread(target=_resolve, daemon=True)
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
         return None
+    return result[0]
 
 
 def tls_handshake(ip, sni_host, port=443, timeout=8):
@@ -244,22 +252,11 @@ def enumerate_hosts(domain, progress_callback=None, stop_event=None):
         pending = set(futures.keys())
 
         while pending:
-            done, pending = wait(pending, timeout=15, return_when=FIRST_COMPLETED)
+            done, pending = wait(pending, timeout=2, return_when=FIRST_COMPLETED)
             if not done:
-                # Semua host yang masih pending dianggap gagal/hang,
-                # agar progres tidak macet selamanya di satu host.
-                for future in list(pending):
-                    sub = futures[future]
-                    results.append({
-                        "sni_host": sub, "ip": "-", "response_time_ms": 0,
-                        "tls_version": "-", "alpn": "-", "tls_port": "-",
-                        "extra_ports": [], "status": "-", "cdn": "-",
-                    })
-                    if progress_callback:
-                        progress_callback(len(results), len(sorted_subs))
-                    future.cancel()
-                pending.clear()
-                break
+                # Tidak ada host selesai dalam 2s: jangan tandai gagal, lanjut loop.
+                # Host yang benar-benar macet akan selesai saat timeout socket (5-8s).
+                pass
             for future in done:
                 sub = futures[future]
                 try:
@@ -278,6 +275,10 @@ def enumerate_hosts(domain, progress_callback=None, stop_event=None):
             if stop_event and stop_event.is_set():
                 for f in list(pending):
                     f.cancel()
+                try:
+                    executor.shutdown(wait=False)
+                except Exception:
+                    pass
                 break
 
     results.sort(key=lambda x: x["sni_host"])

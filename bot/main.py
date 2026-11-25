@@ -183,7 +183,7 @@ socket.setdefaulttimeout(10)
 MAX_MESSAGE = 3800  # batas aman per pesan Telegram
 ITEM_PER_PAGE = 10  # data per halaman untuk pagination
 CDN_LIMIT_DEFAULT = MAX_IPS_PER_SCAN  # 1000 dari CLI
-IP_OVERALL_TIMEOUT = 10  # detik maksimum per IP sebelum dianggap gagal
+IP_OVERALL_TIMEOUT = 5  # detik maksimum per IP sebelum dianggap gagal
 MAX_TOTAL_BATCH = 1500  # batas total IP per batch multi-target
 
 # ===================== STATE USER =====================
@@ -2764,6 +2764,12 @@ def run_cdnscan_target_batch(chat_id, message_id):
                     with scan_lock:
                         if scan_state["stop_requested"]:
                             scan_dihentikan = True
+                            for f in list(pending):
+                                f.cancel()
+                            try:
+                                executor.shutdown(wait=False)
+                            except Exception:
+                                pass
                             break
 
         finally:
