@@ -56,12 +56,13 @@
             <div class="tab-panel" id="panel-cdnscan">
                 <div style="margin-bottom:10px;">
                     <label>Provider:</label>
-                    <select onchange="if(this.value){handleScanDirect('cdnscan', this.value); this.value='';}" style="padding:5px;">
+                    <select id="cdnscan-provider" onchange="loadCdnRanges(this.value)" style="padding:5px;">
                         <option value="">-- pilih provider --</option>
                         <option value="cloudflare">Cloudflare</option>
                         <option value="cloudfront">CloudFront</option>
                     </select>
                 </div>
+                <div id="cdnscan-ranges" class="result-area" style="margin-bottom:10px;"></div>
                 <form id="form-cdnscan" onsubmit="handleScan(event, 'cdnscan')">
                     <label>Atau masukkan IP/CIDR manual:</label>
                     <input type="text" name="target" placeholder="173.245.48.0/20" required>

@@ -14,6 +14,27 @@ function handleScanDirect(action, target) {
     handleScan(null, action, target);
 }
 
+async function loadCdnRanges(provider) {
+    const container = document.getElementById('cdnscan-ranges');
+    if (!provider) { container.innerHTML = ''; return; }
+    container.innerHTML = '<div class="scanning"><div class="spinner"></div><span class="status-text">Memuat IP range...</span></div>';
+    try {
+        const resp = await fetch(`scan.php?action=cdnscan_ranges&target=${encodeURIComponent(provider)}`);
+        const data = await resp.json();
+        if (!data.success) { container.innerHTML = `<div class="error">${escapeHtml(data.error || 'Gagal')}</div>`; return; }
+        const ranges = data.ranges || [];
+        if (ranges.length === 0) { container.innerHTML = '<div class="error">Tidak ada range</div>'; return; }
+        let html = `<h3>IP Range ${escapeHtml(provider)} (${ranges.length})</h3>`;
+        html += `<button type="button" onclick="handleScanDirect('cdnscan','${provider}')" style="margin-bottom:8px;">Scan semua range</button><br>`;
+        ranges.forEach(r => {
+            html += `<button type="button" onclick="handleScanDirect('cdnscan','${escapeHtml(r)}')" style="margin:2px;">${escapeHtml(r)}</button> `;
+        });
+        container.innerHTML = html;
+    } catch (err) {
+        container.innerHTML = `<div class="error">Error: ${escapeHtml(err.message)}</div>`;
+    }
+}
+
 async function handleScan(event, action, targetOverride = null) {
     if (event) event.preventDefault();
 

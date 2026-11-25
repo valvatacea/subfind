@@ -12,7 +12,7 @@ $target = $_POST['target'] ?? ($_GET['target'] ?? '');
 $poll = $_GET['poll'] ?? '';
 
 // Validasi action
-$allowed_actions = ['d2ip', 'subfind', 'cdnscan', 'sniscan', 'rdns'];
+$allowed_actions = ['d2ip', 'subfind', 'cdnscan', 'cdnscan_ranges', 'sniscan', 'rdns'];
 if (!in_array($action, $allowed_actions)) {
     echo json_encode(['success' => false, 'error' => 'Aksi tidak valid']);
     exit;
@@ -111,6 +111,23 @@ if ($poll || isset($_GET['scan_id'])) {
         ]);
         exit;
     }
+}
+
+// --- LIST RANGES PROVIDER (CDNScan) ---
+if ($action === 'cdnscan_ranges') {
+    $provider = strtolower(trim($target));
+    if (!in_array($provider, ['cloudflare', 'cloudfront'])) {
+        echo json_encode(['success' => false, 'error' => 'Provider tidak valid']);
+        exit;
+    }
+    $cmd = "cd " . escapeshellarg($BASE_DIR) . " && $PYTHON -c " . escapeshellarg(
+        "import sys,json; sys.path.insert(0,'.'); from cdnscan import get_provider_ips; ips,err=get_provider_ips('$provider'); print(json.dumps(ips or []))"
+    );
+    $out = shell_exec($cmd . " 2>/dev/null");
+    $ranges = json_decode($out, true);
+    if (!is_array($ranges)) $ranges = [];
+    echo json_encode(['success' => true, 'provider' => $provider, 'ranges' => $ranges]);
+    exit;
 }
 
 // --- MULAI SCAN BARU ---
