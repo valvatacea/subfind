@@ -1017,6 +1017,88 @@ def save_scan_state(chat_id, mode, target, results, title, page=1):
     _cs_set(chat_id, "scan_filters", {})
 
 
+
+
+def _load_scan_results_from_file(mode, target):
+    """Coba muat hasil scan dari file output/ jika state hilang (misal setelah restart).
+    Return list of tuples sesuai format build_page_text, atau None jika gagal.
+    """
+    if not target or target == "-":
+        return None
+    OUT_DIR = os.path.join(BASE_DIR, "output")
+    try:
+        if mode == "subfind":
+            jname = os.path.join(OUT_DIR, f"subfind_{target}.json")
+            with open(jname) as f:
+                data = json.load(f)
+            if not isinstance(data, list):
+                data = data.get("results", []) if isinstance(data, dict) else []
+            out = []
+            for item in data:
+                if isinstance(item, dict):
+                    out.append((
+                        item.get("subdomain", "-"),
+                        item.get("ip", "-"),
+                        item.get("ports", "-"),
+                        item.get("status", "-"),
+                        item.get("cdn", "-"),
+                    ))
+                elif isinstance(item, (list, tuple)):
+                    out.append(tuple(item))
+            return out or None
+
+        if mode == "sniscan":
+            jname = os.path.join(OUT_DIR, f"sniscan_{target}.json")
+            with open(jname) as f:
+                data = json.load(f)
+            if not isinstance(data, list):
+                data = data.get("results", []) if isinstance(data, dict) else []
+            out = []
+            for item in data:
+                if isinstance(item, dict):
+                    extra = item.get("extra_ports", [])
+                    extra_str = ",".join(str(p) for p in extra) if extra else "-"
+                    out.append((
+                        item.get("sni_host", "-"),
+                        item.get("ip", "-"),
+                        item.get("tls_version", "-"),
+                        item.get("alpn", "-"),
+                        item.get("tls_port", "-"),
+                        extra_str,
+                        item.get("response_time_ms", "-"),
+                        item.get("status", "-"),
+                        item.get("cdn", "-"),
+                    ))
+                elif isinstance(item, (list, tuple)):
+                    out.append(tuple(item))
+            return out or None
+
+        if mode == "cdnscan":
+            # Agregasi semua file cdnscan_*.json (satu per target)
+            import glob
+            files = glob.glob(os.path.join(OUT_DIR, "cdnscan_*.json"))
+            out = []
+            for jname in files:
+                try:
+                    with open(jname) as f:
+                        data = json.load(f)
+                except Exception:
+                    continue
+                if not isinstance(data, list):
+                    data = data.get("results", []) if isinstance(data, dict) else []
+                for item in data:
+                    if isinstance(item, dict):
+                        out.append((
+                            item.get("ip", "-"),
+                            item.get("ports", "-"),
+                            item.get("cdn", "-"),
+                            item.get("status", "-"),
+                        ))
+            return out or None
+    except Exception as e:
+        log.debug("load scan results from file failed: %s", e)
+        return None
+
 def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=None):
     """Tampilkan halaman scan saat ini dari state.
     info_text: teks tambahan yang ditampilkan di atas tabel (misal "sudah discan").
@@ -1026,6 +1108,12 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=N
     st = get_state(chat_id)
     results = st.get("scan_results", [])
     mode = st.get("scan_mode", "subfind")
+    if not results:
+        target = st.get("scan_target", "-")
+        loaded = _load_scan_results_from_file(mode, target)
+        if loaded:
+            results = loaded
+            set_state(chat_id, scan_results=results, scan_mode=mode, scan_target=target)
     page = _scan_page_get(chat_id)
     target = st.get("scan_target", "-")
     title = st.get("scan_title", "Hasil Scan")
@@ -1725,6 +1813,8 @@ def run_sniscan(chat_id, message_id, domain, session_id=None):
             "alpn": r["alpn"],
             "tls_port": r["tls_port"],
             "extra_ports": r["extra_ports"],
+            "status": r.get("status", "-"),
+            "cdn": r.get("cdn", "-"),
             "target": domain
         }
         for r in results
