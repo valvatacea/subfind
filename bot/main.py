@@ -2056,7 +2056,8 @@ def cb_handler(call):
         target = st.get("scan_target", "-")
         if mode == "d2ip":
             results = st.get("scan_results", []) or []
-            content = "\n".join(str(x) for x in results)
+            # Hapus markup HTML agar file .txt bersih
+            content = "\n".join(re.sub(r"<[^>]+>", "", str(x)) for x in results)
         else:
             results = _load_scan_results_from_file(mode, target) or []
             # Urutkan berdasarkan status (terkecil -> terbesar); non-numerik di akhir
