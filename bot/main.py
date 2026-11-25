@@ -183,7 +183,7 @@ socket.setdefaulttimeout(10)
 MAX_MESSAGE = 3800  # batas aman per pesan Telegram
 ITEM_PER_PAGE = 10  # data per halaman untuk pagination
 CDN_LIMIT_DEFAULT = MAX_IPS_PER_SCAN  # 1000 dari CLI
-IP_OVERALL_TIMEOUT = 5  # detik maksimum per IP sebelum dianggap gagal
+IP_OVERALL_TIMEOUT = 2  # detik maksimum per IP sebelum dianggap gagal
 MAX_TOTAL_BATCH = 1500  # batas total IP per batch multi-target
 
 # ===================== STATE USER =====================
