@@ -221,3 +221,35 @@ pre {
     background: #f44336;
     color: white;
 }
+
+/* CDNScan provider dropdown & range list */
+.provider-select {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #444;
+    background: #2a2a2a;
+    color: #eee;
+    font-size: 14px;
+}
+.range-btn {
+    display: inline-block;
+    margin: 3px;
+    padding: 4px 8px;
+    border: 1px solid #4CAF50;
+    border-radius: 4px;
+    background: #1e1e1e;
+    color: #4CAF50;
+    cursor: pointer;
+    font-size: 12px;
+}
+.range-btn:hover {
+    background: #4CAF50;
+    color: #fff;
+}
+.limit-picker {
+    padding: 10px;
+    border: 1px solid #555;
+    border-radius: 6px;
+    background: #252525;
+    margin-top: 8px;
+}

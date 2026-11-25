@@ -10,8 +10,8 @@ function showTab(tabName, btn) {
     btn.classList.add('active');
 }
 
-function handleScanDirect(action, target) {
-    handleScan(null, action, target);
+function handleScanDirect(action, target, limit = null) {
+    handleScan(null, action, target, limit);
 }
 
 async function loadCdnRanges(provider) {
@@ -25,17 +25,50 @@ async function loadCdnRanges(provider) {
         const ranges = data.ranges || [];
         if (ranges.length === 0) { container.innerHTML = '<div class="error">Tidak ada range</div>'; return; }
         let html = `<h3>IP Range ${escapeHtml(provider)} (${ranges.length})</h3>`;
-        html += `<button type="button" onclick="handleScanDirect('cdnscan','${provider}')" style="margin-bottom:8px;">Scan semua range</button><br>`;
+        // Tombol scan all -> pilih limit dulu
+        html += `<div style="margin-bottom:8px;"><button type="button" onclick="selectCdnTarget('${provider}')">Scan semua range</button></div>`;
+        html += `<div style="margin-bottom:8px;">`;
         ranges.forEach(r => {
-            html += `<button type="button" onclick="handleScanDirect('cdnscan','${escapeHtml(r)}')" style="margin:2px;">${escapeHtml(r)}</button> `;
+            html += `<button type="button" onclick="selectCdnTarget('${escapeHtml(r)}')" class="range-btn">${escapeHtml(r)}</button> `;
         });
+        html += `</div>`;
+        html += `<div id="cdnscan-limit-picker" style="margin-top:10px;"></div>`;
         container.innerHTML = html;
     } catch (err) {
         container.innerHTML = `<div class="error">Error: ${escapeHtml(err.message)}</div>`;
     }
 }
 
-async function handleScan(event, action, targetOverride = null) {
+function selectCdnTarget(target) {
+    const picker = document.getElementById('cdnscan-limit-picker');
+    if (!picker) return;
+    picker.innerHTML = `
+        <div class="limit-picker">
+            <b>Target:</b> ${escapeHtml(target)}<br>
+            <b>Pilih limit IP:</b><br>
+            <button type="button" onclick="handleScanDirect('cdnscan','${escapeHtml(target)}',500)">500</button>
+            <button type="button" onclick="handleScanDirect('cdnscan','${escapeHtml(target)}',1000)">1000</button>
+            <button type="button" onclick="showCustomLimit('${escapeHtml(target)}')">Custom</button>
+            <button type="button" onclick="document.getElementById('cdnscan-limit-picker').innerHTML=''">Batal</button>
+        </div>
+    `;
+}
+
+function showCustomLimit(target) {
+    const picker = document.getElementById('cdnscan-limit-picker');
+    if (!picker) return;
+    picker.innerHTML = `
+        <div class="limit-picker">
+            <b>Target:</b> ${escapeHtml(target)}<br>
+            <label>Limit (1-1000):</label>
+            <input type="number" id="cdnscan-custom-limit" min="1" max="1000" value="500" style="width:80px;">
+            <button type="button" onclick="const v=document.getElementById('cdnscan-custom-limit').value; handleScanDirect('cdnscan','${escapeHtml(target)}', v)">Scan</button>
+            <button type="button" onclick="document.getElementById('cdnscan-limit-picker').innerHTML=''">Batal</button>
+        </div>
+    `;
+}
+
+async function handleScan(event, action, targetOverride = null, limitOverride = null) {
     if (event) event.preventDefault();
 
     const form = event ? event.target : document.getElementById('form-' + action);
@@ -74,7 +107,7 @@ async function handleScan(event, action, targetOverride = null) {
         const startResp = await fetch('scan.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `action=${encodeURIComponent(action)}&target=${encodeURIComponent(target)}`
+            body: `action=${encodeURIComponent(action)}&target=${encodeURIComponent(target)}${limitOverride ? '&limit=' + encodeURIComponent(limitOverride) : ''}`
         });
         const startData = await startResp.json();
 
