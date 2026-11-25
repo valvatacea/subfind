@@ -194,6 +194,19 @@ def set_state(chat_id, **kw):
         st = user_state.get(chat_id, {})
         st.update(kw)
         user_state[chat_id] = st
+    # Persist UI keys (mode/awaiting/prev_menu) ke chat_state.settings (Fase 3.4)
+    ui_kw = {k: v for k, v in kw.items() if k in _UI_KEYS}
+    if ui_kw and _ss is not None:
+        try:
+            settings = _ss.get_chat_settings(chat_id)
+            settings.update(ui_kw)
+            # remove None keys
+            for k, v in list(settings.items()):
+                if v is None and k in _UI_KEYS:
+                    settings.pop(k, None)
+            _ss.set_chat_settings(chat_id, settings)
+        except Exception as e:
+            log.debug("persist ui keys failed: %s", e)
     # Dual-write ke session store (best-effort, jangan crash bot)
     if _ss is not None:
         try:
@@ -217,9 +230,20 @@ def set_state(chat_id, **kw):
             log.debug("session dual-write set_state failed: %s", e)
 
 
+_UI_KEYS = ("mode", "awaiting", "prev_menu")
+
 def get_state(chat_id):
     with state_lock:
-        return user_state.get(chat_id, {})
+        st = dict(user_state.get(chat_id, {}))
+    if _ss is not None:
+        try:
+            settings = _ss.get_chat_settings(chat_id)
+            for k in _UI_KEYS:
+                if k in settings:
+                    st[k] = settings[k]
+        except Exception:
+            pass
+    return st
 
 
 def clear_state(chat_id):
@@ -229,6 +253,10 @@ def clear_state(chat_id):
     if _ss is not None:
         try:
             _ss.clear_active_session(chat_id)
+            settings = _ss.get_chat_settings(chat_id)
+            for k in _UI_KEYS:
+                settings.pop(k, None)
+            _ss.set_chat_settings(chat_id, settings)
         except Exception as e:
             log.debug("session dual-write clear_state failed: %s", e)
 
