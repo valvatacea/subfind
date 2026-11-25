@@ -638,7 +638,7 @@ def kb_page(mode, page, total_pages, back_target=None, filter_active=False, filt
         m.add(*buttons2)
 
     # Tombol unduh .txt (di bawah filter)
-    m.add(InlineKeyboardButton("📥 Unduh .txt", callback_data="download:txt"))
+    m.add(InlineKeyboardButton("📥 Unduh", callback_data="download:txt"))
 
     prev = back_target or {"subfind": "menu:subfind", "cdnscan": "menu:cdnscan", "d2ip": "menu:d2ip"}.get(mode, "menu:main")
     m.add(InlineKeyboardButton("↩️ Kembali", callback_data=f"back:{prev}"))
