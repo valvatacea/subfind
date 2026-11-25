@@ -255,6 +255,60 @@ def _hist_page_set(chat_id, key, page):
     set_state(chat_id, **{key: page})
 
 
+# Subsystem 2 (Fase 3): scan_page & scan_back_target -> chat_state.settings
+def _scan_page_get(chat_id):
+    if _ss is not None:
+        try:
+            v = _ss.get_chat_settings(chat_id).get("scan_page")
+            if v is not None:
+                return v
+        except Exception:
+            pass
+    return get_state(chat_id).get("scan_page", 1)
+
+
+def _scan_page_set(chat_id, page):
+    if _ss is not None:
+        try:
+            st = _ss.get_chat_settings(chat_id)
+            st["scan_page"] = page
+            _ss.set_chat_settings(chat_id, st)
+            return
+        except Exception:
+            pass
+    _scan_page_set(chat_id, page)
+
+
+def _scan_back_target_get(chat_id):
+    if _ss is not None:
+        try:
+            v = _ss.get_chat_settings(chat_id).get("scan_back_target")
+            if v is not None:
+                return v
+        except Exception:
+            pass
+    return get_state(chat_id).get("scan_back_target")
+
+
+def _scan_back_target_set(chat_id, value):
+    if _ss is not None:
+        try:
+            st = _ss.get_chat_settings(chat_id)
+            if value is None:
+                st.pop("scan_back_target", None)
+            else:
+                st["scan_back_target"] = value
+            _ss.set_chat_settings(chat_id, st)
+            return
+        except Exception:
+            pass
+    if value is None:
+        # no-op fallback
+        pass
+    else:
+        set_state(chat_id, scan_back_target=value)
+
+
 # ===================== ESCAPE HTML =====================
 def esc(text):
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -916,7 +970,7 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=N
     st = get_state(chat_id)
     results = st.get("scan_results", [])
     mode = st.get("scan_mode", "subfind")
-    page = st.get("scan_page", 1)
+    page = _scan_page_get(chat_id)
     target = st.get("scan_target", "-")
     title = st.get("scan_title", "Hasil Scan")
     filters = st.get("scan_filters", {}) or {}
@@ -932,7 +986,7 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=N
         text = f"⚠️ <b>{title}</b>\nTidak ada data yang cocok dengan filter."
         if info_text:
             text = f"{info_text}\n\n{text}"
-        prev = back_target or st.get("scan_back_target") or {"subfind": "menu:subfind", "cdnscan": "menu:cdnscan", "d2ip": "menu:d2ip"}.get(mode, "menu:main")
+        prev = back_target or _scan_back_target_get(chat_id) or {"subfind": "menu:subfind", "cdnscan": "menu:cdnscan", "d2ip": "menu:d2ip"}.get(mode, "menu:main")
         try:
             if edit:
                 _edit_queue.put((
@@ -948,7 +1002,7 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=N
     text, page, total_pages = build_page_text(results, page, mode, title)
     set_state(chat_id, scan_page=page)
     if back_target:
-        set_state(chat_id, scan_back_target=back_target)
+        _scan_back_target_set(chat_id, back_target)
 
     # Indikator filter di atas tabel
     filter_line = ""
