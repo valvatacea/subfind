@@ -178,12 +178,43 @@ MAX_TOTAL_BATCH = 1500  # batas total IP per batch multi-target
 user_state = {}
 state_lock = threading.Lock()
 
+# Session store (Fase 1: dual-write, best-effort). None jika import gagal.
+try:
+    from bot import session_store as _ss
+except Exception:
+    try:
+        sys.path.insert(0, BOT_DIR)
+        import session_store as _ss
+    except Exception:
+        _ss = None
+
 
 def set_state(chat_id, **kw):
     with state_lock:
         st = user_state.get(chat_id, {})
         st.update(kw)
         user_state[chat_id] = st
+    # Dual-write ke session store (best-effort, jangan crash bot)
+    if _ss is not None:
+        try:
+            sid = st.get('_sid')
+            if sid is None:
+                active = _ss.get_active_session(chat_id)
+                if active is not None:
+                    sid = active['id']
+                    with state_lock:
+                        user_state.setdefault(chat_id, {})['_sid'] = sid
+                    st['_sid'] = sid
+            if sid is not None:
+                _ss.update_session(sid, payload=kw)
+            elif 'mode' in kw:
+                new_sid = _ss.create_session(chat_id, kw['mode'], payload=kw, status='awaiting_input')
+                _ss.set_active_session(chat_id, new_sid)
+                with state_lock:
+                    user_state.setdefault(chat_id, {})['_sid'] = new_sid
+                st['_sid'] = new_sid
+        except Exception as e:
+            log.debug("session dual-write set_state failed: %s", e)
 
 
 def get_state(chat_id):
@@ -193,7 +224,35 @@ def get_state(chat_id):
 
 def clear_state(chat_id):
     with state_lock:
-        user_state.pop(chat_id, None)
+        st = user_state.pop(chat_id, None)
+        sid = st.get('_sid') if isinstance(st, dict) else None
+    if _ss is not None:
+        try:
+            _ss.clear_active_session(chat_id)
+        except Exception as e:
+            log.debug("session dual-write clear_state failed: %s", e)
+
+
+# Subsystem 1 (Fase 3): history page disimpan di chat_state.settings, bukan user_state.
+def _hist_page_get(chat_id, key):
+    if _ss is not None:
+        try:
+            return _ss.get_chat_settings(chat_id).get(key, 1)
+        except Exception:
+            pass
+    return get_state(chat_id).get(key, 1)
+
+
+def _hist_page_set(chat_id, key, page):
+    if _ss is not None:
+        try:
+            st = _ss.get_chat_settings(chat_id)
+            st[key] = page
+            _ss.set_chat_settings(chat_id, st)
+            return
+        except Exception:
+            pass
+    set_state(chat_id, **{key: page})
 
 
 # ===================== ESCAPE HTML =====================
@@ -628,7 +687,7 @@ def build_cdnscan_history_page(page=1, per_page=10):
 
 def show_cdnscan_history_page(chat_id, message_id, page, edit=True):
     """Tampilkan halaman riwayat CDNScan dengan tombol inline per entri."""
-    set_state(chat_id, cdn_history_page=page)
+    _hist_page_set(chat_id, "cdn_history_page", page)
     text, page, total_pages = build_cdnscan_history_page(page)
     kb = InlineKeyboardMarkup(row_width=2)
 
@@ -700,7 +759,7 @@ def show_cdnscan_history_detail(chat_id, message_id, filename, edit=True):
     save_scan_state(chat_id, "cdnscan", target, results, "CDNScan", page=1)
     info_text = f"✅ <b>Target sudah discan sebelumnya.</b>\nProvider: {provider}\nTotal: {len(data)} data"
     st_hist = get_state(chat_id)
-    hist_page = st_hist.get("cdn_history_page", 1)
+    hist_page = _hist_page_get(chat_id, "cdn_history_page")
     show_scan_page(chat_id, message_id, edit=True, info_text=info_text, back_target=f"cdnscan:history:{hist_page}")
 
 
@@ -761,7 +820,7 @@ def build_subfind_history_page(page=1, per_page=10):
 
 def show_subfind_history_page(chat_id, message_id, page, edit=True):
     """Tampilkan halaman riwayat SubFind dengan tombol inline per entri."""
-    set_state(chat_id, subfind_history_page=page)
+    _hist_page_set(chat_id, "subfind_history_page", page)
     text, page, total_pages = build_subfind_history_page(page)
     kb = InlineKeyboardMarkup(row_width=2)
 
@@ -832,7 +891,7 @@ def show_subfind_history_detail(chat_id, message_id, filename, edit=True):
     save_scan_state(chat_id, "subfind", target, results, "SubFind", page=1)
     info_text = f"✅ <b>Target sudah discan sebelumnya.</b>\nTotal: {len(data)} subdomain"
     st_hist = get_state(chat_id)
-    hist_page = st_hist.get("subfind_history_page", 1)
+    hist_page = _hist_page_get(chat_id, "subfind_history_page")
     show_scan_page(chat_id, message_id, edit=True, info_text=info_text, back_target=f"subfind:history:{hist_page}")
 
 
@@ -974,7 +1033,7 @@ def build_sniscan_history_page(page=1, per_page=10):
 
 def show_sniscan_history_page(chat_id, message_id, page, edit=True):
     """Tampilkan halaman riwayat SNIScan dengan tombol inline per entri."""
-    set_state(chat_id, sniscan_history_page=page)
+    _hist_page_set(chat_id, "sniscan_history_page", page)
     text, page, total_pages = build_sniscan_history_page(page)
     kb = InlineKeyboardMarkup(row_width=2)
 
@@ -1084,7 +1143,7 @@ def show_sniscan_history_detail(chat_id, message_id, filename, edit=True):
     save_scan_state(chat_id, "sniscan", target, results, "SNIScan", page=1)
     info_text = f"✅ <b>Target sudah discan sebelumnya.</b>\nTotal: {len(results)} host"
     st_hist = get_state(chat_id)
-    hist_page = st_hist.get("sniscan_history_page", 1)
+    hist_page = _hist_page_get(chat_id, "sniscan_history_page")
     show_scan_page(chat_id, message_id, edit=True, info_text=info_text, back_target=f"sniscan:history:{hist_page}")
 
 
@@ -1177,7 +1236,7 @@ def run_d2ip(chat_id, message_id, domain):
 
 
 # ===================== SUBFIND (impor dari subfind.py) =====================
-def run_subfind(chat_id, message_id, domain):
+def run_subfind(chat_id, message_id, domain, session_id=None):
     if message_id is None:
         sent = bot.send_message(chat_id, f"🔍 <b>SubFind</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...")
         message_id = sent.message_id
@@ -1202,8 +1261,16 @@ def run_subfind(chat_id, message_id, domain):
         "eta": 0,
         "stop_requested": False,
         "scan_type": "subfind",
+        "session_id": session_id,
     }
     scan_lock = threading.Lock()
+
+    # Fase 2: tandai session running
+    if session_id is not None and _ss is not None:
+        try:
+            _ss.update_session(session_id, status='running', payload={'domain': domain})
+        except Exception as e:
+            log.debug("session update (running) failed: %s", e)
 
     # Register ke registry agar tombol Stop dapat mengakses scan_state ini
     register_scan_state(chat_id, scan_state)
@@ -1290,6 +1357,12 @@ def run_subfind(chat_id, message_id, domain):
         with open(jname, 'w') as f:
             json.dump(json_data, f, indent=2)
         save_scan_state(chat_id, "subfind", domain, results, "SubFind")
+        if session_id is not None and _ss is not None:
+            try:
+                _ss.update_session(session_id, status='cancelled', payload={'domain': domain, 'results': len(results)})
+                _ss.clear_active_session(chat_id)
+            except Exception as e:
+                log.debug("session update (cancelled) failed: %s", e)
         _edit_queue.put((
             chat_id, message_id,
             f"⏹️ <b>SubFind dihentikan</b>\n"
@@ -1312,6 +1385,12 @@ def run_subfind(chat_id, message_id, domain):
             f"⚠️ <b>SubFind</b>\nTidak ada subdomain ditemukan untuk <b>{esc(domain)}</b>.",
             {"reply_markup": kb_back("menu:subfind")}
         ))
+        if session_id is not None and _ss is not None:
+            try:
+                _ss.update_session(session_id, status='done', payload={'domain': domain, 'results': 0})
+                _ss.clear_active_session(chat_id)
+            except Exception as e:
+                log.debug("session update (empty) failed: %s", e)
         clear_state(chat_id)
         return
 
@@ -1325,11 +1404,17 @@ def run_subfind(chat_id, message_id, domain):
 
     # Simpan ke state dan tampilkan halaman 1 (pagination)
     save_scan_state(chat_id, "subfind", domain, results, "SubFind")
+    if session_id is not None and _ss is not None:
+        try:
+            _ss.update_session(session_id, status='done', payload={'domain': domain, 'results': len(results)})
+            _ss.clear_active_session(chat_id)
+        except Exception as e:
+            log.debug("session update (done) failed: %s", e)
     show_scan_page(chat_id, sent.message_id, edit=True)
 
 
 # ===================== SNISCAN (impor dari sniscan.py) =====================
-def run_sniscan(chat_id, message_id, domain):
+def run_sniscan(chat_id, message_id, domain, session_id=None):
     log.info("SNIScan mulai: domain=%s chat_id=%s", domain, chat_id)
     if message_id is None:
         sent = bot.send_message(chat_id, f"🔍 <b>SNIScan</b>\nMempersiapkan scan untuk <b>{esc(domain)}</b>...")
@@ -1355,8 +1440,15 @@ def run_sniscan(chat_id, message_id, domain):
         "eta": 0,
         "stop_requested": False,
         "scan_type": "sniscan",
+        "session_id": session_id,
     }
     scan_lock = threading.Lock()
+
+    if session_id is not None and _ss is not None:
+        try:
+            _ss.update_session(session_id, status='running', payload={'domain': domain})
+        except Exception as e:
+            log.debug("session update (running) failed: %s", e)
 
     # Register ke registry agar tombol Stop dapat mengakses scan_state ini
     register_scan_state(chat_id, scan_state)
@@ -1466,12 +1558,18 @@ def run_sniscan(chat_id, message_id, domain):
                 r["tls_port"],
                 ",".join(str(p) for p in r["extra_ports"]) if r["extra_ports"] else "-",
                 r["response_time_ms"],
-                r["status"],
-                r["cdn"],
+                r.get("status", "-"),
+                r.get("cdn", "-"),
             )
             for r in results
         ]
         save_scan_state(chat_id, "sniscan", domain, results_tuples, "SNIScan")
+        if session_id is not None and _ss is not None:
+            try:
+                _ss.update_session(session_id, status='cancelled', payload={'domain': domain, 'results': len(results)})
+                _ss.clear_active_session(chat_id)
+            except Exception as e:
+                log.debug("session update (cancelled) failed: %s", e)
         _edit_queue.put((
             chat_id, message_id,
             f"⏹️ <b>SNIScan dihentikan</b>\n"
@@ -1495,6 +1593,12 @@ def run_sniscan(chat_id, message_id, domain):
             f"⚠️ <b>SNIScan</b>\nTidak ada SNI host ditemukan untuk <b>{esc(domain)}</b>.",
             {"reply_markup": kb_back("menu:sniscan")}
         ))
+        if session_id is not None and _ss is not None:
+            try:
+                _ss.update_session(session_id, status='done', payload={'domain': domain, 'results': 0})
+                _ss.clear_active_session(chat_id)
+            except Exception as e:
+                log.debug("session update (empty) failed: %s", e)
         clear_state(chat_id)
         return
 
@@ -1528,31 +1632,37 @@ def run_sniscan(chat_id, message_id, domain):
             r["tls_port"],
             ",".join(str(p) for p in r["extra_ports"]) if r["extra_ports"] else "-",
             r["response_time_ms"],
-            r["status"],
-            r["cdn"],
+            r.get("status", "-"),
+            r.get("cdn", "-"),
         )
         for r in results
     ]
 
     # Simpan ke state dan tampilkan halaman 1 (pagination)
     save_scan_state(chat_id, "sniscan", domain, results_tuples, "SNIScan")
+    if session_id is not None and _ss is not None:
+        try:
+            _ss.update_session(session_id, status='done', payload={'domain': domain, 'results': len(results)})
+            _ss.clear_active_session(chat_id)
+        except Exception as e:
+            log.debug("session update (done) failed: %s", e)
     show_scan_page(chat_id, sent.message_id, edit=True)
     log.info("SNIScan selesai: domain=%s total=%d", domain, len(results))
 
 
 # ===================== WRAPPER SLOT SCAN (subfind & sniscan) ====================
-def _run_subfind_with_slot(chat_id, message_id, domain):
+def _run_subfind_with_slot(chat_id, message_id, domain, session_id=None):
     """Jalankan SubFind dengan slot scan per chat; lepas slot di finally."""
     try:
-        run_subfind(chat_id, message_id, domain)
+        run_subfind(chat_id, message_id, domain, session_id=session_id)
     finally:
         bebaskan_slot_scan(chat_id)
 
 
-def _run_sniscan_with_slot(chat_id, message_id, domain):
+def _run_sniscan_with_slot(chat_id, message_id, domain, session_id=None):
     """Jalankan SNIScan dengan slot scan per chat; lepas slot di finally."""
     try:
-        run_sniscan(chat_id, message_id, domain)
+        run_sniscan(chat_id, message_id, domain, session_id=session_id)
     finally:
         bebaskan_slot_scan(chat_id)
 
@@ -1632,7 +1742,14 @@ def cb_handler(call):
         )
 
     elif data == "subfind:search":
-        set_state(chat_id, mode="subfind", awaiting="domain", prev_menu="menu:subfind")
+        sid = None
+        if _ss is not None:
+            try:
+                sid = _ss.create_session(chat_id, "subfind", status="awaiting_input", payload={"prev_menu": "menu:subfind"})
+                _ss.set_active_session(chat_id, sid)
+            except Exception as e:
+                log.debug("session create (subfind:search) failed: %s", e)
+        set_state(chat_id, mode="subfind", awaiting="domain", prev_menu="menu:subfind", _sid=sid)
         bot.edit_message_text(
             "🔍 <b>SubFind — Domain ➜ Subdomain</b>\n\nKirim domain yang mau dicari subdomain-nya (contoh: example.com).",
             chat_id, message_id, reply_markup=kb_back("menu:subfind")
@@ -1653,7 +1770,14 @@ def cb_handler(call):
         )
 
     elif data == "sniscan:search":
-        set_state(chat_id, mode="sniscan", awaiting="domain", prev_menu="menu:sniscan")
+        sid = None
+        if _ss is not None:
+            try:
+                sid = _ss.create_session(chat_id, "sniscan", status="awaiting_input", payload={"prev_menu": "menu:sniscan"})
+                _ss.set_active_session(chat_id, sid)
+            except Exception as e:
+                log.debug("session create (sniscan:search) failed: %s", e)
+        set_state(chat_id, mode="sniscan", awaiting="domain", prev_menu="menu:sniscan", _sid=sid)
         bot.edit_message_text(
             "🔍 <b>SNIScan — Domain ➜ SNI</b>\n\nKirim domain yang mau discan SNI-nya (contoh: instagram.com).",
             chat_id, message_id, reply_markup=kb_back("menu:sniscan")
@@ -2549,8 +2673,20 @@ def text_handler(message):
                 reply_markup=kb_back("menu:subfind"),
             )
             return
-        set_state(chat_id, mode="subfind", awaiting=None)
-        threading.Thread(target=_run_subfind_with_slot, args=(chat_id, None, domain), daemon=True).start()
+        sid = None
+        if _ss is not None:
+            try:
+                active = _ss.get_active_session(chat_id)
+                if active is None:
+                    sid = _ss.create_session(chat_id, "subfind", status="awaiting_input", payload={"domain": domain})
+                    _ss.set_active_session(chat_id, sid)
+                else:
+                    sid = active['id']
+                    _ss.update_session(sid, status="running", payload={"domain": domain})
+            except Exception as e:
+                log.debug("session ensure (subfind) failed: %s", e)
+        set_state(chat_id, mode="subfind", awaiting=None, _sid=sid)
+        threading.Thread(target=_run_subfind_with_slot, args=(chat_id, None, domain, sid), daemon=True).start()
         return
 
     if mode == "cdnscan_limit" and awaiting == "custom_limit":
@@ -2622,8 +2758,20 @@ def text_handler(message):
                 reply_markup=kb_back("menu:sniscan"),
             )
             return
-        set_state(chat_id, mode="sniscan", awaiting=None)
-        threading.Thread(target=_run_sniscan_with_slot, args=(chat_id, None, domain), daemon=True).start()
+        sid = None
+        if _ss is not None:
+            try:
+                active = _ss.get_active_session(chat_id)
+                if active is None:
+                    sid = _ss.create_session(chat_id, "sniscan", status="awaiting_input", payload={"domain": domain})
+                    _ss.set_active_session(chat_id, sid)
+                else:
+                    sid = active['id']
+                    _ss.update_session(sid, status="running", payload={"domain": domain})
+            except Exception as e:
+                log.debug("session ensure (sniscan) failed: %s", e)
+        set_state(chat_id, mode="sniscan", awaiting=None, _sid=sid)
+        threading.Thread(target=_run_sniscan_with_slot, args=(chat_id, None, domain, sid), daemon=True).start()
         return
 
     if awaiting == "filter_value":
@@ -2646,5 +2794,11 @@ def text_handler(message):
 
 # ===================== MAIN =====================
 if __name__ == '__main__':
+    try:
+        from .session_store import init_db
+        init_db()
+        log.info("session_store ready")
+    except Exception as e:
+        log.warning("session_store init failed: %s", e)
     log.info("Surfinder Telegram Bot sedang berjalan...")
     bot.infinity_polling()
