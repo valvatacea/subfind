@@ -9,6 +9,29 @@ if [ -z "$1" ]; then
 fi
 
 DOMAIN=$1
+BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Validasi domain + filter NSFW (opsional, via Python)
+if ! python3 - "$DOMAIN" "$BASE_DIR" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[2])
+from common.validators import validate_domain
+from common.nsfw_filter import is_blocked
+
+domain = sys.argv[1]
+if not validate_domain(domain):
+    print("Domain tidak valid.")
+    sys.exit(1)
+
+blocked, kata = is_blocked(domain)
+if blocked:
+    print(f"Domain diblokir: {kata}")
+    sys.exit(1)
+PY
+then
+    echo "Domain tidak valid atau diblokir (NSFW)."
+    exit 1
+fi
 
 {
 echo "Domain: $DOMAIN"

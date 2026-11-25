@@ -31,13 +31,25 @@ def _load_blocklist():
 def is_blocked(domain):
     """Cek apakah domain mengandung kata kunci dari blocklist.
     Return (True, kata_kunci) jika terblokir, (None, None) jika aman.
+
+    Entri dengan titik (domain) dicocokkan secara utuh/suffix domain,
+    bukan substring bebas, agar tidak false positive (mis. youtube.com vs tube.com).
+    Entri tanpa titik (kata kunci) tetap dicocokkan sebagai substring.
     """
     if not domain:
         return None, None
-    d = domain.lower()
+    d = domain.lower().strip().rstrip('.')
     for kata in _load_blocklist():
-        if kata in d:
-            return True, kata
+        if not kata:
+            continue
+        k = kata.lower()
+        if '.' in k:
+            # domain-like: exact match atau subdomain
+            if d == k or d.endswith('.' + k):
+                return True, kata
+        else:
+            if k in d:
+                return True, kata
     return None, None
 
 
