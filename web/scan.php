@@ -9,6 +9,7 @@ $PYTHON = file_exists($BASE_DIR . '/.venv/bin/python') ? $BASE_DIR . '/.venv/bin
 
 $action = $_POST['action'] ?? ($_GET['action'] ?? '');
 $target = $_POST['target'] ?? ($_GET['target'] ?? '');
+$limit = $_POST['limit'] ?? ($_GET['limit'] ?? '');
 $poll = $_GET['poll'] ?? '';
 
 // Validasi action
@@ -130,6 +131,15 @@ if ($action === 'cdnscan_ranges') {
     exit;
 }
 
+// Validasi limit (opsional)
+$limit_arg = '';
+if ($limit !== '' && ctype_digit((string)$limit)) {
+    $l = (int)$limit;
+    if ($l >= 1 && $l <= 1000) {
+        $limit_arg = " --limit " . $l;
+    }
+}
+
 // --- MULAI SCAN BARU ---
 $target_escaped = escapeshellarg($target);
 
@@ -142,7 +152,7 @@ if ($action === 'd2ip') {
         'sniscan' => 'sniscan.py',
         'rdns' => 'rdns.py',
     ];
-    $script = "$PYTHON " . $script_map[$action] . " $target_escaped";
+    $script = "$PYTHON " . $script_map[$action] . " $target_escaped" . ($action === 'cdnscan' ? $limit_arg : '');
 }
 
 // ID unik untuk scan ini (untuk file progress & pid)
