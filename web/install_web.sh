@@ -104,7 +104,7 @@ EOF
 
     if [ -d /etc/nginx/sites-enabled ]; then
         ln -sf "$conf" /etc/nginx/sites-enabled/subfind-web
-        rm -f /etc/nginx/sites-enabled/default
+        # JANGAN hapus default site (bisa dipakai natssh/dll). subfind-web listen di port terpisah.
     fi
     log_ok "Nginx config dibuat"
 }
