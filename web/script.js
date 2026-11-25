@@ -102,7 +102,7 @@ async function handleScan(event, action) {
                 }
 
                 if (pollData.output) {
-                    resultArea.innerHTML += `<h3>Output CLI:</h3><pre>${escapeHtml(pollData.output)}</pre>`;
+                    resultArea.innerHTML += `<h3>Result:</h3><pre>${escapeHtml(pollData.output)}</pre>`;
                 }
             }
         }, 2000);
