@@ -25,12 +25,23 @@ if (!preg_match('/^[a-zA-Z0-9.\/-]+$/', $target)) {
 }
 
 // --- POLLING: cek status scan yang berjalan ---
-if ($poll) {
-    $pid = (int)$poll;
-    $running = shell_exec("ps -p $pid -o pid=");
-    $running = trim($running);
-
-    $outFile = $OUTPUT_DIR . "/scan_$pid.txt";
+if ($poll || isset($_GET['scan_id'])) {
+    $scan_id = $_GET['scan_id'] ?? '';
+    if ($scan_id !== '') {
+        $outFile = $OUTPUT_DIR . "/scan_" . $scan_id . ".txt";
+        $pidFile = $OUTPUT_DIR . "/scan_" . $scan_id . ".pid";
+        $pid = file_exists($pidFile) ? (int)trim(file_get_contents($pidFile)) : 0;
+    } else {
+        $pid = (int)$poll;
+        $outFile = $OUTPUT_DIR . "/scan_$pid.txt";
+        $pidFile = null;
+    }
+    if ($pid <= 0) {
+        // scan baru dimulai, pidFile belum siap
+        $running = file_exists($outFile) ? 'starting' : '';
+    } else {
+        $running = trim(shell_exec("ps -p $pid -o pid="));
+    }
     $jsonFile = null;
 
     // Tentukan file JSON output berdasarkan action dan target
@@ -52,9 +63,17 @@ if ($poll) {
         }
     }
 
-    if (!$running && file_exists($outFile)) {
+    $output = file_exists($outFile) ? file_get_contents($outFile) : '';
+    // Anggap selesai hanya jika output berisi marker penyelesaian
+    $completed = (!$running) && file_exists($outFile) && (
+        strpos($output, 'Hasil disimpan') !== false ||
+        strpos($output, 'Selesai.') !== false ||
+        strpos($output, 'Error:') !== false
+    );
+
+    if ($completed) {
         // Scan selesai
-        $output = file_get_contents($outFile);
+
         $jsonData = null;
         if ($jsonFile && file_exists($jsonFile)) {
             $jsonData = json_decode(file_get_contents($jsonFile), true);
@@ -69,6 +88,14 @@ if ($poll) {
         ]);
         exit;
     } elseif ($running) {
+        echo json_encode([
+            'success' => true,
+            'status' => 'running',
+            'pid' => $pid
+        ]);
+        exit;
+    } elseif (file_exists($outFile)) {
+        // Scan masih berjalan (belum ada marker penyelesaian)
         echo json_encode([
             'success' => true,
             'status' => 'running',
@@ -100,8 +127,12 @@ if ($action === 'd2ip') {
     $script = "$PYTHON " . $script_map[$action] . " $target_escaped";
 }
 
-$command = "cd $BASE_DIR && nohup $script > $OUTPUT_DIR/scan_%d.txt 2>&1 & echo \$!";
-// Jalankan dan ambil PID
+// ID unik untuk scan ini (untuk file progress & pid)
+$scan_id = uniqid('scan', true);
+$outFile = $OUTPUT_DIR . "/scan_" . $scan_id . ".txt";
+$pidFile = $OUTPUT_DIR . "/scan_" . $scan_id . ".pid";
+
+$command = "cd $BASE_DIR && nohup $script > " . escapeshellarg($outFile) . " 2>&1 & echo \$! > " . escapeshellarg($pidFile);
 $descriptorSpec = [
     0 => ["pipe", "r"],
     1 => ["pipe", "w"],
@@ -112,15 +143,22 @@ if (!is_resource($process)) {
     echo json_encode(['success' => false, 'error' => 'Gagal memulai scan']);
     exit;
 }
-$pid = proc_get_status($process)['pid'];
 fclose($pipes[0]);
 fclose($pipes[1]);
 fclose($pipes[2]);
 proc_close($process);
 
+// Tunggu sebentar agar pidFile terisi
+usleep(200000);
+$pid = 0;
+if (file_exists($pidFile)) {
+    $pid = (int)trim(file_get_contents($pidFile));
+}
+
 echo json_encode([
     'success' => true,
     'status' => 'started',
+    'scan_id' => $scan_id,
     'pid' => $pid,
     'message' => "Scan dimulai untuk $target"
 ]);
