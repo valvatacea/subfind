@@ -104,6 +104,17 @@ find_php_socket() {
     echo "/run/php/php-fpm.sock"
 }
 
+env_set() {
+    local key="$1" val="$2"
+    local f="${SUBFIND_INSTALL_DIR:-/root/subfind}/.env"
+    touch "$f"
+    if grep -q "^${key}=" "$f" 2>/dev/null; then
+        sed -i "s|^${key}=.*|${key}=${val}|" "$f"
+    else
+        echo "${key}=${val}" >> "$f"
+    fi
+}
+
 extract_root_domain() {
     local domain="$1"
     local psl_file="$2"
@@ -149,6 +160,15 @@ extract_root_domain() {
 }
 
 setup_ssl() {
+    # Muat .env yang sudah ada (subfind top-level atau bot/.env)
+    ENV_FILE=""
+    for cand in "${SUBFIND_INSTALL_DIR:-/root/subfind}/.env" "${SUBFIND_INSTALL_DIR:-/root/subfind}/bot/.env"; do
+        if [ -f "$cand" ]; then ENV_FILE="$cand"; break; fi
+    done
+    if [ -n "$ENV_FILE" ]; then
+        set -a; . "$ENV_FILE"; set +a
+        log_info "Memuat variabel dari $ENV_FILE"
+    fi
     # Jika SSL_DOMAIN tidak di-set via env, tanya user
     if [ -z "$SSL_DOMAIN" ]; then
         echo ""
@@ -204,6 +224,12 @@ setup_ssl() {
     [ -n "${CF_Token:-}" ] && export CF_Token
     [ -n "${CF_Key:-}" ] && export CF_Key
     [ -n "${CF_Email:-}" ] && export CF_Email
+
+    # Simpan kredensial ke .env subfind
+    [ -n "${CF_Token:-}" ] && env_set "CF_Token" "${CF_Token}"
+    [ -n "${CF_Key:-}" ] && env_set "CF_Key" "${CF_Key}"
+    [ -n "${CF_Email:-}" ] && env_set "CF_Email" "${CF_Email}"
+    [ -n "${SSL_DOMAIN:-}" ] && env_set "SSL_DOMAIN" "${SSL_DOMAIN}"
 
     if [ -z "${CF_Token:-}" ] && [ -z "${CF_Key:-}" ]; then
         log_error "Kredensial Cloudflare kosong, SSL dibatalkan."
