@@ -349,26 +349,23 @@ def main():
             f.write(f"{pad_label('CDN', 12)}: {esc(r['cdn'])}\n")
             f.write("----------------------------------------------\n")
 
-    # Simpan JSON dengan metadata
+    # Simpan JSON (format list, konsisten dengan bot & web)
     jname = f"{OUTPUT_DIR}/sniscan_{domain}.json"
-    json_data = {
-        "domain": domain,
-        "scanned_at": datetime.now().isoformat(),
-        "total": len(results),
-        "results": [
-            {
-                "sni_host": r["sni_host"],
-                "ip": r["ip"],
-                "response_time_ms": r["response_time_ms"],
-                "tls_version": r["tls_version"],
-                "alpn": r["alpn"],
-                "tls_port": r["tls_port"],
-                "extra_ports": r["extra_ports"],
-                "cdn": r["cdn"],
-            }
-            for r in results
-        ],
-    }
+    json_data = [
+        {
+            "sni_host": r["sni_host"],
+            "ip": r["ip"],
+            "response_time_ms": r["response_time_ms"],
+            "tls_version": r["tls_version"],
+            "alpn": r["alpn"],
+            "tls_port": r["tls_port"],
+            "extra_ports": r["extra_ports"],
+            "status": r.get("status", "-"),
+            "cdn": r["cdn"],
+            "target": domain,
+        }
+        for r in results
+    ]
     try:
         with open(jname, 'w') as f:
             json.dump(json_data, f, indent=2)
