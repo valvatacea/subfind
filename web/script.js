@@ -122,7 +122,6 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
             <span class="status-text"><span id="status-text-${action}">Memulai...</span></span>
             <div class="progress-wrap">
                 <div class="progress-bar"></div>
-                <div class="progress-text" id="progress-text-${action}"></div>
             </div>
         </div>
     `;
@@ -163,10 +162,6 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
             }
 
             if (pollData.status === 'running') {
-                if (pollData.progress_text) {
-                    const pt = document.getElementById('progress-text-' + action);
-                    if (pt) pt.textContent = pollData.progress_text;
-                }
                 const msgMap = {
                     'd2ip': ['Resolve domain', 'Query DNS', 'Mengumpulkan IP'],
                     'subfind': ['Enumerasi subdomain', 'Resolve IP', 'Scan port', 'Deteksi CDN'],
@@ -175,11 +170,18 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
                     'rdns': ['Reverse DNS lookup', 'Query PTR'],
                 };
                 const msgs = msgMap[action] || ['Memindai target', 'Mengumpulkan data', 'Memproses hasil'];
-                const idx = (statusText.dataset.idx || 0);
-                const next = (parseInt(idx) + 1) % msgs.length;
-                statusText.dataset.idx = next;
-                const dots = '.'.repeat((parseInt(idx) % 3) + 1);
-                statusText.textContent = msgs[idx % msgs.length] + dots;
+                if (pollData.progress_text) {
+                    // Teks progres nyata dari CLI
+                    statusText.textContent = pollData.progress_text;
+                    const pt = document.getElementById('progress-text-' + action);
+                    if (pt) pt.textContent = '';
+                } else {
+                    const idx = (statusText.dataset.idx || 0);
+                    const next = (parseInt(idx) + 1) % msgs.length;
+                    statusText.dataset.idx = next;
+                    const dots = '.'.repeat((parseInt(idx) % 3) + 1);
+                    statusText.textContent = msgs[idx % msgs.length] + dots;
+                }
                 return;
             }
 
