@@ -35,7 +35,7 @@ async function handleScan(event, action) {
     resultArea.innerHTML = `
         <div class="scanning" style="margin-top:15px;">
             <div class="spinner"></div>
-            <span class="status-text">Memulai scan... <span id="status-text-${action}">Memindai target.</span></span>
+            <span class="status-text"><span id="status-text-${action}">Memindai target.</span></span>
         </div>
     `;
 
