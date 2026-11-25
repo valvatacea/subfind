@@ -54,13 +54,17 @@
 
             <!-- CDNScan -->
             <div class="tab-panel" id="panel-cdnscan">
-                <div class="provider-buttons" style="margin-bottom:10px;">
-                    <button type="button" onclick="handleScanDirect('cdnscan','cloudflare')">Cloudflare</button>
-                    <button type="button" onclick="handleScanDirect('cdnscan','cloudfront')">CloudFront</button>
+                <div style="margin-bottom:10px;">
+                    <label>Provider:</label>
+                    <select onchange="if(this.value){handleScanDirect('cdnscan', this.value); this.value='';}" style="padding:5px;">
+                        <option value="">-- pilih provider --</option>
+                        <option value="cloudflare">Cloudflare</option>
+                        <option value="cloudfront">CloudFront</option>
+                    </select>
                 </div>
                 <form id="form-cdnscan" onsubmit="handleScan(event, 'cdnscan')">
-                    <label>Target (CIDR / IP / Provider):</label>
-                    <input type="text" name="target" placeholder="173.245.48.0/20 atau cloudflare" required>
+                    <label>Atau masukkan IP/CIDR manual:</label>
+                    <input type="text" name="target" placeholder="173.245.48.0/20" required>
                     <button type="submit">Scan</button>
                 </form>
                 <div id="result-cdnscan" class="result-area"></div>
