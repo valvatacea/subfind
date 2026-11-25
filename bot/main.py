@@ -1431,7 +1431,7 @@ def run_d2ip(chat_id, message_id, domain):
     # Coba multiple resolver
     multi = d2ip_resolve_multi(domain)
 
-    lines = [f"✅ <b>D2IP selesai</b>\nDomain: <b>{esc(domain)}</b>\n"]
+    lines = [f"Domain: <b>{esc(domain)}</b>\n"]
     if ip:
         lines.append(f"Socket: <code>{esc(ip)}</code>")
     else:
