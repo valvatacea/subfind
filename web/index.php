@@ -54,6 +54,13 @@
 
             <!-- CDNScan -->
             <div class="tab-panel" id="panel-cdnscan">
+                <div class="provider-buttons" style="margin-bottom:10px;">
+                    <button type="button" onclick="handleScanDirect('cdnscan','cloudflare')">Cloudflare</button>
+                    <button type="button" onclick="handleScanDirect('cdnscan','cloudfront')">CloudFront</button>
+                    <button type="button" onclick="handleScanDirect('cdnscan','fastly')">Fastly</button>
+                    <button type="button" onclick="handleScanDirect('cdnscan','google')">Google</button>
+                    <button type="button" onclick="handleScanDirect('cdnscan','akamai')">Akamai</button>
+                </div>
                 <form id="form-cdnscan" onsubmit="handleScan(event, 'cdnscan')">
                     <label>Target (CIDR / IP / Provider):</label>
                     <input type="text" name="target" placeholder="173.245.48.0/20 atau cloudflare" required>

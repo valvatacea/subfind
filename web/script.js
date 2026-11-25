@@ -10,12 +10,21 @@ function showTab(tabName, btn) {
     btn.classList.add('active');
 }
 
-async function handleScan(event, action) {
-    event.preventDefault();
+function handleScanDirect(action, target) {
+    handleScan(null, action, target);
+}
 
-    const form = event.target;
-    const targetInput = form.querySelector('input[name="target"]');
-    const target = targetInput.value.trim();
+async function handleScan(event, action, targetOverride = null) {
+    if (event) event.preventDefault();
+
+    const form = event ? event.target : document.getElementById('form-' + action);
+    const targetInput = form ? form.querySelector('input[name="target"]') : null;
+    const target = (targetOverride !== null && targetOverride !== undefined) ? String(targetOverride).trim() : (targetInput ? targetInput.value.trim() : '');
+
+    // Jika dipanggil via tombol provider, isi input juga
+    if (targetOverride !== null && targetOverride !== undefined && targetInput) {
+        targetInput.value = target;
+    }
 
     if (!target) {
         showError(form, 'Masukkan target terlebih dahulu');
