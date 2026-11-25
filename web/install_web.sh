@@ -148,6 +148,14 @@ verify() {
     echo "  (pastikan firewall membuka port $PORT)"
 }
 
+# Reinstall flag
+REINSTALL="${REINSTALL:-0}"
+for arg in "$@"; do
+    case "$arg" in
+        --reinstall) REINSTALL=1 ;;
+    esac
+done
+
 main() {
     echo ""
     echo "============================================================"
@@ -155,6 +163,17 @@ main() {
     echo "============================================================"
     echo ""
     need_root
+
+    if [ "$REINSTALL" = "1" ]; then
+        log_info "Mode reinstall: menghapus config site lama..."
+        rm -f /etc/nginx/sites-enabled/subfind-web /etc/nginx/sites-available/subfind-web
+        # Bersihkan hasil scan lama (kecuali cache ipranges)
+        if [ -d "$INSTALL_DIR/output" ]; then
+            find "$INSTALL_DIR/output" -maxdepth 2 -type f \( -name '*.txt' -o -name '*.json' \) ! -path '*/ipranges/*' -delete 2>/dev/null || true
+        fi
+        log_ok "Config lama dibersihkan"
+    fi
+
     install_deps
     setup_dirs
     create_nginx_conf
