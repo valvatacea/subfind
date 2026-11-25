@@ -1,4 +1,9 @@
 <?php
+// ============================================================
+// SURFIND WEB — CACHE-BUSTING NOTE
+// Setiap perubahan index.php / script.css / script.js: selalu naikkan query-string cache-busting dari v=N ke v=N+1 (jangan pertahankan v=2), biar browser fetch versi terbaru.
+// Contoh: v=2 -> v=3, dst.
+// ============================================================
 // index.php - Web antarmuka untuk CDNScan, SubFind, SNIScan, D2IP (AJAX)
 ?>
 <!DOCTYPE html>
