@@ -376,8 +376,8 @@ def main():
     except Exception as e:
         print(f"[!] Gagal menyimpan JSON: {e}")
 
-    print(f"\nHasil disimpan ke: {fname}")
-    print(f"JSON disimpan ke: {jname}")
+    print()
+    print("Selesai.")
 
 
 if __name__ == '__main__':

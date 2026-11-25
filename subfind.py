@@ -420,8 +420,8 @@ def main():
     with open(jname, 'w') as f:
         json.dump(json_data, f, indent=2)
 
-    print(f"\n    Hasil disimpan ke: {fname}")
-    print(f"    JSON disimpan ke: {jname}")
+    print()
+    print("Selesai.")
 
 if __name__ == '__main__':
     main()

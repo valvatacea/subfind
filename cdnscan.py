@@ -717,10 +717,7 @@ def main():
         else:
             print(f"\n    [*] Progres: {new_offset} IP telah discan dari '{label}'.")
 
-        if save_txt:
-            print(f"\n    Hasil disimpan ke: {fname}")
-        if save_json:
-            print(f"    JSON disimpan ke: {jname}")
+        # (keterangan path dihilangkan; penyelesaian ditandai oleh "Scan semua target selesai.")
 
     print("\nScan semua target selesai.")
 
