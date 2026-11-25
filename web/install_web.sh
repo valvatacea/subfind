@@ -17,6 +17,11 @@ else
 fi
 SERVICE_NGINX="nginx"
 PHP_FPM_SERVICE=""
+SSL_ENABLED="${SSL_ENABLED:-0}"
+SSL_DOMAIN="${SSL_DOMAIN:-}"
+SSL_CERT="/etc/nginx/ssl/subfind_fullchain.pem"
+SSL_KEY="/etc/nginx/ssl/subfind_key.pem"
+SSL_CHAIN="/etc/nginx/ssl/subfind.pem"
 
 RED='\033[0;31m'; GREEN='\033[1;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 log_info(){ echo -e "${BLUE}[INFO]${NC} $*"; }
@@ -99,13 +104,114 @@ find_php_socket() {
     echo "/run/php/php-fpm.sock"
 }
 
+setup_ssl() {
+    # Jika SSL_DOMAIN tidak di-set via env, tanya user
+    if [ -z "$SSL_DOMAIN" ]; then
+        echo ""
+        read -rp "Aktifkan SSL (HTTPS) via acme.sh + Cloudflare DNS? (y/N): " _ssl_ans
+        case "${_ssl_ans:-N}" in
+            y|Y) ;;
+            *) log_info "SSL dinonaktifkan (HTTP only)."; SSL_ENABLED=0; return 0 ;;
+        esac
+        read -rp "Domain/Host untuk SSL (contoh: subfind.example.com): " SSL_DOMAIN
+        [ -z "$SSL_DOMAIN" ] && { log_error "Domain kosong, SSL dibatalkan."; SSL_ENABLED=0; return 0; }
+    fi
+    SSL_ENABLED=1
+    export SSL_DOMAIN
+
+    # Kredensial Cloudflare
+    if [ -z "${CF_Token:-}" ] && [ -z "${CF_Key:-}" ]; then
+        echo ""
+        echo -e "${YELLOW}Pilih jenis kredensial Cloudflare:${NC}"
+        echo "  1) API Token"
+        echo "  2) API Key + Email"
+        read -rp "Pilihan (1-2, 0 = batal SSL): " cf_pilih
+        case "$cf_pilih" in
+            1) read -rp "Cloudflare API Token: " CF_Token; export CF_Token ;;
+            2) read -rp "Cloudflare API Key: " CF_Key; read -rp "Cloudflare Account Email: " CF_Email; export CF_Key CF_Email ;;
+            0|"") log_warn "SSL dibatalkan."; SSL_ENABLED=0; return 0 ;;
+            *) log_warn "Pilihan tidak valid, SSL dibatalkan."; SSL_ENABLED=0; return 0 ;;
+        esac
+    fi
+    [ -n "${CF_Token:-}" ] && export CF_Token
+    [ -n "${CF_Key:-}" ] && export CF_Key
+    [ -n "${CF_Email:-}" ] && export CF_Email
+
+    if [ -z "${CF_Token:-}" ] && [ -z "${CF_Key:-}" ]; then
+        log_error "Kredensial Cloudflare kosong, SSL dibatalkan."
+        SSL_ENABLED=0
+        return 0
+    fi
+
+    # Install acme.sh jika belum ada
+    if [ ! -x "$HOME/.acme.sh/acme.sh" ]; then
+        log_info "Memasang acme.sh..."
+        curl -fsSL https://get.acme.sh | sh -s email="${CF_Email:-admin@example.com}" >/dev/null 2>&1 || true
+    fi
+    if [ ! -x "$HOME/.acme.sh/acme.sh" ]; then
+        log_error "acme.sh tidak tersedia, SSL dibatalkan."
+        SSL_ENABLED=0
+        return 0
+    fi
+
+    mkdir -p /etc/nginx/ssl
+    log_info "Menerbitkan sertifikat SSL untuk $SSL_DOMAIN via acme.sh (Cloudflare DNS)..."
+    "$HOME/.acme.sh/acme.sh" --issue --force --dns dns_cf -d "$SSL_DOMAIN" \
+        --cert-file "$SSL_CHAIN" \
+        --key-file "$SSL_KEY" \
+        --fullchain-file "$SSL_CERT" \
+        --reloadcmd "systemctl reload nginx" || {
+            log_error "Gagal menerbitkan sertifikat. SSL dibatalkan."
+            SSL_ENABLED=0
+            return 0
+        }
+    log_ok "Sertifikat SSL diterbitkan."
+
+    # Cron auto-renew
+    if ! crontab -l 2>/dev/null | grep -q "acme.sh --cron"; then
+        (crontab -l 2>/dev/null; echo "0 2 * * * $HOME/.acme.sh/acme.sh --cron --home $HOME/.acme.sh >> /var/log/acme-renew.log 2>&1") | crontab -
+        log_ok "Cron auto-renew acme.sh ditambahkan."
+    fi
+}
+
 create_nginx_conf() {
     local sock
     sock="$(find_php_socket)"
     local conf="/etc/nginx/sites-available/subfind-web"
     log_info "Membuat nginx config (port $PORT, socket $sock)..."
 
-    cat > "$conf" <<EOF
+    if [ "$SSL_ENABLED" = "1" ]; then
+        cat > "$conf" <<EOF
+server {
+    listen $PORT ssl;
+    listen [::]:$PORT ssl;
+
+    server_name $SSL_DOMAIN;
+    root $WEB_DIR;
+    index index.php;
+
+    ssl_certificate $SSL_CERT;
+    ssl_certificate_key $SSL_KEY;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    location / {
+        try_files \$uri \$uri/ =404;
+    }
+
+    location ~ \\.php\$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:$sock;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\\.ht {
+        deny all;
+    }
+}
+EOF
+    else
+        cat > "$conf" <<EOF
 server {
     listen $PORT;
     listen [::]:$PORT;
@@ -130,6 +236,7 @@ server {
     }
 }
 EOF
+    fi
 
     if [ -d /etc/nginx/sites-enabled ]; then
         ln -sf "$conf" /etc/nginx/sites-enabled/subfind-web
@@ -167,7 +274,11 @@ verify() {
         log_warn "$PHP_FPM_SERVICE tidak aktif"
     fi
     echo ""
-    echo "  Web UI: http://<IP-server>:$PORT/"
+    if [ "$SSL_ENABLED" = "1" ]; then
+        echo "  Web UI: https://$SSL_DOMAIN:$PORT/"
+    else
+        echo "  Web UI: http://<IP-server>:$PORT/"
+    fi
     echo "  (pastikan firewall membuka port $PORT)"
 }
 
@@ -189,6 +300,7 @@ main() {
 
     install_deps
     setup_dirs
+    setup_ssl
     create_nginx_conf
     test_and_restart
     verify
