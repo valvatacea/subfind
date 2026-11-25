@@ -63,6 +63,11 @@ setup_dirs() {
     chown -R www-data:www-data "$WEB_DIR" 2>/dev/null || true
     chmod 755 "$WEB_DIR"
     chown -R www-data:www-data "$INSTALL_DIR/output" 2>/dev/null || true
+    # Pastikan www-data bisa eksekusi venv python (untuk scan.php)
+    if [ -d "$INSTALL_DIR/.venv" ]; then
+        chmod 755 "$INSTALL_DIR" "$INSTALL_DIR/.venv" "$INSTALL_DIR/.venv/bin" 2>/dev/null || true
+        chmod 755 "$INSTALL_DIR/.venv/bin/python"* 2>/dev/null || true
+    fi
     log_ok "Direktori siap"
 }
 
