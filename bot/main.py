@@ -174,11 +174,11 @@ IP_OVERALL_TIMEOUT = 10  # detik maksimum per IP sebelum dianggap gagal
 MAX_TOTAL_BATCH = 1500  # batas total IP per batch multi-target
 
 # ===================== STATE USER =====================
-# user_state[chat_id] = {"mode": "...", "awaiting": "...", ...}
-user_state = {}
-state_lock = threading.Lock()
+# In-memory flags only (scanning). Semua state lain persist di chat_state.settings (session_store).
+_scan_flags = {}
+_scan_flags_lock = threading.Lock()
 
-# Session store (Fase 1: dual-write, best-effort). None jika import gagal.
+# Session store (Fase 1). None jika import gagal.
 try:
     from bot import session_store as _ss
 except Exception:
@@ -189,82 +189,78 @@ except Exception:
         _ss = None
 
 
+def _scan_flag_get(chat_id):
+    with _scan_flags_lock:
+        return bool(_scan_flags.get(chat_id, False))
+
+
+def _scan_flag_set(chat_id, value):
+    with _scan_flags_lock:
+        if value:
+            _scan_flags[chat_id] = True
+        else:
+            _scan_flags.pop(chat_id, None)
+
+
 def set_state(chat_id, **kw):
-    with state_lock:
-        st = user_state.get(chat_id, {})
-        st.update(kw)
-        user_state[chat_id] = st
-    # Persist UI keys (mode/awaiting/prev_menu) ke chat_state.settings (Fase 3.4)
-    ui_kw = {k: v for k, v in kw.items() if k in _UI_KEYS}
-    if ui_kw and _ss is not None:
+    """Persist state ke chat_state.settings. Key 'scanning' ditangani terpisah (in-memory)."""
+    scanning = kw.pop("scanning", None)
+    if scanning is not None:
+        _scan_flag_set(chat_id, bool(scanning))
+    if not kw:
+        return
+    if _ss is not None:
         try:
             settings = _ss.get_chat_settings(chat_id)
-            settings.update(ui_kw)
-            # remove None keys
+            settings.update(kw)
             for k, v in list(settings.items()):
-                if v is None and k in _UI_KEYS:
+                if v is None:
                     settings.pop(k, None)
             _ss.set_chat_settings(chat_id, settings)
         except Exception as e:
-            log.debug("persist ui keys failed: %s", e)
-    # Dual-write ke session store (best-effort, jangan crash bot)
-    if _ss is not None:
+            log.debug("set_state failed: %s", e)
+    # Dual-write session store (best-effort)
+    if _ss is not None and 'mode' in kw:
         try:
-            sid = st.get('_sid')
-            if sid is None:
-                active = _ss.get_active_session(chat_id)
-                if active is not None:
-                    sid = active['id']
-                    with state_lock:
-                        user_state.setdefault(chat_id, {})['_sid'] = sid
-                    st['_sid'] = sid
-            if sid is not None:
-                _ss.update_session(sid, payload=kw)
-            elif 'mode' in kw:
-                new_sid = _ss.create_session(chat_id, kw['mode'], payload=kw, status='awaiting_input')
-                _ss.set_active_session(chat_id, new_sid)
-                with state_lock:
-                    user_state.setdefault(chat_id, {})['_sid'] = new_sid
-                st['_sid'] = new_sid
+            active = _ss.get_active_session(chat_id)
+            if active is None:
+                sid = _ss.create_session(chat_id, kw['mode'], payload=kw, status='awaiting_input')
+                _ss.set_active_session(chat_id, sid)
+            else:
+                _ss.update_session(active['id'], payload=kw)
         except Exception as e:
             log.debug("session dual-write set_state failed: %s", e)
 
 
-_UI_KEYS = ("mode", "awaiting", "prev_menu")
-
 def get_state(chat_id):
-    with state_lock:
-        st = dict(user_state.get(chat_id, {}))
+    """Baca state dari chat_state.settings (+ scanning flag in-memory)."""
+    st = {}
     if _ss is not None:
         try:
-            settings = _ss.get_chat_settings(chat_id)
-            for k in _UI_KEYS:
-                if k in settings:
-                    st[k] = settings[k]
+            st = dict(_ss.get_chat_settings(chat_id))
         except Exception:
-            pass
+            st = {}
+    st["scanning"] = _scan_flag_get(chat_id)
     return st
 
 
+_FLOW_KEYS = ("mode", "awaiting", "prev_menu", "scan_mode", "scan_target", "scan_title",
+              "scan_page", "scan_back_target", "scan_filters", "filter_mode", "filter_field",
+              "cdn_targets", "cdn_selected", "cdn_ranges", "cdn_provider", "cdn_limit",
+              "cdn_range_page", "cdn_target_index", "_sid")
+
 def clear_state(chat_id):
-    with state_lock:
-        st = user_state.pop(chat_id, None)
-        sid = st.get('_sid') if isinstance(st, dict) else None
-        # Preserve scanning flag supaya slot scan tidak bocor saat navigasi menu
-        scanning = bool(st.get("scanning")) if isinstance(st, dict) else False
+    """Hapus flow state (flow keys) untuk menu utama; pertahankan history page."""
+    _scan_flag_set(chat_id, False)
     if _ss is not None:
         try:
             _ss.clear_active_session(chat_id)
             settings = _ss.get_chat_settings(chat_id)
-            for k in _UI_KEYS:
+            for k in _FLOW_KEYS:
                 settings.pop(k, None)
             _ss.set_chat_settings(chat_id, settings)
         except Exception as e:
-            log.debug("session dual-write clear_state failed: %s", e)
-    if scanning:
-        # Kembalikan flag scanning tanpa menimpa state lain
-        with state_lock:
-            user_state.setdefault(chat_id, {})["scanning"] = True
+            log.debug("clear_state failed: %s", e)
 
 
 # Subsystem 1 (Fase 3): history page disimpan di chat_state.settings, bukan user_state.
@@ -1012,12 +1008,11 @@ def show_subfind_history_detail(chat_id, message_id, filename, edit=True):
 
 
 def save_scan_state(chat_id, mode, target, results, title, page=1):
-    """Simpan hasil scan ke state agar bisa di-paging dan dibaca ulang dari JSON."""
+    """Simpan metadata scan ke state; hasil dibaca dari file output/ saat view."""
     set_state(chat_id,
               mode="scan_view",
               scan_mode=mode,
               scan_target=target,
-              scan_results=results,
               scan_page=page,
               scan_title=title)
     _cs_set(chat_id, "scan_filters", {})
@@ -1119,7 +1114,6 @@ def show_scan_page(chat_id, message_id, edit=True, info_text=None, back_target=N
         loaded = _load_scan_results_from_file(mode, target)
         if loaded:
             results = loaded
-            set_state(chat_id, scan_results=results, scan_mode=mode, scan_target=target)
     page = _scan_page_get(chat_id)
     target = st.get("scan_target", "-")
     title = st.get("scan_title", "Hasil Scan")
@@ -1432,7 +1426,6 @@ def run_d2ip(chat_id, message_id, domain):
               mode="scan_view",
               scan_mode="d2ip",
               scan_target=domain,
-              scan_results=lines,
               scan_page=1,
               scan_title="D2IP")
     _cs_set(chat_id, "scan_filters", {})
