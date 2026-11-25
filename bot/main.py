@@ -250,8 +250,7 @@ _FLOW_KEYS = ("mode", "awaiting", "prev_menu", "scan_mode", "scan_target", "scan
               "cdn_range_page", "cdn_target_index", "_sid")
 
 def clear_state(chat_id):
-    """Hapus flow state (flow keys) untuk menu utama; pertahankan history page."""
-    _scan_flag_set(chat_id, False)
+    """Hapus flow state (flow keys) untuk menu utama; pertahankan scanning flag & history page."""
     if _ss is not None:
         try:
             _ss.clear_active_session(chat_id)
