@@ -214,8 +214,9 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
                     // Tidak ada tabel: tampilkan output mentah penuh
                     resultArea.innerHTML = statusBadge + '<br><br>';
                     if (pollData.output) {
-                        resultArea.innerHTML += `<h3>Result:</h3><pre>${escapeHtml(pollData.output)}</pre>`;
+                        resultArea.innerHTML += `<h3>Hasil:</h3><pre>${escapeHtml(pollData.output)}</pre>`;
                     }
+                    resultArea.querySelector('.progress-bar')?.remove();
                 }
             }
         }, 2000);
