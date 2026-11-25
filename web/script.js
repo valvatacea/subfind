@@ -121,7 +121,7 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
             <div class="spinner"></div>
             <span class="status-text"><span id="status-text-${action}">Memulai...</span></span>
             <div class="progress-wrap">
-                <div class="progress-bar"></div>
+                <div class="progress-bar indeterminate"></div>
             </div>
         </div>
     `;
@@ -162,25 +162,35 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
             }
 
             if (pollData.status === 'running') {
-                const msgMap = {
-                    'd2ip': ['Resolve domain', 'Query DNS', 'Mengumpulkan IP'],
-                    'subfind': ['Enumerasi subdomain', 'Resolve IP', 'Scan port', 'Deteksi CDN'],
-                    'cdnscan': ['Parse IP range', 'Deteksi CDN', 'Scan port'],
-                    'sniscan': ['TLS handshake', 'Scan port', 'Deteksi CDN'],
-                    'rdns': ['Reverse DNS lookup', 'Query PTR'],
-                };
-                const msgs = msgMap[action] || ['Memindai target', 'Mengumpulkan data', 'Memproses hasil'];
+                const pb = document.querySelector('#result-' + action + ' .progress-bar');
                 if (pollData.progress_text) {
-                    // Teks progres nyata dari CLI
                     statusText.textContent = pollData.progress_text;
-                    const pt = document.getElementById('progress-text-' + action);
-                    if (pt) pt.textContent = '';
+                    const m = pollData.progress_text.match(/(\d+)\s*%/);
+                    if (m && pb) {
+                        const pct = Math.min(100, Math.max(0, parseInt(m[1], 10)));
+                        pb.classList.remove('indeterminate');
+                        pb.classList.add('determinate');
+                        pb.style.width = pct + '%';
+                    }
                 } else {
+                    const msgMap = {
+                        'd2ip': ['Resolve domain', 'Query DNS', 'Mengumpulkan IP'],
+                        'subfind': ['Enumerasi subdomain', 'Resolve IP', 'Scan port', 'Deteksi CDN'],
+                        'cdnscan': ['Parse IP range', 'Deteksi CDN', 'Scan port'],
+                        'sniscan': ['TLS handshake', 'Scan port', 'Deteksi CDN'],
+                        'rdns': ['Reverse DNS lookup', 'Query PTR'],
+                    };
+                    const msgs = msgMap[action] || ['Memindai target', 'Mengumpulkan data', 'Memproses hasil'];
                     const idx = (statusText.dataset.idx || 0);
                     const next = (parseInt(idx) + 1) % msgs.length;
                     statusText.dataset.idx = next;
                     const dots = '.'.repeat((parseInt(idx) % 3) + 1);
                     statusText.textContent = msgs[idx % msgs.length] + dots;
+                    if (pb) {
+                        pb.classList.remove('determinate');
+                        pb.classList.add('indeterminate');
+                        pb.style.width = '';
+                    }
                 }
                 return;
             }
@@ -251,9 +261,9 @@ function renderTablePage(container, page) {
 
     // Navigasi
     html += `<div class="pagination">`;
-    if (page > 1) html += `<button type="button" class="page-btn" onclick="renderTablePageById('${_tableData.container.id}', ${page-1})">⏮ Prev</button>`;
+    if (page > 1) html += `<button type="button" class="page-btn" onclick="renderTablePageById('${_tableData.container.id}', ${page-1})">◀ Prev</button>`;
     html += `<span class="page-info">${page} / ${totalPages}</span>`;
-    if (page < totalPages) html += `<button type="button" class="page-btn" onclick="renderTablePageById('${_tableData.container.id}', ${page+1})">Next ⏭️</button>`;
+    if (page < totalPages) html += `<button type="button" class="page-btn" onclick="renderTablePageById('${_tableData.container.id}', ${page+1})">Next ▶</button>`;
     html += `</div>`;
 
     // Render ke container yang disimpan
