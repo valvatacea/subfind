@@ -250,6 +250,8 @@ def clear_state(chat_id):
     with state_lock:
         st = user_state.pop(chat_id, None)
         sid = st.get('_sid') if isinstance(st, dict) else None
+        # Preserve scanning flag supaya slot scan tidak bocor saat navigasi menu
+        scanning = bool(st.get("scanning")) if isinstance(st, dict) else False
     if _ss is not None:
         try:
             _ss.clear_active_session(chat_id)
@@ -259,6 +261,10 @@ def clear_state(chat_id):
             _ss.set_chat_settings(chat_id, settings)
         except Exception as e:
             log.debug("session dual-write clear_state failed: %s", e)
+    if scanning:
+        # Kembalikan flag scanning tanpa menimpa state lain
+        with state_lock:
+            user_state.setdefault(chat_id, {})["scanning"] = True
 
 
 # Subsystem 1 (Fase 3): history page disimpan di chat_state.settings, bukan user_state.
