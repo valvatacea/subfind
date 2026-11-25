@@ -104,6 +104,50 @@ find_php_socket() {
     echo "/run/php/php-fpm.sock"
 }
 
+extract_root_domain() {
+    local domain="$1"
+    local psl_file="$2"
+    local parts count best_len line trimmed
+    local best_suffix="" best_len=0
+    local ddots="${domain//[^.]/}"
+    parts=${#ddots}
+    parts=$((parts + 1))
+    local line_count=0
+    while IFS= read -r line; do
+        line_count=$((line_count + 1))
+        trimmed="${line#"${line%%[![:space:]]*}"}"
+        trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+        line="$trimmed"
+        [[ -z "$line" || "$line" == //* ]] && continue
+        if [[ "$line" == \*.* ]]; then
+            line="${line#*.}"
+        fi
+        [[ "$line" == !* ]] && continue
+        [[ -z "$line" ]] && continue
+        local sdots="${line//[^.]/}"
+        count=${#sdots}
+        count=$((count + 1))
+        if [[ "$domain" == "$line" || "$domain" == *".$line" ]]; then
+            if [ "$count" -gt "$best_len" ] && [ "$parts" -gt "$count" ]; then
+                best_suffix="$line"
+                best_len="$count"
+            fi
+        fi
+    done < "$psl_file"
+    if [ -n "$best_suffix" ]; then
+        local start=$((parts - best_len))
+        local remaining="$domain"
+        local idx=1
+        while [ $idx -lt $start ]; do
+            remaining="${remaining#*.}"
+            idx=$((idx + 1))
+        done
+        echo "$remaining"
+        return 0
+    fi
+    return 1
+}
+
 setup_ssl() {
     # Jika SSL_DOMAIN tidak di-set via env, tanya user
     if [ -z "$SSL_DOMAIN" ]; then
@@ -118,6 +162,30 @@ setup_ssl() {
     fi
     SSL_ENABLED=1
     export SSL_DOMAIN
+
+    # Ekstraksi root domain via Public Suffix List (tiru natssh)
+    INSTALL_DIR_SSL="${SUBFIND_INSTALL_DIR:-/root/subfind}"
+    PSL_DIR="$INSTALL_DIR_SSL/config"
+    mkdir -p "$PSL_DIR"
+    PSL_FILE="$PSL_DIR/public_suffix_list.dat"
+    if [ ! -s "$PSL_FILE" ]; then
+        log_info "Mengunduh Public Suffix List..."
+        wget -q "https://publicsuffix.org/list/public_suffix_list.dat" -O "$PSL_FILE" 2>/dev/null || true
+    fi
+    ROOT_DOMAIN=""
+    if [ -s "$PSL_FILE" ]; then
+        ROOT_DOMAIN="$(extract_root_domain "$SSL_DOMAIN" "$PSL_FILE")" || ROOT_DOMAIN=""
+    fi
+    if [ -z "$ROOT_DOMAIN" ]; then
+        ROOT_DOMAIN="$SSL_DOMAIN"
+    fi
+    if [ "$ROOT_DOMAIN" = "$SSL_DOMAIN" ]; then
+        log_warn "Suffix domain '$SSL_DOMAIN' tidak ditemukan di PSL."
+        read -rp "Lanjutkan terbitkan sertifikat untuk $ROOT_DOMAIN? (y/N): " _c
+        case "${_c:-N}" in y|Y) ;; *) log_warn "SSL dibatalkan."; SSL_ENABLED=0; return 0 ;; esac
+    fi
+    log_ok "Root domain untuk sertifikat (wildcard): $ROOT_DOMAIN"
+    export ROOT_DOMAIN
 
     # Kredensial Cloudflare
     if [ -z "${CF_Token:-}" ] && [ -z "${CF_Key:-}" ]; then
@@ -156,7 +224,7 @@ setup_ssl() {
 
     mkdir -p /etc/nginx/ssl
     log_info "Menerbitkan sertifikat SSL untuk $SSL_DOMAIN via acme.sh (Cloudflare DNS)..."
-    "$HOME/.acme.sh/acme.sh" --issue --force --dns dns_cf -d "$SSL_DOMAIN" \
+    "$HOME/.acme.sh/acme.sh" --issue --force --dns dns_cf -d "*.${ROOT_DOMAIN}" -d "${ROOT_DOMAIN}" \
         --cert-file "$SSL_CHAIN" \
         --key-file "$SSL_KEY" \
         --fullchain-file "$SSL_CERT" \
