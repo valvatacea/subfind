@@ -316,6 +316,7 @@ def main():
 
     results, errors = enumerate_hosts(domain, progress_callback=progress_callback)
     print()  # baris baru setelah progres selesai
+    print()  # baris kosong pemisah
 
     if errors:
         print(f"[!] Provider gagal: {'; '.join(errors)}")

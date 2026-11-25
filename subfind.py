@@ -370,6 +370,7 @@ def main():
 
     results, errors = enumerate_domain(domain, progress_callback=progress_callback)
     print()  # baris baru setelah progres selesai
+    print()  # baris kosong pemisah
 
     if errors:
         print(f"[!] Provider gagal: {'; '.join(errors)}")
