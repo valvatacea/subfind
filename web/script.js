@@ -120,6 +120,10 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
         <div class="scanning" style="margin-top:15px;">
             <div class="spinner"></div>
             <span class="status-text"><span id="status-text-${action}">Memulai...</span></span>
+            <div class="progress-wrap">
+                <div class="progress-bar"></div>
+                <div class="progress-text" id="progress-text-${action}"></div>
+            </div>
         </div>
     `;
 
@@ -159,6 +163,10 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
             }
 
             if (pollData.status === 'running') {
+                if (pollData.progress_text) {
+                    const pt = document.getElementById('progress-text-' + action);
+                    if (pt) pt.textContent = pollData.progress_text;
+                }
                 const msgMap = {
                     'd2ip': ['Resolve domain', 'Query DNS', 'Mengumpulkan IP'],
                     'subfind': ['Enumerasi subdomain', 'Resolve IP', 'Scan port', 'Deteksi CDN'],

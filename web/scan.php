@@ -90,10 +90,29 @@ if ($poll || isset($_GET['scan_id'])) {
         ]);
         exit;
     } elseif ($running) {
+        // Ekstrak teks progres terakhir dari output (CLI pakai \r untuk baris progres)
+        $progress_text = '';
+        if (file_exists($outFile)) {
+            $raw = file_get_contents($outFile);
+            $parts = preg_split('/\r|\n/', $raw);
+            $parts = array_filter(array_map('trim', $parts));
+            if ($parts) {
+                $last = end($parts);
+                // Ambil baris terakhir yang mengandung progres (bar/%) jika ada
+                foreach (array_reverse($parts) as $pp) {
+                    if (preg_match('/[█░]|\d+%|Elapsed|ETA/', $pp)) {
+                        $last = $pp;
+                        break;
+                    }
+                }
+                $progress_text = $last;
+            }
+        }
         echo json_encode([
             'success' => true,
             'status' => 'running',
-            'pid' => $pid
+            'pid' => $pid,
+            'progress_text' => $progress_text
         ]);
         exit;
     } elseif (file_exists($outFile)) {
