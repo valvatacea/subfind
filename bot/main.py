@@ -2400,11 +2400,12 @@ def cb_handler(call):
             target_page = int(parts[2])
             mode = parts[1]
             st = get_state(chat_id)
-            if st.get("mode") == "scan_view" and st.get("scan_mode") == mode:
-                set_state(chat_id, scan_page=target_page)
+            if st.get("scan_mode") == mode:
+                set_state(chat_id, mode="scan_view", scan_page=target_page)
                 back_target = st.get("scan_back_target", None)
                 show_scan_page(chat_id, message_id, edit=True, back_target=back_target)
             else:
+                log.debug("page handler reject: mode=%s scan_mode=%s requested=%s", st.get("mode"), st.get("scan_mode"), mode)
                 try:
                     bot.answer_callback_query(call.id, "Sesi scan sudah kedaluwarsa.")
                 except Exception:
