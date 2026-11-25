@@ -244,7 +244,7 @@ def enumerate_hosts(domain, progress_callback=None, stop_event=None):
         pending = set(futures.keys())
 
         while pending:
-            done, pending = wait(pending, timeout=30, return_when=FIRST_COMPLETED)
+            done, pending = wait(pending, timeout=15, return_when=FIRST_COMPLETED)
             if not done:
                 # Semua host yang masih pending dianggap gagal/hang,
                 # agar progres tidak macet selamanya di satu host.
