@@ -281,3 +281,35 @@ pre {
     color: #eee;
     width: 70px;
 }
+
+/* Paginasi tabel */
+.pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+.page-btn {
+    padding: 6px 14px;
+    border: 1px solid #4CAF50;
+    border-radius: 4px;
+    background: #1e1e1e;
+    color: #4CAF50;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: bold;
+    transition: background 0.2s, color 0.2s;
+}
+.page-btn:hover {
+    background: #4CAF50;
+    color: #fff;
+}
+.page-info {
+    padding: 6px 12px;
+    border-radius: 4px;
+    background: #2a2a2a;
+    color: #eee;
+    font-size: 13px;
+    font-weight: bold;
+}

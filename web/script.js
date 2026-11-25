@@ -214,10 +214,10 @@ function renderTablePage(container, page) {
     html += `</tbody></table>`;
 
     // Navigasi
-    html += `<div style="margin-top:10px;">`;
-    if (page > 1) html += `<button type="button" onclick="renderTablePageById('${_tableData.container.id}', ${page-1})">⏮ Prev</button> `;
-    html += `<span style="margin:0 8px;">${page}/${totalPages}</span>`;
-    if (page < totalPages) html += ` <button type="button" onclick="renderTablePageById('${_tableData.container.id}', ${page+1})">Next ⏭️</button>`;
+    html += `<div class="pagination">`;
+    if (page > 1) html += `<button type="button" class="page-btn" onclick="renderTablePageById('${_tableData.container.id}', ${page-1})">⏮ Prev</button>`;
+    html += `<span class="page-info">${page} / ${totalPages}</span>`;
+    if (page < totalPages) html += `<button type="button" class="page-btn" onclick="renderTablePageById('${_tableData.container.id}', ${page+1})">Next ⏭️</button>`;
     html += `</div>`;
 
     // Render ke container yang disimpan
