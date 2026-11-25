@@ -46,7 +46,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 EXTRA_PORTS = [8443, 2053, 2083, 2087, 2096, 444, 777, 80, 8080, 22, 109, 143, 442]
 
 
-def fetch(url, timeout=15, retries=2):
+def fetch(url, timeout=15, retries=3):
     last_err = ""
     for attempt in range(retries):
         try:
@@ -57,12 +57,12 @@ def fetch(url, timeout=15, retries=2):
             if response.status_code >= 400:
                 return f"HTTP_ERROR_{response.status_code}"
             return response.text
-        except curl_requests.errors.ConnectTimeout as e:
-            return f"URL_ERROR_{e}"
-        except curl_requests.errors.ReadTimeout as e:
-            return f"URL_ERROR_{e}"
-        except curl_requests.errors.ConnectionError as e:
-            return f"URL_ERROR_{e}"
+        except curl_requests.errors.RequestsError as e:
+            last_err = f"URL_ERROR_{e}"
+            if attempt < retries - 1:
+                time.sleep(1)
+                continue
+            return last_err
         except Exception as e:
             last_err = f"ERR_{type(e).__name__}"
             if attempt < retries - 1:
@@ -76,6 +76,10 @@ def crt_sh(domain):
     """Ambil subdomain dari Certificate Transparency logs (crt.sh)."""
     url = f"https://crt.sh/?q=%.{domain}&output=json"
     result = fetch(url)
+    if result == "HTTP_ERROR_404":
+        return set(), None
+    if result.startswith("HTTP_ERROR_5"):
+        return set(), None
     if result.startswith(("HTTP_ERROR_", "URL_ERROR_", "ERR_")):
         return set(), f"crt.sh gagal: {result}"
     try:
@@ -214,15 +218,26 @@ def enumerate_hosts(domain, progress_callback=None, stop_event=None):
     if err:
         errors.append(f"crt.sh: {err}")
 
-    s, err = wordlist_fallback(domain)
-    if s:
-        subs |= s
+    # Fallback ke wordlist hanya jika crt.sh tidak mengembalikan hasil
+    if not subs:
+        s2, err2 = wordlist_fallback(domain)
+        if s2:
+            subs |= s2
+        if err2:
+            errors.append(f"wordlist: {err2}")
 
     if not subs:
         return [], errors
 
+    # Bersihkan wildcard (*.domain) dari hasil enumerasi
+    subs = {n[2:] if n.startswith("*.") else n for n in subs}
+    subs = {n for n in subs if n and "*" not in n}
+
     sorted_subs = sorted(subs)
     results = []
+
+    if progress_callback and sorted_subs:
+        progress_callback(0, len(sorted_subs))
 
     with ThreadPoolExecutor(max_workers=min(20, len(sorted_subs))) as executor:
         futures = {executor.submit(process_host, sub): sub for sub in sorted_subs}
@@ -238,7 +253,7 @@ def enumerate_hosts(domain, progress_callback=None, stop_event=None):
                     results.append({
                         "sni_host": sub, "ip": "-", "response_time_ms": 0,
                         "tls_version": "-", "alpn": "-", "tls_port": "-",
-                        "extra_ports": [], "status": "-",
+                        "extra_ports": [], "status": "-", "cdn": "-",
                     })
                     if progress_callback:
                         progress_callback(len(results), len(sorted_subs))
@@ -254,13 +269,15 @@ def enumerate_hosts(domain, progress_callback=None, stop_event=None):
                     results.append({
                         "sni_host": sub, "ip": "-", "response_time_ms": 0,
                         "tls_version": "-", "alpn": "-", "tls_port": "-",
-                        "extra_ports": [], "status": "-",
+                        "extra_ports": [], "status": "-", "cdn": "-",
                     })
                 if progress_callback:
                     progress_callback(len(results), len(sorted_subs))
 
             # Cek stop_event setelah setiap batch selesai diproses
             if stop_event and stop_event.is_set():
+                for f in list(pending):
+                    f.cancel()
                 break
 
     results.sort(key=lambda x: x["sni_host"])

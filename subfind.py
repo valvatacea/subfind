@@ -59,12 +59,12 @@ def fetch(url, timeout=15, retries=2) -> str:
             if response.status_code >= 400:
                 return f"HTTP_ERROR_{response.status_code}"
             return response.text
-        except curl_requests.errors.ConnectTimeout as e:
-            return f"URL_ERROR_{e}"
-        except curl_requests.errors.ReadTimeout as e:
-            return f"URL_ERROR_{e}"
-        except curl_requests.errors.ConnectionError as e:
-            return f"URL_ERROR_{e}"
+        except curl_requests.errors.RequestsError as e:
+            last_err = f"URL_ERROR_{e}"
+            if attempt < retries - 1:
+                time.sleep(1)
+                continue
+            return last_err
         except Exception as e:
             last_err = f"ERR_{type(e).__name__}"
             if attempt < retries - 1:
@@ -77,6 +77,8 @@ def crt_sh(domain):
     """Ambil subdomain dari Certificate Transparency logs (crt.sh)"""
     url = f"https://crt.sh/?q=%.{domain}&output=json"
     result = fetch(url)
+    if result == "HTTP_ERROR_404" or (isinstance(result, str) and result.startswith("HTTP_ERROR_5")):
+        return set(), None
     if result.startswith("HTTP_ERROR_"):
         return set(), f"crt.sh HTTP error: {result.split('_')[-1]}"
     if result.startswith("URL_ERROR_"):
@@ -258,9 +260,12 @@ def enumerate_domain(domain, progress_callback=None, stop_event=None):
     if err:
         errors.append(f"hackertarget: {err}")
 
-    # 3. wordlist (selalu fetch)
-    s, err = wordlist_fallback(domain)
-    provider_subs["wordlist"] = s if s else set()
+    # 3. wordlist (hanya jika crt.sh dan hackertarget tidak menghasilkan apa pun)
+    if provider_subs["crt.sh"] or provider_subs["hackertarget"]:
+        provider_subs["wordlist"] = set()
+    else:
+        s, err = wordlist_fallback(domain)
+        provider_subs["wordlist"] = s if s else set()
 
     # Bandingkan & simpan cache per provider (logika sama dengan CLI asli)
     provider_final = {}
@@ -305,6 +310,7 @@ def enumerate_domain(domain, progress_callback=None, stop_event=None):
                 for future in list(pending):
                     sub = futures[future]
                     results.append((sub, '-', '-', '-', '-'))
+                    future.cancel()
                 pending.clear()
                 break
             for future in done:
@@ -319,6 +325,8 @@ def enumerate_domain(domain, progress_callback=None, stop_event=None):
 
             # Cek stop_event setelah setiap batch selesai diproses
             if stop_event and stop_event.is_set():
+                for f in list(pending):
+                    f.cancel()
                 break
 
     results.sort(key=lambda x: x[0])

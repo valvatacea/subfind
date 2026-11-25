@@ -71,6 +71,8 @@ print_lock = threading.Lock()
 def fetch(url, timeout=15, progress_callback=None):
     try:
         response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=timeout, impersonate="chrome152", stream=True)
+        if response.status_code >= 400:
+            return f"HTTP_ERROR_{response.status_code}"
         total = int(response.headers.get('Content-Length', 0)) or None
         downloaded = 0
         chunks = []
@@ -86,11 +88,7 @@ def fetch(url, timeout=15, progress_callback=None):
                 progress_callback(downloaded, total)
                 last_update = now
         return b''.join(chunks).decode('utf-8', errors='ignore')
-    except curl_requests.errors.ConnectTimeout as e:
-        return f"URL_ERROR_{e}"
-    except curl_requests.errors.ReadTimeout as e:
-        return f"URL_ERROR_{e}"
-    except curl_requests.errors.ConnectionError as e:
+    except curl_requests.errors.RequestsError as e:
         return f"URL_ERROR_{e}"
     except Exception as e:
         return f"ERR_{type(e).__name__}"
@@ -336,6 +334,37 @@ def count_existing_ips(fname):
         return 0
 
 
+def count_ips_in_range(input_str):
+    """Hitung jumlah IP dalam CIDR/range/single tanpa membuat list (hemat memori)."""
+    input_str = input_str.strip()
+    # CIDR
+    try:
+        network = ipaddress.ip_network(input_str, strict=False)
+        if network.prefixlen >= 31:
+            return network.num_addresses
+        return network.num_addresses - 2
+    except ValueError:
+        pass
+    # Range start-end
+    if '-' in input_str:
+        parts = input_str.split('-')
+        if len(parts) == 2:
+            try:
+                start = ipaddress.ip_address(parts[0].strip())
+                end = ipaddress.ip_address(parts[1].strip())
+                if start.version == end.version and int(end) >= int(start):
+                    return int(end) - int(start) + 1
+            except ValueError:
+                pass
+    # Single IP
+    try:
+        ipaddress.ip_address(input_str)
+        return 1
+    except ValueError:
+        pass
+    return 0
+
+
 def count_total_batch_ips_cli(targets):
     """Hitung total IP yang akan discan dalam satu batch dari daftar targets CLI.
 
@@ -346,8 +375,8 @@ def count_total_batch_ips_cli(targets):
     for label, cidr_str, user_limit, tfname, safe_name, provider in targets:
         state = load_state(cidr_str)
         offset = state.get('scanned_count', 0) if state else 0
-        all_full = parse_ip_range(cidr_str)
-        total_full = len(all_full) if all_full else 0
+        all_full = None
+        total_full = count_ips_in_range(cidr_str)
         sisa = max(0, total_full - offset)
         if sisa > 0:
             ips = min(user_limit, sisa) if user_limit else sisa

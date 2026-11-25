@@ -96,6 +96,7 @@ try:
     with open(img_path, 'rb') as f:
         resp = requests.post(
             url,
+            data={'photo': '{"type":"static","photo":"attach://photo"}'},
             files={'photo': ('surfinder_profile.png', f, 'image/png')},
             timeout=30
         )

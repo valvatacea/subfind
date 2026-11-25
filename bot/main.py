@@ -92,6 +92,13 @@ def request_scan_stop(chat_id):
         if not scan_state:
             return False
         scan_state["stop_requested"] = True
+        # Propagate ke stop_event (dipakai SNIScan) jika ada
+        stop_event = scan_state.get("stop_event")
+        if stop_event is not None:
+            try:
+                stop_event.set()
+            except Exception:
+                pass
         return True
 
 

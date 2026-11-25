@@ -9,10 +9,6 @@ if [ -z "$1" ]; then
 fi
 
 DOMAIN=$1
-OUT_DIR="output"
-OUT_FILE="$OUT_DIR/${DOMAIN}.txt"
-
-mkdir -p "$OUT_DIR"
 
 {
 echo "Domain: $DOMAIN"
@@ -27,7 +23,7 @@ fi
 # Coba dengan host
 if command -v host &>/dev/null; then
     echo "=== host ==="
-    host "$DOMAIN" | grep "has address" | awk '{print $NF}'
+    host "$DOMAIN" | awk '/has (IPv6 )?address/ {print $NF}'
 fi
 
 # Coba dengan getent (bawaan glibc)
@@ -39,11 +35,9 @@ fi
 # Coba dengan nslookup
 if command -v nslookup &>/dev/null; then
     echo "=== nslookup ==="
-    nslookup "$DOMAIN" | grep "Address:" | tail -n +2 | awk '{print $2}'
+    nslookup "$DOMAIN" | awk '/^Address:/ {print $2}' | tail -n +2
 fi
 
 echo ""
 echo "Selesai."
-} | tee "$OUT_FILE"
-
-echo "Hasil disimpan ke: $OUT_FILE"
+}
