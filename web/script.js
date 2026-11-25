@@ -60,10 +60,31 @@ function showCustomLimit(target) {
             <b>Target:</b> ${escapeHtml(target)}<br>
             <label>Limit (1-1000):</label>
             <input type="number" id="cdnscan-custom-limit" min="1" max="1000" value="500" style="width:80px;">
-            <button type="button" class="limit-btn" onclick="const v=document.getElementById('cdnscan-custom-limit').value; if(v<1||v>1000){alert('Limit 1-1000');return;} handleScanDirect('cdnscan','${escapeHtml(target)}', v)">Scan</button>
+            <button type="button" class="limit-btn" onclick="scanCustomLimit('${escapeHtml(target)}')">Scan</button>
             <button type="button" class="limit-btn" onclick="document.getElementById('cdnscan-limit-picker').innerHTML=''">Batal</button>
         </div>
     `;
+}
+
+function scanCustomLimit(target) {
+    const input = document.getElementById('cdnscan-custom-limit');
+    if (!input) return;
+    const v = parseInt(input.value, 10);
+    if (isNaN(v) || v < 1 || v > 1000) {
+        alert('Limit harus 1-1000');
+        return;
+    }
+    handleScanDirect('cdnscan', target, v);
+}
+
+function setScanningState(scanning) {
+    const selectors = ['.range-btn', '.limit-btn', '#form-cdnscan button[type="submit"]', '#form-cdnscan input'];
+    selectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach(el => { el.disabled = scanning; });
+    });
+    // juga tombol provider-select
+    const ps = document.querySelector('.provider-select');
+    if (ps) ps.disabled = scanning;
 }
 
 async function handleScan(event, action, targetOverride = null, limitOverride = null) {
@@ -82,6 +103,8 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
         showError(form, 'Masukkan target terlebih dahulu');
         return;
     }
+
+    setScanningState(true);
 
     const resultArea = document.getElementById('result-' + action);
     resultArea.innerHTML = '';
@@ -113,6 +136,7 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
             showError(resultArea, startData.error || 'Gagal memulai scan');
             btn.disabled = false;
             btn.textContent = originalText;
+            setScanningState(false);
             return;
         }
 
@@ -129,6 +153,8 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
                 showError(resultArea, pollData.error || 'Scan gagal');
                 btn.disabled = false;
                 btn.textContent = originalText;
+                setScanningState(false);
+                setScanningState(false);
                 return;
             }
 
