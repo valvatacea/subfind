@@ -768,10 +768,16 @@ def get_cdnscan_history():
                     target = first.get("target", fname.replace("cdnscan_", "").replace(".json", ""))
                     provider = first.get("provider", "-")
                     count = len(data)
+                elif isinstance(data, dict):
+                    results = data.get("results", [])
+                    if not results:
+                        continue
+                    first = results[0] if isinstance(results, list) and results else {}
+                    target = (first.get("target") if isinstance(first, dict) else None) or data.get("target") or fname.replace("cdnscan_", "").replace(".json", "")
+                    provider = (first.get("provider") if isinstance(first, dict) else None) or data.get("provider", "-")
+                    count = len(results)
                 else:
-                    target = fname.replace("cdnscan_", "").replace(".json", "")
-                    provider = "-"
-                    count = 0
+                    continue
                 files.append({
                     "type": "cdnscan",
                     "target": target,
@@ -904,9 +910,15 @@ def get_subfind_history():
                     first = data[0]
                     target = first.get("target", fname.replace("subfind_", "").replace(".json", ""))
                     count = len(data)
+                elif isinstance(data, dict):
+                    results = data.get("results", [])
+                    if not results:
+                        continue
+                    first = results[0] if isinstance(results, list) and results else {}
+                    target = (first.get("target") if isinstance(first, dict) else None) or data.get("target") or data.get("domain") or fname.replace("subfind_", "").replace(".json", "")
+                    count = len(results)
                 else:
-                    target = fname.replace("subfind_", "").replace(".json", "")
-                    count = 0
+                    continue
                 files.append({
                     "type": "subfind",
                     "target": target,
@@ -1201,11 +1213,14 @@ def get_sniscan_history():
                     target = first.get("target", fname.replace("sniscan_", "").replace(".json", ""))
                     count = len(data)
                 elif isinstance(data, dict):
-                    target = data.get("target", data.get("domain", fname.replace("sniscan_", "").replace(".json", "")))
-                    count = len(data.get("results", []))
+                    results = data.get("results", [])
+                    if not results:
+                        continue
+                    first = results[0] if isinstance(results, list) and results else {}
+                    target = (first.get("target") if isinstance(first, dict) else None) or data.get("target") or data.get("domain") or fname.replace("sniscan_", "").replace(".json", "")
+                    count = len(results)
                 else:
-                    target = fname.replace("sniscan_", "").replace(".json", "")
-                    count = 0
+                    continue
                 files.append({
                     "type": "sniscan",
                     "target": target,
@@ -1575,7 +1590,8 @@ def run_subfind(chat_id, message_id, domain, session_id=None):
         json_data = [{"subdomain": r[0], "ip": r[1], "ports": r[2], "status": r[3], "cdn": r[4], "target": domain} for r in results]
         with open(jname, 'w') as f:
             json.dump(json_data, f, indent=2)
-        save_scan_state(chat_id, "subfind", domain, results, "SubFind")
+        if results:
+            save_scan_state(chat_id, "subfind", domain, results, "SubFind")
         if session_id is not None and _ss is not None:
             try:
                 _ss.update_session(session_id, status='cancelled', payload={'domain': domain, 'results': len(results)})
@@ -1782,7 +1798,8 @@ def run_sniscan(chat_id, message_id, domain, session_id=None):
             )
             for r in results
         ]
-        save_scan_state(chat_id, "sniscan", domain, results_tuples, "SNIScan")
+        if results:
+            save_scan_state(chat_id, "sniscan", domain, results_tuples, "SNIScan")
         if session_id is not None and _ss is not None:
             try:
                 _ss.update_session(session_id, status='cancelled', payload={'domain': domain, 'results': len(results)})
@@ -2822,7 +2839,8 @@ def run_cdnscan_target_batch(chat_id, message_id):
 
         # Scan dihentikan paksa via tombol Stop
         if scan_dihentikan:
-            save_scan_state(chat_id, "cdnscan", targets[-1] if targets else [], all_results, "CDNScan")
+            if has_data:
+                save_scan_state(chat_id, "cdnscan", targets[-1] if targets else [], all_results, "CDNScan")
             _edit_queue.put((
                 chat_id, message_id,
                 f"⏹️ <b>CDNScan dihentikan</b>\n"
@@ -2846,7 +2864,8 @@ def run_cdnscan_target_batch(chat_id, message_id):
         else:
             # Semua target 100% selesai → hanya "Lihat"
             # Simpan hasil aktual ke state agar bisa dilihat melalui tombol "Lihat"
-            save_scan_state(chat_id, "cdnscan", targets[-1] if targets else [], all_results, "CDNScan")
+            if has_data:
+                save_scan_state(chat_id, "cdnscan", targets[-1] if targets else [], all_results, "CDNScan")
             _edit_queue.put((
                 chat_id, message_id,
                 "✅ <b>CDNScan selesai</b>\nSemua target telah discan.",
