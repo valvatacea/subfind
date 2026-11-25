@@ -8,7 +8,13 @@ set -euo pipefail
 
 INSTALL_DIR="${SUBFIND_INSTALL_DIR:-/root/subfind}"
 WEB_DIR="$INSTALL_DIR/web"
-PORT="${WEB_PORT:-8080}"
+# Port: dari env WEB_PORT, atau tanya user
+if [ -z "${WEB_PORT:-}" ]; then
+    read -rp "Port web UI [8080]: " PORT
+    PORT="${PORT:-8080}"
+else
+    PORT="$WEB_PORT"
+fi
 SERVICE_NGINX="nginx"
 PHP_FPM_SERVICE=""
 
