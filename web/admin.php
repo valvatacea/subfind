@@ -54,12 +54,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 <body>
     <div class="container">
         <h1>&#127983; Surfinder</h1>
-        <form method="post" class="admin-form">
+        <br method="post" class="admin-form">
             <?php if ($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
             <div class="login-field">
                 <label>Username:</label><br>
                 <input type="text" name="user" required autofocus><br>
             </div>
+            </br>
             <div class="login-field">
                 <label>Password:</label><br>
                 <div class="password-input-wrapper">
