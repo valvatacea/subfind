@@ -44,8 +44,8 @@ function selectCdnTarget(target) {
         <div class="limit-picker">
             <b>Target:</b> ${escapeHtml(target)}<br>
             <b>Pilih limit IP (maks 1000):</b><br>
-            <button type="button" class="limit-btn" onclick="handleScanDirect('cdnscan','${escapeHtml(target)}',500)">500</button>
-            <button type="button" class="limit-btn" onclick="handleScanDirect('cdnscan','${escapeHtml(target)}',1000)">1000</button>
+            <button type="button" class="limit-btn" onclick="setCdnLimit(500)">500</button>
+            <button type="button" class="limit-btn" onclick="setCdnLimit(1000)">1000</button>
             <button type="button" class="limit-btn" onclick="showCustomLimit('${escapeHtml(target)}')">Custom</button>
             <button type="button" class="limit-btn" onclick="document.getElementById('cdnscan-limit-picker').innerHTML=''">Batal</button>
         </div>
@@ -60,21 +60,37 @@ function showCustomLimit(target) {
             <b>Target:</b> ${escapeHtml(target)}<br>
             <label>Limit (1-1000):</label>
             <input type="number" id="cdnscan-custom-limit" min="1" max="1000" value="500" style="width:80px;">
-            <button type="button" class="limit-btn" onclick="scanCustomLimit('${escapeHtml(target)}')">Scan</button>
+            <button type="button" class="limit-btn" onclick="setCustomLimit()">Set</button>
             <button type="button" class="limit-btn" onclick="document.getElementById('cdnscan-limit-picker').innerHTML=''">Batal</button>
         </div>
     `;
 }
 
-function scanCustomLimit(target) {
+function setCdnLimit(limit) {
+    const input = document.getElementById('cdnscan-limit-input');
+    if (input) {
+        input.value = limit;
+    }
+    const picker = document.getElementById('cdnscan-limit-picker');
+    if (picker) {
+        picker.innerHTML = `<div class="limit-picker" style="color:#4CAF50;"><b>Target disetel.</b><br>Limit IP: <b>${limit}</b><br>Klik tombol <b>Scan</b> di bawah untuk memulai.</div>`;
+    }
+}
+
+function setCustomLimit() {
     const input = document.getElementById('cdnscan-custom-limit');
-    if (!input) return;
+    const hidden = document.getElementById('cdnscan-limit-input');
+    if (!input || !hidden) return;
     const v = parseInt(input.value, 10);
     if (isNaN(v) || v < 1 || v > 1000) {
         alert('Limit harus 1-1000');
         return;
     }
-    handleScanDirect('cdnscan', target, v);
+    hidden.value = v;
+    const picker = document.getElementById('cdnscan-limit-picker');
+    if (picker) {
+        picker.innerHTML = `<div class="limit-picker" style="color:#4CAF50;"><b>Target disetel.</b><br>Limit IP: <b>${v}</b><br>Klik tombol <b>Scan</b> di bawah untuk memulai.</div>`;
+    }
 }
 
 function setScanningState(scanning) {
@@ -92,7 +108,9 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
 
     const form = event ? event.target : document.getElementById('form-' + action);
     const targetInput = form ? form.querySelector('input[name="target"]') : null;
+    const limitInput = form ? form.querySelector('input[name="limit"]') : null;
     const target = (targetOverride !== null && targetOverride !== undefined) ? String(targetOverride).trim() : (targetInput ? targetInput.value.trim() : '');
+    const formLimit = limitInput ? limitInput.value.trim() : '';
 
     // Jika dipanggil via tombol provider, isi input juga
     if (targetOverride !== null && targetOverride !== undefined && targetInput) {
@@ -131,7 +149,7 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
         const startResp = await fetch('scan.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `action=${encodeURIComponent(action)}&target=${encodeURIComponent(target)}${limitOverride ? '&limit=' + encodeURIComponent(limitOverride) : ''}`
+            body: `action=${encodeURIComponent(action)}&target=${encodeURIComponent(target)}${limitOverride ? '&limit=' + encodeURIComponent(limitOverride) : (formLimit ? '&limit=' + encodeURIComponent(formLimit) : '')}`
         });
         const startData = await startResp.json();
 

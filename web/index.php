@@ -71,6 +71,7 @@
                 <form id="form-cdnscan" onsubmit="handleScan(event, 'cdnscan')">
                     <label>Atau masukkan IP/CIDR manual:</label>
                     <input type="text" name="target" placeholder="173.245.48.0/20" required>
+                    <input type="hidden" name="limit" id="cdnscan-limit-input" value="">
                     <button type="submit">Scan</button>
                 </form>
                 <div id="result-cdnscan" class="result-area"></div>
@@ -88,6 +89,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=10"></script>
+    <script src="script.js?v=11"></script>
 </body>
 </html>
