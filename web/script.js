@@ -406,9 +406,18 @@ function renderJsonResults(container, jsonData, action) {
         return;
     }
 
-    // Urutkan tabel berdasarkan kolom Status (terendah dulu)
+    // Urutkan tabel berdasarkan kolom Status (kode HTTP terendah dulu: 200, 300, 400...)
     const statusCol = action === 'sniscan' ? 7 : 3;
-    rows.sort((a, b) => String(a[statusCol] || '-').localeCompare(String(b[statusCol] || '-')));
+    const toNum = (v) => {
+        const n = parseInt(String(v || '-'), 10);
+        return isNaN(n) ? Infinity : n;
+    };
+    rows.sort((a, b) => {
+        const na = toNum(a[statusCol]);
+        const nb = toNum(b[statusCol]);
+        if (na !== nb) return na - nb;
+        return String(a[statusCol] || '-').localeCompare(String(b[statusCol] || '-'));
+    });
 
     // Simpan data untuk pagination
     _tableData = { columns, rows, action, container, prefixHtml: '', suffixHtml: '', extraHtml: '' };
