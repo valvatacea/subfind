@@ -70,10 +70,6 @@ function unlockCdnForm() {
             targetInput.readOnly = false;
             targetInput.value = '';
         }
-        const scanBtn = form.querySelector('button[type="submit"]');
-        if (scanBtn) {
-            scanBtn.textContent = 'Scan';
-        }
         const limitInput = form.querySelector('input[name="limit"]');
         if (limitInput) {
             limitInput.value = '';
