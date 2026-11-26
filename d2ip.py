@@ -31,6 +31,7 @@ if blocked:
     sys.exit(1)
 
 print(f"Domain: {DOMAIN}")
+print("Selesai.")
 print("")
 
 # Coba dengan dig
