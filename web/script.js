@@ -406,6 +406,10 @@ function renderJsonResults(container, jsonData, action) {
         return;
     }
 
+    // Urutkan tabel berdasarkan kolom Status (terendah dulu)
+    const statusCol = action === 'sniscan' ? 7 : 3;
+    rows.sort((a, b) => String(a[statusCol] || '-').localeCompare(String(b[statusCol] || '-')));
+
     // Simpan data untuk pagination
     _tableData = { columns, rows, action, container, prefixHtml: '', suffixHtml: '', extraHtml: '' };
     _tableData.container = container;
