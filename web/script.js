@@ -203,20 +203,18 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
                 // Hapus spinner dan progress bar sebelum menampilkan hasil (seluruh action, termasuk d2ip)
                 resultArea.querySelectorAll('.spinner, .progress-bar, .progress-wrap, .scanning').forEach(el => el.remove());
 
-                const statusBadge = `<span class="status-badge status-completed">Selesai</span>`;
+                // Tampilkan hasil (tanpa badge "Selesai")
                 if (pollData.json && action !== 'rdns') {
-                    // Ada tabel: tampilkan badge + tabel, tanpa output mentah
                     renderJsonResults(resultArea, pollData.json, action);
                     if (_tableData) {
-                        _tableData.prefixHtml = statusBadge + '<br><br>';
+                        _tableData.prefixHtml = '<br><br>';
                         _tableData.suffixHtml = '';
                         renderTablePage(resultArea, 1);
                     } else {
-                        resultArea.insertAdjacentHTML('afterbegin', statusBadge + '<br><br>');
+                        resultArea.insertAdjacentHTML('afterbegin', '<br><br>');
                     }
                 } else {
-                    // Tidak ada tabel: tampilkan output mentah penuh (d2ip, rdns, dst.)
-                    resultArea.innerHTML = statusBadge + '<br><br>';
+                    resultArea.innerHTML = '<br><br>';
                     if (pollData.output) {
                         resultArea.innerHTML += `<h3>Hasil:</h3><pre>${escapeHtml(pollData.output)}</pre>`;
                     }
