@@ -19,11 +19,15 @@
         <h1>&#127983; Surfinder</h1>
 
         <nav class="tabs">
-            <button class="tab active" onclick="showTab('d2ip', this)">D2IP</button>
-            <button class="tab" onclick="showTab('rdns', this)">IP2D</button>
-            <button class="tab" onclick="showTab('subfind', this)">SubFind</button>
-            <button class="tab" onclick="showTab('cdnscan', this)">CDNScan</button>
-            <button class="tab" onclick="showTab('sniscan', this)">SNIScan</button>
+            <div class="tab-row">
+                <button class="tab active" onclick="showTab('d2ip', this)">D2IP</button>
+                <button class="tab" onclick="showTab('rdns', this)">IP2D</button>
+                <button class="tab" onclick="showTab('cdnscan', this)">CDNScan</button>
+            </div>
+            <div class="tab-row">
+                <button class="tab" onclick="showTab('subfind', this)">SubFind</button>
+                <button class="tab" onclick="showTab('sniscan', this)">SNIScan</button>
+            </div>
         </nav>
 
         <div id="tab-content">
