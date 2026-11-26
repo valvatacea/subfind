@@ -300,7 +300,7 @@ def main():
         print(blocked_message(domain, kata))
         sys.exit(1)
 
-    print(f"═══ SNISCAN (TLS HANDSHAKE & MULTI-PORT): {domain} ═══")
+    print(f"═══ SNISCAN (TLS HANDSHAKE & MULTI-PORT): {domain} ═══") if sys.stdout.isatty() else None
     print()
 
     start_time = time.time()
