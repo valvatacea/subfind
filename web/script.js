@@ -329,7 +329,11 @@ function renderTablePage(container, page) {
 
     let html = `<h3>Hasil Scan (${total} data) — Halaman ${page}/${totalPages}</h3>`;
     html += `<div class="table-wrap"><table><thead><tr>`;
-    columns.forEach(col => html += `<th>${escapeHtml(col)}</th>`);
+    columns.forEach((col, i) => {
+        const isSorted = _tableData.sortCol === i;
+        const dir = _tableData.sortDir === 'asc' ? ' ▲' : ' ▼';
+        html += `<th onclick="sortTable(${i})" style="cursor:pointer;user-select:none;">${escapeHtml(col)}${isSorted ? dir : ''}</th>`;
+    });
     html += `</tr></thead><tbody>`;
     chunk.forEach(row => {
         html += `<tr>`;
@@ -407,22 +411,23 @@ function renderJsonResults(container, jsonData, action) {
         return;
     }
 
-    // Urutkan tabel berdasarkan kolom Status (kode HTTP terendah dulu: 200, 300, 400...)
+    // Urutkan tabel berdasarkan kolom Status (kode HTTP terendah dulu: 200, 300, 400...) sebagai default awal
     const statusCol = action === 'sniscan' ? 7 : 3;
+    _tableData.sortCol = statusCol;
+    _tableData.sortDir = 'asc';
     const toNum = (v) => {
         const n = parseInt(String(v || '-'), 10);
         return isNaN(n) ? Infinity : n;
     };
     rows.sort((a, b) => {
-        const na = toNum(a[statusCol]);
-        const nb = toNum(b[statusCol]);
+        const na = toNum(a[_tableData.sortCol]);
+        const nb = toNum(b[_tableData.sortCol]);
         if (na !== nb) return na - nb;
-        return String(a[statusCol] || '-').localeCompare(String(b[statusCol] || '-'));
+        return String(a[_tableData.sortCol] || '-').localeCompare(String(b[_tableData.sortCol] || '-'));
     });
 
     // Simpan data untuk pagination
-    _tableData = { columns, rows, action, container, prefixHtml: '', suffixHtml: '', extraHtml: '' };
-    _tableData.container = container;
+    _tableData = { columns, rows, action, container, prefixHtml: '', suffixHtml: '', extraHtml: '', sortCol: statusCol, sortDir: 'asc' };
     renderTablePage(container, 1);
 }
 
@@ -431,6 +436,31 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = String(text);
     return div.innerHTML;
+}
+
+// Urutkan tabel berdasarkan kolom yang diklik (clickable header)
+function sortTable(colIndex) {
+    if (!_tableData) return;
+    if (_tableData.sortCol === colIndex) {
+        _tableData.sortDir = _tableData.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        _tableData.sortCol = colIndex;
+        _tableData.sortDir = 'asc';
+    }
+    const rows = _tableData.rows;
+    const toNum = (v) => {
+        const n = parseInt(String(v || '-'), 10);
+        return isNaN(n) ? Infinity : n;
+    };
+    rows.sort((a, b) => {
+        const na = toNum(a[_tableData.sortCol]);
+        const nb = toNum(b[_tableData.sortCol]);
+        if (na !== nb) return _tableData.sortDir === 'asc' ? na - nb : nb - na;
+        return _tableData.sortDir === 'asc'
+            ? String(a[_tableData.sortCol] || '-').localeCompare(String(b[_tableData.sortCol] || '-'))
+            : String(b[_tableData.sortCol] || '-').localeCompare(String(a[_tableData.sortCol] || '-'));
+    });
+    renderTablePage(_tableData.container, 1);
 }
 
 // Bersihkan baris progres mentah dan header/footer CLI dari output akhir (lapisan frontend)
