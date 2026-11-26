@@ -4,7 +4,7 @@ let isScanning = false;
 
 function showTab(tabName, btn) {
     if (isScanning) {
-        alert('Scan sedang berjalan. Tunggu hingga selesai sebelum pindah menu.');
+        alert('Tidak bisa pindah menu saat scan sedang berjalan. Tunggu proses selesai.');
         return;
     }
     // Sembunyikan semua panel
