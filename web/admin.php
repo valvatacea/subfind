@@ -60,6 +60,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <label>Username:</label><br>
                 <input type="text" name="user" required autofocus><br>
             </div>
+            <br>
             <div class="login-field">
                 <label>Password:</label><br>
                 <div class="password-input-wrapper">
