@@ -418,35 +418,34 @@ pre {
 
 /* Admin password toggle */
 .password-input-wrapper {
-    display: block;
-}
-
-.password-input-group {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 6px;
 }
 
-.password-input-group input {
-    flex: 1;
+.password-input-wrapper input {
+    width: 100%;
+    padding-right: 40px;
+    box-sizing: border-box;
 }
 
 .password-toggle {
-    background: #2a2a2a;
-    border: 1px solid #333;
-    color: #e0e0e0;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    padding: 0;
     cursor: pointer;
-    padding: 6px 10px;
-    font-size: 14px;
-    line-height: 1;
-    border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .password-toggle:hover {
-    background: #333;
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
 }
 
 .eye-icon {
