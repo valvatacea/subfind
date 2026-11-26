@@ -58,36 +58,13 @@ def main():
         sys.exit(1)
     ip = sys.argv[1].strip()
     names, err = reverse_lookup(ip)
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    out_dir = os.path.join(base_dir, "output")
-    os.makedirs(out_dir, exist_ok=True)
-    safe = ip.replace(":", "_")
-    jname = os.path.join(out_dir, f"rdns_{safe}.json")
-    tname = os.path.join(out_dir, f"rdns_{safe}.txt")
     if err:
         print(f"Error: {err}")
         print()
-        data = {"ip": ip, "hostnames": [], "error": err}
     else:
         for n in names:
             print(n)
         print()
-        data = {"ip": ip, "hostnames": names, "error": None}
-    try:
-        with open(jname, "w") as f:
-            json.dump(data, f, indent=2)
-    except Exception:
-        pass
-    try:
-        with open(tname, "w") as f:
-            if err:
-                f.write(f"Error: {err}\n")
-            else:
-                f.write(f"IP: {ip}\n")
-                for n in names:
-                    f.write(f"{n}\n")
-    except Exception:
-        pass
 
 
 if __name__ == "__main__":

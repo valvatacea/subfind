@@ -1486,16 +1486,6 @@ def run_rdns(chat_id, message_id, ip):
     lines = [f"🔄 <b>IP2Domain</b>\nIP: <code>{esc(ip)}</code>\n", "Hostname (PTR):"]
     for n in names:
         lines.append(f"  • {esc(n)}")
-    # simpan txt
-    out_dir = os.path.join(BASE_DIR, "output")
-    os.makedirs(out_dir, exist_ok=True)
-    fname = f"rdns_{ip}.txt"
-    fpath = os.path.join(out_dir, fname)
-    try:
-        with open(fpath, "w") as f:
-            f.write("\n".join(lines) + "\n")
-    except Exception:
-        pass
     bot.edit_message_text(
         "\n".join(lines),
         chat_id, message_id, reply_markup=kb_back("menu:rdns")

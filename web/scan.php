@@ -50,9 +50,6 @@ if ($poll || isset($_GET['scan_id'])) {
         $jsonFile = $OUTPUT_DIR . "/subfind_$target.json";
     } elseif ($action === 'sniscan') {
         $jsonFile = $OUTPUT_DIR . "/sniscan_$target.json";
-    } elseif ($action === 'rdns') {
-        $safe = str_replace(':', '_', $target);
-        $jsonFile = $OUTPUT_DIR . "/rdns_$safe.json";
     } elseif ($action === 'cdnscan') {
         // CDNScan menyimpan per range dengan safe name, cari file terbaru
         $files = glob($OUTPUT_DIR . '/cdnscan_*.json');
