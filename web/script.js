@@ -102,7 +102,7 @@ function setCdnLimit(limit) {
     }
     const picker = document.getElementById('cdnscan-limit-picker');
     if (picker) {
-        picker.innerHTML = `<div class="limit-picker" style="color:#4CAF50;"><b>Target disetel.</b><br>Target: <b>${escapeHtml(currentCdnTarget || target)}</b><br>Limit IP: <b>${limit}</b><br><button type="button" class="limit-btn" onclick="selectCdnTarget('${escapeHtml(currentCdnTarget || target)}')">Ubah limit</button> <button type="button" class="limit-btn" onclick="unlockCdnForm()">Batal</button></div>`;
+        picker.innerHTML = `<div class="limit-picker" style="color:#4CAF50;"><b>Target:</b> <b>${escapeHtml(currentCdnTarget || target)}</b><br>Limit IP: <b>${limit}</b><br><button type="button" class="limit-btn" onclick="selectCdnTarget('${escapeHtml(currentCdnTarget || target)}')">Ubah limit</button> <button type="button" class="limit-btn" onclick="unlockCdnForm()">Batal</button></div>`;
     }
 }
 
@@ -118,7 +118,7 @@ function setCustomLimit() {
     hidden.value = v;
     const picker = document.getElementById('cdnscan-limit-picker');
     if (picker) {
-        picker.innerHTML = `<div class="limit-picker" style="color:#4CAF50;"><b>Target disetel.</b><br>Target: <b>${escapeHtml(currentCdnTarget)}</b><br>Limit IP: <b>${v}</b><br><button type="button" class="limit-btn" onclick="selectCdnTarget('${escapeHtml(currentCdnTarget)}')">Ubah limit</button> <button type="button" class="limit-btn" onclick="unlockCdnForm()">Batal</button></div>`;
+        picker.innerHTML = `<div class="limit-picker" style="color:#4CAF50;"><b>Target:</b> <b>${escapeHtml(currentCdnTarget)}</b><br>Limit IP: <b>${v}</b><br><button type="button" class="limit-btn" onclick="selectCdnTarget('${escapeHtml(currentCdnTarget)}')">Ubah limit</button> <button type="button" class="limit-btn" onclick="unlockCdnForm()">Batal</button></div>`;
     }
 }
 
