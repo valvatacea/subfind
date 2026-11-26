@@ -320,37 +320,13 @@ function renderTablePageById(containerId, page) {
 function renderTablePage(container, page) {
     if (!_tableData) return;
     const { columns, rows, action } = _tableData;
-    // Filter status & port jika ada filter aktif
-    let filtered = rows;
-    const fs = (_tableData.filterStatus || '').trim();
-    const fp = (_tableData.filterPort || '').trim();
-    const statusCol = action === 'sniscan' ? 7 : 3;
-    const portsCol = action === 'sniscan' ? 6 : 2;
-    if (fs || fp) {
-        filtered = rows.filter(r => {
-            const s = String(r[statusCol] || '').toLowerCase();
-            const p = String(r[portsCol] || '').toLowerCase();
-            const okS = fs ? s.includes(fs.toLowerCase()) : true;
-            const okP = fp ? p.includes(fp.toLowerCase()) : true;
-            return okS && okP;
-        });
-    }
-    const total = filtered.length;
+    const total = rows.length;
     const totalPages = Math.max(1, Math.ceil(total / TABLE_PER_PAGE));
     page = Math.max(1, Math.min(page, totalPages));
     const start = (page - 1) * TABLE_PER_PAGE;
-    const chunk = filtered.slice(start, start + TABLE_PER_PAGE);
+    const chunk = rows.slice(start, start + TABLE_PER_PAGE);
 
     let html = `<h3>Hasil Scan (${total} data) — Halaman ${page}/${totalPages}</h3>`;
-    // Filter controls (hanya untuk mode yang punya hasil terstruktur)
-    if (action !== 'd2ip' && action !== 'rdns') {
-        html += `<div class="filter-bar">`;
-        html += `<label>Status:</label> <select id="filter-status-${action}" class="filter-input"><option value="">Semua</option></select>`;
-        html += `<label>Port:</label> <input type="text" id="filter-port-${action}" class="filter-input" placeholder="port">`;
-        html += `<button type="button" class="filter-btn" onclick="applyFilter('${action}')">Terapkan</button>`;
-        html += `<button type="button" class="filter-btn secondary" onclick="clearFilter('${action}')">Bersihkan</button>`;
-        html += `</div>`;
-    }
     html += `<div class="table-wrap"><table><thead><tr>`;
     columns.forEach(col => html += `<th>${escapeHtml(col)}</th>`);
     html += `</tr></thead><tbody>`;
@@ -435,18 +411,8 @@ function renderJsonResults(container, jsonData, action) {
     rows.sort((a, b) => String(a[statusCol] || '-').localeCompare(String(b[statusCol] || '-')));
 
     // Simpan data untuk pagination
-    _tableData = { columns, rows, action, container, prefixHtml: '', suffixHtml: '', extraHtml: '', filterStatus: '', filterPort: '' };
+    _tableData = { columns, rows, action, container, prefixHtml: '', suffixHtml: '', extraHtml: '' };
     _tableData.container = container;
-
-    // Isi dropdown status dengan nilai unik dari data
-    const statuses = [...new Set(rows.map(r => String(r[statusCol] || '-')).filter(s => s !== '-'))].sort();
-    const sel = document.getElementById('filter-status-' + action);
-    if (sel) {
-        statuses.forEach(s => {
-            sel.innerHTML += `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`;
-        });
-    }
-
     renderTablePage(container, 1);
 }
 
@@ -455,26 +421,4 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = String(text);
     return div.innerHTML;
-}
-
-function applyFilter(action) {
-    const sel = document.getElementById('filter-status-' + action);
-    const inp = document.getElementById('filter-port-' + action);
-    if (_tableData && _tableData.action === action) {
-        _tableData.filterStatus = sel ? sel.value : '';
-        _tableData.filterPort = inp ? inp.value : '';
-        renderTablePage(_tableData.container, 1);
-    }
-}
-
-function clearFilter(action) {
-    const sel = document.getElementById('filter-status-' + action);
-    const inp = document.getElementById('filter-port-' + action);
-    if (sel) sel.value = '';
-    if (inp) inp.value = '';
-    if (_tableData && _tableData.action === action) {
-        _tableData.filterStatus = '';
-        _tableData.filterPort = '';
-        renderTablePage(_tableData.container, 1);
-    }
 }
