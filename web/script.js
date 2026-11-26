@@ -48,9 +48,6 @@ function selectCdnTarget(target) {
         targetInput.readOnly = true;
     }
     const scanBtn = form ? form.querySelector('button[type="submit"]') : null;
-    if (scanBtn) {
-        scanBtn.textContent = 'Scan (target terpilih)';
-    }
     const picker = document.getElementById('cdnscan-limit-picker');
     if (!picker) return;
     picker.innerHTML = `
