@@ -65,13 +65,9 @@ if ($poll || isset($_GET['scan_id'])) {
     }
 
     $output = file_exists($outFile) ? file_get_contents($outFile) : '';
-    // Anggap selesai hanya jika output berisi marker penyelesaian
-    $completed = (!$running) && file_exists($outFile) && (
-        stripos($output, 'Hasil disimpan') !== false ||
-        stripos($output, 'Selesai') !== false ||
-        stripos($output, 'Error:') !== false ||
-        stripos($output, 'Scan semua target selesai') !== false
-    );
+    // Anggap selesai jika proses sudah mati dan file output ada
+    // (termasuk kasus error, mis. d2ip domain invalid/NSFW yang tidak mencetak marker 'Selesai')
+    $completed = (!$running) && file_exists($outFile);
 
     if ($completed) {
         // Scan selesai
