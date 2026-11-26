@@ -1,5 +1,4 @@
 <?php
-session_start();
 // ============================================================
 // SURFIND WEB — CACHE-BUSTING NOTE
 // Setiap perubahan index.php / script.css / script.js: selalu naikkan query-string cache-busting dari v=N ke v=N+1 (jangan pertahankan v=2), biar browser fetch versi terbaru.
@@ -13,19 +12,11 @@ session_start();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
     <div class="container">
         <h1>&#127983; Surfinder</h1>
-        <div class="admin-bar">
-            <?php if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true): ?>
-                <span class="admin-status">🔒 Admin: Aktif</span> |
-                <a href="admin.php?logout=1" class="admin-logout">Logout</a>
-            <?php else: ?>
-                <a href="admin.php" class="admin-login">Admin Login</a>
-            <?php endif; ?>
-        </div>
 
         <nav class="tabs">
             <div class="tab-row">
