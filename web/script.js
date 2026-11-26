@@ -292,11 +292,7 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
                     // Tidak ada tabel: tampilkan output mentah penuh (d2ip, rdns, dst.)
                     resultArea.innerHTML = '<br><br>';
                     if (pollData.output) {
-                        resultArea.innerHTML += `<h3>Hasil:</h3><pre>${escapeHtml(cleanCliOutput(pollData.output))}</pre>`;
-                        // Stil tulisan "Selesai." di output d2ip / rdns
-                        resultArea.querySelectorAll('pre').forEach(pre => {
-                            pre.innerHTML = pre.innerHTML.replace(/Selesai\./g, '<span class="status-selesai">Selesai.</span>');
-                        });
+                        resultArea.innerHTML += `<span class="status-selesai">Selesai.</span> <h3>Hasil:</h3><pre>${escapeHtml(cleanCliOutput(pollData.output))}</pre>`;
                     }
                 }
             }
