@@ -98,43 +98,6 @@ if (isset($_POST['delete'])) {
         <form method="post">
             <button type="submit" name="logout" class="btn-logout">Logout</button>
         </form>
-
-        <h3>🛠️ Admin Dashboard</h3>
-        <p>Waktu server: <?= date('Y-m-d H:i:s') ?></p>
-        <p>PHP Version: <?= phpversion() ?></p>
-
-        <h3>File Output Scan</h3>
-        <?php
-        $files = [];
-        if (is_dir($OUT_DIR)) {
-            $all = scandir($OUT_DIR);
-            foreach ($all as $f) {
-                if ($f === '.' || $f === '..') continue;
-                $files[] = $f;
-            }
-            rsort($files);
-        }
-        if (empty($files)) {
-            echo '<p>Tidak ada file output.</p>';
-        } else {
-            echo '<table class="admin-table">';
-            echo '<tr><th>File</th><th>Ukuran</th><th>Terakhir Diubah</th><th>Aksi</th></tr>';
-            foreach ($files as $f) {
-                $path = $OUT_DIR . '/' . $f;
-                if (!is_file($path)) continue;
-                $size = filesize($path);
-                $mtime = date('Y-m-d H:i:s', filemtime($path));
-                echo '<tr>';
-                echo '<td>' . htmlspecialchars($f) . '</td>';
-                echo '<td>' . number_format($size) . ' bytes</td>';
-                echo '<td>' . htmlspecialchars($mtime) . '</td>';
-                echo '<td><button type="submit" form="del-' . urlencode($f) . '" class="btn-delete">Hapus</button></td>';
-                echo '</tr>';
-                echo '<form id="del-' . urlencode($f) . '" method="post" class="hidden"><input type="hidden" name="delete" value="' . htmlspecialchars($f) . '"></form>';
-            }
-            echo '</table>';
-        }
-        ?>
     </div>
 </body>
 </html>
