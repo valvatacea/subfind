@@ -68,7 +68,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     <button type="button" class="password-toggle" onclick="toggleAdminPassword()" id="admin-pass-toggle">
                         <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                     </button>
-                </div><br>
+                </div>
             </div>
             <button type="submit" class="btn-login">Login</button>
         </form>
