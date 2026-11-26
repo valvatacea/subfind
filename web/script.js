@@ -129,6 +129,10 @@ function setScanningState(scanning) {
     });
     const ps = document.querySelector('.provider-select');
     if (ps) ps.disabled = scanning;
+    if (scanning) {
+        // Hapus elemen "Selesai." lama saat scan baru dimulai
+        document.querySelectorAll('.status-selesai-d2ip, .status-selesai-rdns').forEach(el => el.remove());
+    }
     if (!scanning) {
         const form = document.getElementById('form-cdnscan');
         if (form) {
@@ -292,7 +296,14 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
                     // Tidak ada tabel: tampilkan output mentah penuh (d2ip, rdns, dst.)
                     resultArea.innerHTML = '<br><br>';
                     if (pollData.output) {
-                        resultArea.innerHTML += `<span class="status-selesai">Selesai.</span> <h3>Hasil:</h3><pre>${escapeHtml(cleanCliOutput(pollData.output))}</pre>`;
+                        resultArea.innerHTML += `<h3>Hasil:</h3><pre>${escapeHtml(cleanCliOutput(pollData.output))}</pre>`;
+                    }
+                    // Tampilkan "Selesai." di bawah form (bukan di dalam hasil)
+                    const form = document.getElementById('form-' + action);
+                    if (form) {
+                        const oldStatus = form.parentNode.querySelector('.status-selesai-' + action);
+                        if (oldStatus) oldStatus.remove();
+                        form.insertAdjacentHTML('afterend', `<span class="status-selesai status-selesai-${action}">Selesai.</span>`);
                     }
                 }
             }
