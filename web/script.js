@@ -204,7 +204,7 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
                 resultArea.querySelectorAll('.spinner, .progress-bar, .progress-wrap, .scanning').forEach(el => el.remove());
 
                 const statusBadge = `<span class="status-badge status-completed">Selesai</span>`;
-                if (pollData.json) {
+                if (pollData.json && action !== 'rdns') {
                     // Ada tabel: tampilkan badge + tabel, tanpa output mentah
                     renderJsonResults(resultArea, pollData.json, action);
                     if (_tableData) {
@@ -215,7 +215,7 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
                         resultArea.insertAdjacentHTML('afterbegin', statusBadge + '<br><br>');
                     }
                 } else {
-                    // Tidak ada tabel: tampilkan output mentah penuh (d2ip, dst.)
+                    // Tidak ada tabel: tampilkan output mentah penuh (d2ip, rdns, dst.)
                     resultArea.innerHTML = statusBadge + '<br><br>';
                     if (pollData.output) {
                         resultArea.innerHTML += `<h3>Hasil:</h3><pre>${escapeHtml(pollData.output)}</pre>`;
@@ -324,21 +324,6 @@ function renderJsonResults(container, jsonData, action) {
     } else if (action === 'd2ip') {
         // d2ip biasanya output teks, bukan JSON terstruktur
         container.innerHTML += `<h3>Hasil D2IP:</h3>`;
-        return;
-    } else if (action === 'rdns') {
-        if (jsonData && jsonData.error) {
-            container.innerHTML += `<div class="error">${escapeHtml(jsonData.error)}</div>`;
-            return;
-        }
-        const names = (jsonData && jsonData.hostnames) || [];
-        if (names.length === 0) {
-            container.innerHTML += `<div class="error">Tidak ada PTR record</div>`;
-            return;
-        }
-        let html = `<h3>Hasil IP2D (${names.length} hostname)</h3><ul>`;
-        names.forEach(n => html += `<li>${escapeHtml(n)}</li>`);
-        html += `</ul>`;
-        container.innerHTML += html;
         return;
     }
 
