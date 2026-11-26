@@ -49,21 +49,21 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="style.css?v=19">
+    <link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
     <div class="container">
         <h1>&#127983; Surfinder</h1>
-        <form method="post" style="max-width:400px;margin:20px auto;">
+        <form method="post" class="admin-form">
             <?php if ($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
-            <div class="login-field" style="margin-bottom:10px;">
-                <label style="margin:0;padding:0;">Username:</label><br>
-                <input type="text" name="user" required autofocus style="width:100%;padding:10px;background:#0a0a0a;border:1px solid #333;border-radius:4px;color:#e0e0e0;font-size:14px;margin:0;padding:0;"><br>
+            <div class="login-field">
+                <label>Username:</label><br>
+                <input type="text" name="user" required autofocus><br>
             </div>
-            <div class="login-field" style="margin-bottom:10px;">
-                <label style="margin:0;padding:0;">Password:</label><br>
-                <input type="password" name="pass" required style="width:100%;padding:10px;background:#0a0a0a;border:1px solid #333;border-radius:4px;color:#e0e0e0;font-size:14px;margin:0;padding:0;"><br>
-                <button type="submit" style="background:#4CAF50;color:white;border:none;padding:10px 24px;border-radius:4px;cursor:pointer;font-size:14px;font-weight:600;width:100%;margin-top:10px;">Login</button>
+            <div class="login-field">
+                <label>Password:</label><br>
+                <input type="password" name="pass" required><br>
+                <button type="submit" class="btn-login">Login</button>
             </div>
         </form>
     </div>
@@ -90,13 +90,13 @@ if (isset($_POST['delete'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="style.css?v=19">
+    <link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
     <div class="container">
         <h1>&#127983; Surfinder</h1>
-        <form method="post" style="margin-bottom:20px;">
-            <button type="submit" name="logout" style="background:#f44336;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;">Logout</button>
+        <form method="post">
+            <button type="submit" name="logout" class="btn-logout">Logout</button>
         </form>
 
         <h3>🛠️ Admin Dashboard</h3>
@@ -117,7 +117,7 @@ if (isset($_POST['delete'])) {
         if (empty($files)) {
             echo '<p>Tidak ada file output.</p>';
         } else {
-            echo '<table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;">';
+            echo '<table class="admin-table">';
             echo '<tr><th>File</th><th>Ukuran</th><th>Terakhir Diubah</th><th>Aksi</th></tr>';
             foreach ($files as $f) {
                 $path = $OUT_DIR . '/' . $f;
@@ -128,9 +128,9 @@ if (isset($_POST['delete'])) {
                 echo '<td>' . htmlspecialchars($f) . '</td>';
                 echo '<td>' . number_format($size) . ' bytes</td>';
                 echo '<td>' . htmlspecialchars($mtime) . '</td>';
-                echo '<td><button type="submit" form="del-' . urlencode($f) . '" style="color:#f44336;border:none;background:transparent;cursor:pointer;">Hapus</button></td>';
+                echo '<td><button type="submit" form="del-' . urlencode($f) . '" class="btn-delete">Hapus</button></td>';
                 echo '</tr>';
-                echo '<form id="del-' . urlencode($f) . '" method="post" style="display:none;"><input type="hidden" name="delete" value="' . htmlspecialchars($f) . '"></form>';
+                echo '<form id="del-' . urlencode($f) . '" method="post" class="hidden"><input type="hidden" name="delete" value="' . htmlspecialchars($f) . '"></form>';
             }
             echo '</table>';
         }
