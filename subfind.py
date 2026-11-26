@@ -184,7 +184,7 @@ def save_cache(domain, provider, subs):
 def scan_ports_summary(ip, ports=COMMON_PORTS, timeout=1.5):
     """Scan port terbuka pada IP, return daftar angka port saja"""
     open_ports = scan_ports(ip, ports, timeout=timeout)
-    return ",".join(str(p) for p in open_ports) if open_ports else "-"
+    return ", ".join(str(p) for p in open_ports) if open_ports else "-"
 
 def detect_cdn(ip, host=None):
     """Deteksi CDN dari IP range cache atau header response HTTP.
