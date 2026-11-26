@@ -418,9 +418,17 @@ pre {
 
 /* Admin password toggle */
 .password-input-wrapper {
+    display: block;
+}
+
+.password-input-group {
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+.password-input-group input {
+    flex: 1;
 }
 
 .password-toggle {
@@ -428,7 +436,7 @@ pre {
     border: 1px solid #333;
     color: #e0e0e0;
     cursor: pointer;
-    padding: 2px;
+    padding: 6px 10px;
     font-size: 14px;
     line-height: 1;
     border-radius: 4px;
@@ -443,6 +451,8 @@ pre {
 
 .eye-icon {
     display: block;
+    width: 20px;
+    height: 20px;
 }
 
 /* Admin page styles */

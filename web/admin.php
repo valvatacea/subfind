@@ -49,7 +49,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="style.css?v=23">
+    <link rel="stylesheet" href="style.css?v=24">
 </head>
 <body>
     <div class="container">
@@ -61,12 +61,13 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <input type="text" name="user" required autofocus><br>
             </div>
             <div class="login-field password-input-wrapper">
-                <label>Password:</label><br>
-                <input type="password" name="pass" required id="admin-pass">
-                <button type="button" class="password-toggle" onclick="toggleAdminPassword()" id="admin-pass-toggle">
-                    <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                </button><br>
-            </div>
+                <label>Password:</label>
+                <div class="password-input-group">
+                    <input type="password" name="pass" required id="admin-pass">
+                    <button type="button" class="password-toggle" onclick="toggleAdminPassword()" id="admin-pass-toggle">
+                        <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
+                </div>
             <button type="submit" class="btn-login">Login</button>
         </form>
     </div>
@@ -109,7 +110,7 @@ if (isset($_POST['delete'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="style.css?v=23">
+    <link rel="stylesheet" href="style.css?v=24">
 </head>
 <body>
     <div class="container">
