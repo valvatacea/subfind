@@ -77,10 +77,11 @@ if ($poll || isset($_GET['scan_id'])) {
             $jsonData = json_decode(file_get_contents($jsonFile), true);
         }
 
-        // Bersihkan baris progres mentah dari output akhir (agar tidak muncul sebagai teks)
+        // Bersihkan baris progres mentah dan header/footer CLI dari output akhir
         $cleanOutput = preg_split('/\r|\n/', $output);
         $cleanOutput = array_filter($cleanOutput, function($line) {
-            return !preg_match('/[█░]|\d+%|Elapsed|ETA/', trim($line));
+            $t = trim($line);
+            return !preg_match('/[█░]|\d+%|Elapsed|ETA/', $t) && !preg_match('/^═══/', $t);
         });
         $output = implode("\n", $cleanOutput);
 
