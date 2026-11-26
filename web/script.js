@@ -251,7 +251,7 @@ function renderTablePage(container, page) {
     const chunk = rows.slice(start, start + TABLE_PER_PAGE);
 
     let html = `<h3>Hasil Scan (${total} data) — Halaman ${page}/${totalPages}</h3>`;
-    html += `<table><thead><tr>`;
+    html += `<div class="table-wrap"><table><thead><tr>`;
     columns.forEach(col => html += `<th>${escapeHtml(col)}</th>`);
     html += `</tr></thead><tbody>`;
     chunk.forEach(row => {
@@ -259,7 +259,7 @@ function renderTablePage(container, page) {
         row.forEach(cell => html += `<td>${escapeHtml(cell)}</td>`);
         html += `</tr>`;
     });
-    html += `</tbody></table>`;
+    html += `</tbody></table></div>`;
 
     // Navigasi
     html += `<div class="pagination">`;
