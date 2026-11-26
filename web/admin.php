@@ -40,11 +40,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
     <div class="container">
-        <h1>&#128270; Surfinder</h1>
+        <h1>&#127983; Surfinder</h1>
         <form method="post" style="max-width:400px;margin:20px auto;">
             <?php if ($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
             <label>Username:</label><br>
@@ -77,11 +77,11 @@ if (isset($_POST['delete'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
     <div class="container">
-        <h1>&#128270; Surfinder</h1>
+        <h1>&#127983; Surfinder</h1>
         <form method="post" style="margin-bottom:20px;">
             <button type="submit" name="logout" style="background:#f44336;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;">Logout</button>
         </form>
