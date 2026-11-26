@@ -435,8 +435,10 @@ pre {
     right: auto;
     top: auto;
     transform: none;
-    background: transparent;
-    border: none;
+    background: #0a0a0a;
+    box-sizing: border-box;
+    border: 1px solid #333;
+    border-radius: 4px;
     padding: 0;
     cursor: pointer;
     display: flex;
@@ -451,11 +453,7 @@ pre {
 
 .eye-icon {
     display: block;
-    background: #0a0a0a;
-    border: 1px solid #333;
-    border-radius: 4px;
     color: #e0e0e0;
-    box-sizing: border-box;
     margin-bottom: 12px;
     width: 25px;
     height: 25px;
