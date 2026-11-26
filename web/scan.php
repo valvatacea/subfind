@@ -151,7 +151,7 @@ $limit_arg = '';
 if ($limit !== '' && ctype_digit((string)$limit)) {
     $l = (int)$limit;
     if ($l >= 1 && $l <= 1000) {
-        $limit_arg = " --limit " . $l;
+        $limit_arg = " --limit " . $l . " --yes";
     }
 }
 
