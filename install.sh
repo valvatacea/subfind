@@ -185,6 +185,44 @@ setup_web() {
 }
 
 # -----------------------------------------------------------------------------
+# Setup kredensial admin web UI (disimpan ke .env)
+# -----------------------------------------------------------------------------
+setup_web_admin() {
+    local env_file="$INSTALL_DIR/.env"
+
+    # Nilai default saat ini dari .env jika ada
+    local cur_user cur_pass
+    cur_user=$(grep '^ADMIN_USER=' "$env_file" 2>/dev/null | cut -d= -f2- || true)
+    cur_pass=$(grep '^ADMIN_PASS=' "$env_file" 2>/dev/null | cut -d= -f2- || true)
+
+    echo ""
+    echo "============================================================="
+    echo "  Setup Admin Web UI (admin.php)"
+    echo "============================================================="
+    read -p "Username admin web [${cur_user:-admin}]: " ADMIN_USER
+    ADMIN_USER="${ADMIN_USER:-${cur_user:-admin}}"
+
+    read -s -p "Password admin web [${cur_pass:-(kosongkan untuk admin123)}]: " ADMIN_PASS
+    echo ""
+    ADMIN_PASS="${ADMIN_PASS:-${cur_pass:-admin123}}"
+
+    # Simpan/update ke .env
+    if [ -f "$env_file" ] && grep -q '^ADMIN_USER=' "$env_file"; then
+        sed -i "s/^ADMIN_USER=.*/ADMIN_USER=$ADMIN_USER/" "$env_file"
+    else
+        echo "ADMIN_USER=$ADMIN_USER" >> "$env_file"
+    fi
+
+    if [ -f "$env_file" ] && grep -q '^ADMIN_PASS=' "$env_file"; then
+        sed -i "s/^ADMIN_PASS=.*/ADMIN_PASS=$ADMIN_PASS/" "$env_file"
+    else
+        echo "ADMIN_PASS=$ADMIN_PASS" >> "$env_file"
+    fi
+
+    log_ok "Kredensial admin disimpan ke $env_file"
+}
+
+# -----------------------------------------------------------------------------
 # Cek PATH
 # -----------------------------------------------------------------------------
 check_path() {
@@ -268,6 +306,7 @@ main() {
     create_symlinks
     setup_bot
     setup_web
+    setup_web_admin
     check_path
     verify
 

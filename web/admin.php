@@ -5,12 +5,21 @@
 // ============================================================
 session_start();
 
-// Konfigurasi admin (GANTI username/password di bawah ini)
-define('ADMIN_USER', 'admin');
-define('ADMIN_PASS', 'admin123');
+// Konfigurasi admin (dibaca dari .env di bawah ini)
 
 $BASE_DIR = dirname(__FILE__);
 $OUT_DIR = $BASE_DIR . '/output';
+
+// Muat kredensial dari .env (satu level di atas web/)
+$env_file = $BASE_DIR . '/../.env';
+if (is_file($env_file)) {
+    $env = parse_ini_file($env_file, false, INI_SCANNER_TRIM);
+    define('ADMIN_USER', $env['ADMIN_USER'] ?? 'admin');
+    define('ADMIN_PASS', $env['ADMIN_PASS'] ?? 'admin123');
+} else {
+    define('ADMIN_USER', 'admin');
+    define('ADMIN_PASS', 'admin123');
+}
 
 // Logout via POST (tanpa link)
 if (isset($_POST['logout'])) {
