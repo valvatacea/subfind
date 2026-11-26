@@ -420,7 +420,7 @@ pre {
 .password-input-wrapper {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .password-toggle {
@@ -428,7 +428,7 @@ pre {
     border: 1px solid #333;
     color: #e0e0e0;
     cursor: pointer;
-    padding: 4px 8px;
+    padding: 2px;
     font-size: 14px;
     line-height: 1;
     border-radius: 4px;
@@ -439,6 +439,10 @@ pre {
 
 .password-toggle:hover {
     background: #333;
+}
+
+.eye-icon {
+    display: block;
 }
 
 /* Admin page styles */

@@ -49,7 +49,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="style.css?v=22">
+    <link rel="stylesheet" href="style.css?v=23">
 </head>
 <body>
     <div class="container">
@@ -63,21 +63,26 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             <div class="login-field password-input-wrapper">
                 <label>Password:</label><br>
                 <input type="password" name="pass" required id="admin-pass">
-                <button type="button" class="password-toggle" onclick="toggleAdminPassword()" id="admin-pass-toggle">👁️</button><br>
-                <button type="submit" class="btn-login">Login</button>
+                <button type="button" class="password-toggle" onclick="toggleAdminPassword()" id="admin-pass-toggle">
+                    <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                </button><br>
             </div>
+            <button type="submit" class="btn-login">Login</button>
         </form>
     </div>
     <script>
+        const eyeOpen = '<svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+        const eyeClosed = '<svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 18.34A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.39 9.39a4.86 4.86 0 0 1 0-6.84 4.86 4.86 0 0 1 6.84 0 4.86 4.86 0 0 1 0 6.84z"><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
+
         function toggleAdminPassword() {
             const input = document.getElementById('admin-pass');
             const btn = document.getElementById('admin-pass-toggle');
             if (input.type === 'password') {
                 input.type = 'text';
-                btn.textContent = '🙈';
+                btn.innerHTML = eyeClosed;
             } else {
                 input.type = 'password';
-                btn.textContent = '👁️';
+                btn.innerHTML = eyeOpen;
             }
         }
     </script>
@@ -104,7 +109,7 @@ if (isset($_POST['delete'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="style.css?v=22">
+    <link rel="stylesheet" href="style.css?v=23">
 </head>
 <body>
     <div class="container">
