@@ -57,12 +57,12 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         <form method="post" class="admin-form">
             <?php if ($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
             <div class="login-field">
-                <label>Username:</label>
+                <label>Username:</label><br>
                 <input type="text" name="user" required autofocus>
             </div>
             <br>
             <div class="login-field">
-                <label>Password:</label>
+                <label>Password:</label><br>
                 <div class="password-input-wrapper">
                     <input type="password" name="pass" required id="admin-pass">
                     <button type="button" class="password-toggle" onclick="toggleAdminPassword()" id="admin-pass-toggle">
