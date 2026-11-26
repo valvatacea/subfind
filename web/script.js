@@ -41,9 +41,15 @@ let currentCdnTarget = null;
 
 function selectCdnTarget(target) {
     currentCdnTarget = target;
+    const form = document.getElementById('form-cdnscan');
     const targetInput = document.querySelector('#form-cdnscan input[name="target"]');
     if (targetInput) {
         targetInput.value = target;
+        targetInput.readOnly = true;
+    }
+    const scanBtn = form ? form.querySelector('button[type="submit"]') : null;
+    if (scanBtn) {
+        scanBtn.textContent = 'Scan (target terpilih)';
     }
     const picker = document.getElementById('cdnscan-limit-picker');
     if (!picker) return;
@@ -54,21 +60,44 @@ function selectCdnTarget(target) {
             <button type="button" class="limit-btn" onclick="setCdnLimit(500)">500</button>
             <button type="button" class="limit-btn" onclick="setCdnLimit(1000)">1000</button>
             <button type="button" class="limit-btn" onclick="showCustomLimit('${escapeHtml(target)}')">Custom</button>
-            <button type="button" class="limit-btn" onclick="document.getElementById('cdnscan-limit-picker').innerHTML=''">Batal</button>
+            <button type="button" class="limit-btn" onclick="unlockCdnForm()">Batal</button>
         </div>
     `;
 }
 
+function unlockCdnForm() {
+    const form = document.getElementById('form-cdnscan');
+    if (form) {
+        const targetInput = form.querySelector('input[name="target"]');
+        if (targetInput) {
+            targetInput.readOnly = false;
+            targetInput.value = '';
+        }
+        const scanBtn = form.querySelector('button[type="submit"]');
+        if (scanBtn) {
+            scanBtn.textContent = 'Scan';
+        }
+        const limitInput = form.querySelector('input[name="limit"]');
+        if (limitInput) {
+            limitInput.value = '';
+        }
+    }
+    currentCdnTarget = null;
+    const picker = document.getElementById('cdnscan-limit-picker');
+    if (picker) {
+        picker.innerHTML = '';
+    }
+}
+
 function showCustomLimit(target) {
     const picker = document.getElementById('cdnscan-limit-picker');
-    if (!picker) return;
     picker.innerHTML = `
         <div class="limit-picker">
             <b>Target:</b> ${escapeHtml(target)}<br>
             <label>Limit (1-1000):</label>
             <input type="number" id="cdnscan-custom-limit" min="1" max="1000" value="500" style="width:80px;">
             <button type="button" class="limit-btn" onclick="setCustomLimit()">Set</button>
-            <button type="button" class="limit-btn" onclick="document.getElementById('cdnscan-limit-picker').innerHTML=''">Batal</button>
+            <button type="button" class="limit-btn" onclick="unlockCdnForm()">Batal</button>
         </div>
     `;
 }
@@ -80,7 +109,7 @@ function setCdnLimit(limit) {
     }
     const picker = document.getElementById('cdnscan-limit-picker');
     if (picker) {
-        picker.innerHTML = `<div class="limit-picker" style="color:#4CAF50;"><b>Target disetel.</b><br>Target: <b>${escapeHtml(currentCdnTarget || target)}</b><br>Limit IP: <b>${limit}</b><br>Klik tombol <b>Scan</b> di bawah untuk memulai.<br><button type="button" class="limit-btn" onclick="selectCdnTarget('${escapeHtml(currentCdnTarget || target)}')">Ubah limit</button></div>`;
+        picker.innerHTML = `<div class="limit-picker" style="color:#4CAF50;"><b>Target disetel.</b><br>Target: <b>${escapeHtml(currentCdnTarget || target)}</b><br>Limit IP: <b>${limit}</b><br><button type="button" class="limit-btn" onclick="selectCdnTarget('${escapeHtml(currentCdnTarget || target)}')">Ubah limit</button> <button type="button" class="limit-btn" onclick="unlockCdnForm()">Batal</button></div>`;
     }
 }
 
@@ -96,7 +125,7 @@ function setCustomLimit() {
     hidden.value = v;
     const picker = document.getElementById('cdnscan-limit-picker');
     if (picker) {
-        picker.innerHTML = `<div class="limit-picker" style="color:#4CAF50;"><b>Target disetel.</b><br>Target: <b>${escapeHtml(currentCdnTarget || target)}</b><br>Limit IP: <b>${v}</b><br>Klik tombol <b>Scan</b> di bawah untuk memulai.<br><button type="button" class="limit-btn" onclick="selectCdnTarget('${escapeHtml(currentCdnTarget || target)}')">Ubah limit</button></div>`;
+        picker.innerHTML = `<div class="limit-picker" style="color:#4CAF50;"><b>Target disetel.</b><br>Target: <b>${escapeHtml(currentCdnTarget)}</b><br>Limit IP: <b>${v}</b><br><button type="button" class="limit-btn" onclick="selectCdnTarget('${escapeHtml(currentCdnTarget)}')">Ubah limit</button> <button type="button" class="limit-btn" onclick="unlockCdnForm()">Batal</button></div>`;
     }
 }
 
@@ -105,9 +134,17 @@ function setScanningState(scanning) {
     selectors.forEach(sel => {
         document.querySelectorAll(sel).forEach(el => { el.disabled = scanning; });
     });
-    // juga tombol provider-select
     const ps = document.querySelector('.provider-select');
     if (ps) ps.disabled = scanning;
+    if (!scanning) {
+        const form = document.getElementById('form-cdnscan');
+        if (form) {
+            const targetInput = form.querySelector('input[name="target"]');
+            if (targetInput) targetInput.readOnly = false;
+            const scanBtn = form.querySelector('button[type="submit"]');
+            if (scanBtn) scanBtn.textContent = 'Scan';
+        }
+    }
 }
 
 async function handleScan(event, action, targetOverride = null, limitOverride = null) {
@@ -232,6 +269,12 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
                 btn.disabled = false;
                 btn.textContent = originalText;
                 setScanningState(false);
+                // Buka kunci form target setelah scan selesai
+                const form = document.getElementById('form-cdnscan');
+                if (form) {
+                    const targetInput = form.querySelector('input[name="target"]');
+                    if (targetInput) targetInput.readOnly = false;
+                }
 
                 // Hapus spinner dan progress bar sebelum menampilkan hasil (seluruh action, termasuk d2ip)
                 resultArea.querySelectorAll('.spinner, .progress-bar, .progress-wrap, .scanning').forEach(el => el.remove());
