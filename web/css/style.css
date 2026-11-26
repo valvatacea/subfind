@@ -428,6 +428,8 @@ pre {
     min-width: 0;
     padding-right: 12px;
     box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
 }
 
 .password-toggle {
@@ -440,8 +442,6 @@ pre {
     padding: 0;
     cursor: pointer;
     display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .password-toggle:hover {
