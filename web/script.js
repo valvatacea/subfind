@@ -289,9 +289,10 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
                         resultArea.insertAdjacentHTML('afterbegin', '<br><br>');
                     }
                 } else {
+                    // Tidak ada tabel: tampilkan output mentah penuh (d2ip, rdns, dst.)
                     resultArea.innerHTML = '<br><br>';
                     if (pollData.output) {
-                        resultArea.innerHTML += `<h3>Hasil:</h3><pre>${escapeHtml(pollData.output)}</pre>`;
+                        resultArea.innerHTML += `<h3>Hasil:</h3><pre>${escapeHtml(cleanCliOutput(pollData.output))}</pre>`;
                     }
                 }
             }
@@ -430,4 +431,17 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = String(text);
     return div.innerHTML;
+}
+
+// Bersihkan baris progres mentah dan header/footer CLI dari output akhir (lapisan frontend)
+function cleanCliOutput(text) {
+    if (!text) return text;
+    return text.split('\n').filter(line => {
+        const t = line.trim();
+        if (t === '') return true;
+        if (/[█░]|\d+%|Elapsed|ETA/.test(t)) return false;
+        if (/═══|-{5,}/.test(t)) return false;
+        if (/^Scanning:/.test(t)) return false;
+        return true;
+    }).join('\n').trim();
 }
