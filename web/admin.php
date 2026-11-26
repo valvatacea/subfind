@@ -40,19 +40,18 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="style.css?v=18">
+    <link rel="stylesheet" href="style.css?v=19">
 </head>
 <body>
     <div class="container">
         <h1>&#127983; Surfinder</h1>
         <form method="post" style="max-width:400px;margin:20px auto;">
             <?php if ($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
-            <label>Username:</label><br>
-            <div style="margin-bottom:10px;">
+            <div class="login-field" style="margin-bottom:10px;">
                 <label style="margin:0;padding:0;">Username:</label><br>
                 <input type="text" name="user" required autofocus style="width:100%;padding:10px;background:#0a0a0a;border:1px solid #333;border-radius:4px;color:#e0e0e0;font-size:14px;margin:0;padding:0;"><br>
             </div>
-            <div style="margin-bottom:10px;">
+            <div class="login-field" style="margin-bottom:10px;">
                 <label style="margin:0;padding:0;">Password:</label><br>
                 <input type="password" name="pass" required style="width:100%;padding:10px;background:#0a0a0a;border:1px solid #333;border-radius:4px;color:#e0e0e0;font-size:14px;margin:0;padding:0;"><br>
                 <button type="submit" style="background:#4CAF50;color:white;border:none;padding:10px 24px;border-radius:4px;cursor:pointer;font-size:14px;font-weight:600;width:100%;margin-top:10px;">Login</button>
@@ -82,7 +81,7 @@ if (isset($_POST['delete'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="style.css?v=18">
+    <link rel="stylesheet" href="style.css?v=19">
 </head>
 <body>
     <div class="container">
