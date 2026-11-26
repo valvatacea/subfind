@@ -72,4 +72,3 @@ if shutil.which("nslookup"):
                 print(parts[1])
 
 print("")
-print("Selesai.")
