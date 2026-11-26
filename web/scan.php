@@ -177,7 +177,7 @@ if ($action === 'd2ip') {
         'sniscan' => 'sniscan.py',
         'rdns' => 'rdns.py',
     ];
-    $script = "$PYTHON " . $script_map[$action] . " $target_escaped" . ($action === 'cdnscan' ? $limit_arg : '');
+    $script = "$PYTHON -u " . $script_map[$action] . " $target_escaped" . ($action === 'cdnscan' ? $limit_arg . ' --yes' : '');
 }
 
 // ID unik untuk scan ini (untuk file progress & pid)
