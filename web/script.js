@@ -1,6 +1,12 @@
 // script.js - AJAX logic untuk scan seamless (background + polling)
 
+let isScanning = false;
+
 function showTab(tabName, btn) {
+    if (isScanning) {
+        alert('Scan sedang berjalan. Tunggu hingga selesai sebelum pindah menu.');
+        return;
+    }
     // Sembunyikan semua panel
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
@@ -123,6 +129,7 @@ function setCustomLimit() {
 }
 
 function setScanningState(scanning) {
+    isScanning = scanning;
     const selectors = ['.range-btn', '.limit-btn', '#form-cdnscan button[type="submit"]', '#form-cdnscan input'];
     selectors.forEach(sel => {
         document.querySelectorAll(sel).forEach(el => { el.disabled = scanning; });
