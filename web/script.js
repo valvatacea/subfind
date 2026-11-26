@@ -407,16 +407,31 @@ function renderJsonResults(container, jsonData, action) {
         return;
     }
 
-    // Urutkan tabel berdasarkan kolom Status (kode HTTP terendah dulu: 200, 300, 400...)
+    // Urutkan tabel: Status (terendah dulu) → Memiliki Port → Memiliki CDN
     const statusCol = action === 'sniscan' ? 7 : 3;
+    const portCol = action === 'cdnscan' ? 1 : (action === 'sniscan' ? 4 : 2);
+    const cdnCol = action === 'cdnscan' ? 2 : (action === 'sniscan' ? 8 : 4);
+    const extraPortsCol = action === 'sniscan' ? 5 : -1;
     const toNum = (v) => {
         const n = parseInt(String(v || '-'), 10);
         return isNaN(n) ? Infinity : n;
     };
+    const hasPort = (r) => {
+        const p1 = String(r[portCol] || '-').trim();
+        const p2 = extraPortsCol >= 0 ? String(r[extraPortsCol] || '-').trim() : '-';
+        return p1 !== '-' || p2 !== '-';
+    };
+    const hasCdn = (r) => String(r[cdnCol] || '-').trim() !== '-';
     rows.sort((a, b) => {
         const na = toNum(a[statusCol]);
         const nb = toNum(b[statusCol]);
         if (na !== nb) return na - nb;
+        const pa = hasPort(a) ? 1 : 0;
+        const pb = hasPort(b) ? 1 : 0;
+        if (pa !== pb) return pb - pa;
+        const ca = hasCdn(a) ? 1 : 0;
+        const cb = hasCdn(b) ? 1 : 0;
+        if (ca !== cb) return cb - ca;
         return String(a[statusCol] || '-').localeCompare(String(b[statusCol] || '-'));
     });
 
