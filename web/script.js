@@ -199,6 +199,7 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
                 clearInterval(pollInterval);
                 btn.disabled = false;
                 btn.textContent = originalText;
+                setScanningState(false);
 
                 // Hapus spinner dan progress bar sebelum menampilkan hasil (seluruh action, termasuk d2ip)
                 resultArea.querySelectorAll('.spinner, .progress-bar, .progress-wrap, .scanning').forEach(el => el.remove());
@@ -226,6 +227,7 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
         showError(resultArea, 'Terjadi kesalahan jaringan: ' + err.message);
         btn.disabled = false;
         btn.textContent = originalText;
+        setScanningState(false);
     }
 }
 
