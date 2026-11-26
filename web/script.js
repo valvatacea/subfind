@@ -134,8 +134,6 @@ function setScanningState(scanning) {
         if (form) {
             const targetInput = form.querySelector('input[name="target"]');
             if (targetInput) targetInput.readOnly = false;
-            const scanBtn = form.querySelector('button[type="submit"]');
-            if (scanBtn) scanBtn.textContent = 'Scan';
         }
     }
 }
