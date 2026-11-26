@@ -450,6 +450,7 @@ pre {
 
 .eye-icon {
     display: block;
+    color: #bbb;
     width: 40px;
     height: 40px;
 }
