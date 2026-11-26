@@ -19,15 +19,15 @@ h1 {
 }
 
 .tabs {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 25px;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    margin-bottom: 25px !important;
 }
 
 .tab-row {
-    display: flex;
-    gap: 8px;
+    display: flex !important;
+    gap: 8px !important;
 }
 
 .tab {
@@ -39,9 +39,9 @@ h1 {
     cursor: pointer;
     font-size: 14px;
     transition: all 0.2s;
-    flex: 1;
-    min-width: 0;
-    text-align: center;
+    flex: 1 !important;
+    min-width: 0 !important;
+    text-align: center !important;
 }
 
 .tab:hover {
