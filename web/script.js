@@ -135,6 +135,8 @@ function setScanningState(scanning) {
             const targetInput = form.querySelector('input[name="target"]');
             if (targetInput) targetInput.readOnly = false;
         }
+        const picker = document.getElementById('cdnscan-limit-picker');
+        if (picker) picker.innerHTML = '';
     }
 }
 
@@ -158,6 +160,12 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
     }
 
     setScanningState(true);
+
+    // Hilangkan konfirmasi limit (tombol Ubah limit) setelah scan dimulai
+    if (action === 'cdnscan') {
+        const picker = document.getElementById('cdnscan-limit-picker');
+        if (picker) picker.innerHTML = '';
+    }
 
     const resultArea = document.getElementById('result-' + action);
     resultArea.innerHTML = '';
