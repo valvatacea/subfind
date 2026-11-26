@@ -419,7 +419,7 @@ pre {
 /* Admin password toggle */
 .password-input-wrapper {
     display: flex;
-    align-items: center !important;
+    align-items: center;
     gap: 8px;
 }
 
