@@ -88,6 +88,7 @@ if ($poll || isset($_GET['scan_id'])) {
     } elseif ($running) {
         // Ekstrak teks progres terakhir dari output (CLI pakai \r untuk baris progres)
         $progress_text = '';
+        $progress_percent = null;
         if (file_exists($outFile)) {
             $raw = file_get_contents($outFile);
             $parts = preg_split('/\r|\n/', $raw);
@@ -102,13 +103,18 @@ if ($poll || isset($_GET['scan_id'])) {
                     }
                 }
                 $progress_text = $last;
+                // Ambil angka persen untuk dikirim ke frontend sebagai nilai progres numerik
+                if (preg_match('/(\d+)\s*%/', $last, $m)) {
+                    $progress_percent = (int)$m[1];
+                }
             }
         }
         echo json_encode([
             'success' => true,
             'status' => 'running',
             'pid' => $pid,
-            'progress_text' => $progress_text
+            'progress_text' => $progress_text,
+            'progress_percent' => $progress_percent
         ]);
         exit;
     } elseif (file_exists($outFile)) {

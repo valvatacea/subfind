@@ -163,7 +163,14 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
 
             if (pollData.status === 'running') {
                 const pb = document.querySelector('#result-' + action + ' .progress-bar');
-                if (pollData.progress_text) {
+                if (pollData.progress_percent !== null && pollData.progress_percent !== undefined) {
+                    // Gunakan persen numerik dari CLI sebagai acuan progress bar (deterministik)
+                    const pct = Math.min(100, Math.max(0, parseInt(pollData.progress_percent, 10)));
+                    statusText.textContent = 'Memindai... ' + pct + '%';
+                    pb.classList.remove('indeterminate');
+                    pb.classList.add('determinate');
+                    pb.style.width = pct + '%';
+                } else if (pollData.progress_text) {
                     statusText.textContent = pollData.progress_text;
                     const m = pollData.progress_text.match(/(\d+)\s*%/);
                     if (m && pb) {
