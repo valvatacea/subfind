@@ -45,6 +45,7 @@ function selectCdnTarget(target) {
     if (targetInput) {
         targetInput.value = target;
     }
+    const picker = document.getElementById('cdnscan-limit-picker');
     if (!picker) return;
     picker.innerHTML = `
         <div class="limit-picker">
