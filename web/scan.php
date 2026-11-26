@@ -94,19 +94,22 @@ if ($poll || isset($_GET['scan_id'])) {
             $parts = preg_split('/\r|\n/', $raw);
             $parts = array_filter(array_map('trim', $parts));
             if ($parts) {
-                $last = end($parts);
-                // Ambil baris terakhir yang mengandung progres (bar/%) jika ada
+                $progress_text = '';
+                $progress_percent = null;
+                // Cari baris progres terbaru (mengandung bar/%) untuk ditampilkan sebagai teks
                 foreach (array_reverse($parts) as $pp) {
                     if (preg_match('/[█░]|\d+%|Elapsed|ETA/', $pp)) {
-                        $last = $pp;
+                        $progress_text = $pp;
                         break;
                     }
                 }
-                $progress_text = $last;
-                // Ambil persen TERAKHIR (terbaru) dari output, bukan pertama.
-                // Output CLI dicetak dengan print(end="") tanpa newline, jadi satu baris panjang.
-                if (preg_match_all('/(\d+)\s*%/', $last, $matches)) {
-                    $progress_percent = (int)end($matches[1]);
+                // Ambil persen TERAKHIR (terbaru) dari SEMUA baris output, bukan hanya satu baris.
+                // Beberapa skrip (subfind/sniscan) cetak progres dengan \r di awal setiap baris,
+                // sehingga setelah split setiap progres jadi elemen terpisah; cdnscan cetak tanpa pemisah.
+                foreach ($parts as $pp) {
+                    if (preg_match_all('/(\d+)\s*%/', $pp, $m)) {
+                        $progress_percent = (int)end($m[1]);
+                    }
                 }
             }
         }
