@@ -1,19 +1,19 @@
 <?php
 // ============================================================
 // ADMIN HALAMAN - Khusus Administrator
-// Ubah username/password di bawah ini sesuai keinginanmu.
+// Tanpa link ke halaman lain, akses hanya lewat URL langsung.
 // ============================================================
 session_start();
 
-// Konfigurasi admin (GANTI INI)
+// Konfigurasi admin (GANTI username/password di bawah ini)
 define('ADMIN_USER', 'admin');
 define('ADMIN_PASS', 'admin123');
 
 $BASE_DIR = dirname(__FILE__);
 $OUT_DIR = $BASE_DIR . '/output';
 
-// Logout
-if (isset($_GET['logout'])) {
+// Logout via POST (tanpa link)
+if (isset($_POST['logout'])) {
     session_destroy();
     header('Location: admin.php');
     exit;
@@ -21,7 +21,7 @@ if (isset($_GET['logout'])) {
 
 // Login
 $error = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['logout'])) {
     if ($_POST['user'] === ADMIN_USER && $_POST['pass'] === ADMIN_PASS) {
         $_SESSION['admin_logged_in'] = true;
         header('Location: admin.php');
@@ -35,25 +35,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     ?>
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login Admin — Surfinder</title>
+    <title>Surfinder</title>
     <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
     <div class="container">
-        <h2>🔐 Login Admin</h2>
-        <?php if ($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
-        <form method="post">
+        <h1>&#128270; Surfinder</h1>
+        <form method="post" style="max-width:400px;margin:20px auto;">
+            <?php if ($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
             <label>Username:</label><br>
-            <input type="text" name="user" required autofocus><br>
+            <input type="text" name="user" required autofocus style="width:100%;padding:10px;background:#0a0a0a;border:1px solid #333;border-radius:4px;color:#e0e0e0;font-size:14px;margin-bottom:12px;"><br>
             <label>Password:</label><br>
-            <input type="password" name="pass" required><br><br>
-            <button type="submit">Login</button>
+            <input type="password" name="pass" required style="width:100%;padding:10px;background:#0a0a0a;border:1px solid #333;border-radius:4px;color:#e0e0e0;font-size:14px;margin-bottom:12px;"><br>
+            <button type="submit" style="background:#4CAF50;color:white;border:none;padding:10px 24px;border-radius:4px;cursor:pointer;font-size:14px;font-weight:600;width:100%;">Login</button>
         </form>
-        <p style="margin-top:15px;"><a href="index.php">← Kembali ke Beranda</a></p>
     </div>
 </body>
 </html>
@@ -61,9 +60,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
-// Hapus file output (opsional)
-if (isset($_GET['delete'])) {
-    $f = basename($_GET['delete']);
+// Hapus file output (hanya via POST, tanpa link)
+if (isset($_POST['delete'])) {
+    $f = basename($_POST['delete']);
     $path = $OUT_DIR . '/' . $f;
     if (file_exists($path) && is_file($path)) {
         unlink($path);
@@ -73,19 +72,21 @@ if (isset($_GET['delete'])) {
 }
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin — Surfinder</title>
+    <title>Surfinder</title>
     <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
     <div class="container">
-        <h2>🛠️ Admin Dashboard</h2>
-        <p><a href="admin.php?logout=1" style="background:#f44336;color:#fff;padding:6px 12px;border-radius:4px;text-decoration:none;">Logout</a> | <a href="index.php" style="margin-left:10px;">Kembali ke Beranda</a></p>
+        <h1>&#128270; Surfinder</h1>
+        <form method="post" style="margin-bottom:20px;">
+            <button type="submit" name="logout" style="background:#f44336;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;">Logout</button>
+        </form>
 
-        <h3>Status Sistem</h3>
+        <h3>🛠️ Admin Dashboard</h3>
         <p>Waktu server: <?= date('Y-m-d H:i:s') ?></p>
         <p>PHP Version: <?= phpversion() ?></p>
 
@@ -114,13 +115,13 @@ if (isset($_GET['delete'])) {
                 echo '<td>' . htmlspecialchars($f) . '</td>';
                 echo '<td>' . number_format($size) . ' bytes</td>';
                 echo '<td>' . htmlspecialchars($mtime) . '</td>';
-                echo '<td><a href="admin.php?delete=' . urlencode($f) . '" onclick="return confirm(\'Hapus ' . htmlspecialchars($f, ENT_QUOTES) . '?\')" style="color:#f44336;">Hapus</a></td>';
+                echo '<td><button type="submit" form="del-' . urlencode($f) . '" style="color:#f44336;border:none;background:transparent;cursor:pointer;">Hapus</button></td>';
                 echo '</tr>';
+                echo '<form id="del-' . urlencode($f) . '" method="post" style="display:none;"><input type="hidden" name="delete" value="' . htmlspecialchars($f) . '"></form>';
             }
             echo '</table>';
         }
         ?>
-        <p style="margin-top:20px;"><a href="index.php">← Kembali ke Beranda</a></p>
     </div>
 </body>
 </html>
