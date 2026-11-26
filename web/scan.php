@@ -81,10 +81,14 @@ if ($poll || isset($_GET['scan_id'])) {
         $cleanOutput = preg_split('/\r|\n/', $output);
         $cleanOutput = array_filter($cleanOutput, function($line) {
             $t = trim($line);
-            return !preg_match('/[█░]|\d+%|Elapsed|ETA/', $t)
-                && !preg_match('/^═══/', $t)
-                && !preg_match('/═══ SNISCAN/', $t)
-                && !preg_match('/^Scanning:/', $t);
+            if ($t === '') return true;
+            // Buang baris progres CLI
+            if (preg_match('/[█░]|\d+%|Elapsed|ETA/', $t)) return false;
+            // Buang header/footer CLI (═══, ---, dll)
+            if (preg_match('/═══|-{5,}/', $t)) return false;
+            // Buang header subfind
+            if (preg_match('/^Scanning:/', $t)) return false;
+            return true;
         });
         $output = implode("\n", $cleanOutput);
 
