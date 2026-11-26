@@ -229,13 +229,14 @@ pre {
 
 .status-selesai {
     display: inline-block;
-    background: #4CAF50;
-    color: #fff;
+    border: 2px solid #4CAF50;
+    color: #4CAF50;
     font-weight: 600;
     font-size: 13px;
     padding: 4px 10px;
     border-radius: 4px;
     margin-right: 6px;
+    background: transparent;
 }
 .status-error {
     background: #f44336;
