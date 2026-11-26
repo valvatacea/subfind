@@ -103,9 +103,10 @@ if ($poll || isset($_GET['scan_id'])) {
                     }
                 }
                 $progress_text = $last;
-                // Ambil angka persen untuk dikirim ke frontend sebagai nilai progres numerik
-                if (preg_match('/(\d+)\s*%/', $last, $m)) {
-                    $progress_percent = (int)$m[1];
+                // Ambil persen TERAKHIR (terbaru) dari output, bukan pertama.
+                // Output CLI dicetak dengan print(end="") tanpa newline, jadi satu baris panjang.
+                if (preg_match_all('/(\d+)\s*%/', $last, $matches)) {
+                    $progress_percent = (int)end($matches[1]);
                 }
             }
         }
