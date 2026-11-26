@@ -4,15 +4,6 @@ import socket
 import sys
 import os
 import json
-import time
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from common.progress import build_progress_text
-
-SPINNER = ['⠋', '⠙', '⠹', '⠼', '⠴', '⠦', '⠧', '⠏']
-spinner_idx = [0]
-start_time = time.time()
 
 
 def validate_ip(ip):
@@ -66,17 +57,6 @@ def main():
         print("Usage: python3 rdns.py <ip>")
         sys.exit(1)
     ip = sys.argv[1].strip()
-
-    # Progress 0% sebelum lookup
-    spinner_idx[0] += 1
-    line = build_progress_text(
-        spinner_idx[0], "IP2D", ip, 0, 1, start_time,
-        filled_char="█", empty_char="░", width=10,
-        label_prefix="Scanning", target_suffix="", count_template="[{current}/{total}]", show_target=True,
-    )
-    print(f"\r{line}", end="")
-    sys.stdout.flush()
-
     names, err = reverse_lookup(ip)
     base_dir = os.path.dirname(os.path.abspath(__file__))
     out_dir = os.path.join(base_dir, "output")
@@ -84,17 +64,6 @@ def main():
     safe = ip.replace(":", "_")
     jname = os.path.join(out_dir, f"rdns_{safe}.json")
     tname = os.path.join(out_dir, f"rdns_{safe}.txt")
-
-    # Progress 100% setelah lookup selesai
-    spinner_idx[0] += 1
-    line = build_progress_text(
-        spinner_idx[0], "IP2D", ip, 1, 1, start_time,
-        filled_char="█", empty_char="░", width=10,
-        label_prefix="Scanning", target_suffix="", count_template="[{current}/{total}]", show_target=True,
-    )
-    print(f"\r{line}")
-    print()
-
     if err:
         print(f"Error: {err}")
         print()
