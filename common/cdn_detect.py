@@ -71,6 +71,21 @@ CDN_HEADER_SIGNATURES = [
     (('x-cache',), 'leaseweb'),
 ]
 
+# Kata kunci organisasi ASN yang menunjukkan CDN (untuk deteksi via RDAP)
+CDN_ASN_KEYWORDS = [
+    'CLOUDFLARE', 'AMAZON', 'AKAMAI', 'FASTLY', 'GOOGLE', 'AZURE',
+    'BUNNY', 'KEYCDN', 'STACKPATH', 'SUCURI', 'IMPERVA', 'INCAPSULA',
+    'EDGCAST', 'VERIZON', 'MAXCDN', 'LEASEWEB', 'G-CORE', 'CDN77',
+    'ARVAN', 'HIGHWINDS', 'LIMELIGHT'
+]
+
+# Sufiks nama host CNAME yang menunjukkan CDN
+CDN_CNAME_SUFFIXES = [
+    '.cloudflare.net', '.cloudfront.net', '.akamaiedge.net',
+    '.azureedge.net', '.fastly.net', '.edgekey.net', '.edgesuite.net',
+    '.sucuri.net', '.incapdns.net', '.bunnycdn.com'
+]
+
 
 def check_internet(timeout=5):
     """Cek apakah ada koneksi internet dengan mencoba menghubungi 1.1.1.1:53."""
@@ -184,6 +199,53 @@ def ip_in_ranges(ip, ranges):
     return False
 
 
+def get_asn_via_rdap(ip):
+    """Cek ASN/IP registry via RDAP untuk deteksi CDN berdasarkan organisasi."""
+    try:
+        url = f"https://rdap.org/ip/{ip}"
+        response = curl_requests.get(url, headers=HEADERS_WITHOUT_COMPRESSION, timeout=10, impersonate="chrome152")
+        if response.status_code != 200:
+            return None
+        data = response.json()
+        text = json.dumps(data).upper()
+        for kw in CDN_ASN_KEYWORDS:
+            if kw in text:
+                return kw.title()
+    except Exception:
+        pass
+    return None
+
+
+def check_dns_cname(domain):
+    """Cek apakah domain punya CNAME yang menuju infrastruktur CDN."""
+    if not domain:
+        return None
+    try:
+        name, aliaslist, ipaddrlist = socket.gethostbyname_ex(domain)
+        all_names = [name] + list(aliaslist or [])
+        for alias in all_names:
+            alias_lower = alias.lower()
+            for suffix in CDN_CNAME_SUFFIXES:
+                if alias_lower.endswith(suffix):
+                    # Mapping suffix ke nama CDN yang mudah dibaca
+                    mapping = {
+                        '.cloudflare.net': 'Cloudflare',
+                        '.cloudfront.net': 'CloudFront',
+                        '.akamaiedge.net': 'Akamai',
+                        '.azureedge.net': 'Azure CDN',
+                        '.fastly.net': 'Fastly',
+                        '.edgekey.net': 'Akamai',
+                        '.edgesuite.net': 'Akamai',
+                        '.sucuri.net': 'Sucuri',
+                        '.incapdns.net': 'Imperva',
+                        '.bunnycdn.com': 'BunnyCDN',
+                    }
+                    return mapping.get(suffix, suffix.strip('.').title())
+    except Exception:
+        pass
+    return None
+
+
 def detect_cdn_from_headers(host, port=443, timeout=5):
     """Deteksi CDN dari header response HTTP/HTTPS."""
     for scheme in ('https', 'http'):
@@ -214,6 +276,8 @@ def detect_cdn(ip, host=None):
     """Deteksi CDN untuk IP.
     
     Tier 1: Cek IP range cache (cloudflare.json, cloudfront.json) — CIDR exact match
+    Tier 1.5: Cek ASN via RDAP (rdap.org/ip/{ip}) — organisasi CDN
+    Tier 1.7: Cek DNS CNAME (hanya untuk host/domain) — CNAME ke domain CDN
     Tier 2: Jika tidak cocok, cek header response HTTP (Server, cf-ray, via, x-cache)
     Tier 3: Return '-' jika tidak ditemukan
     
@@ -230,6 +294,17 @@ def detect_cdn(ip, host=None):
         if ranges and ip_in_ranges(ip, ranges):
             display = 'Cloudflare' if provider_name == 'cloudflare' else 'CloudFront'
             return f'{display} (IP range)'
+
+    # Tier 1.5: Cek ASN via RDAP
+    asn_result = get_asn_via_rdap(ip)
+    if asn_result:
+        return f'{asn_result} (ASN)'
+
+    # Tier 1.7: Cek DNS CNAME (hanya untuk host/domain)
+    if host:
+        cname_result = check_dns_cname(host)
+        if cname_result:
+            return f'{cname_result} (CNAME)'
 
     # Tier 2: Deteksi via header response
     target_host = host or ip
