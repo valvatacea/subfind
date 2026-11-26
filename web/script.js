@@ -344,10 +344,11 @@ function renderTablePage(container, page) {
     let html = `<h3>Hasil Scan (${total} data) — Halaman ${page}/${totalPages}</h3>`;
     // Filter controls (hanya untuk mode yang punya hasil terstruktur)
     if (action !== 'd2ip' && action !== 'rdns') {
-        html += `<div class="filter-bar" style="margin:8px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">`;
-        html += `<label style="font-size:12px;">Status:</label> <select id="filter-status-${action}" style="padding:4px 8px;font-size:12px;"><option value="">Semua</option></select> `;
-        html += `<label style="font-size:12px;">Port:</label> <input type="text" id="filter-port-${action}" placeholder="port" style="padding:4px 8px;font-size:12px;width:90px;"> `;
-        html += `<button type="button" onclick="applyFilter('${action}')" class="page-btn" style="padding:4px 12px;">Terapkan</button> <button type="button" onclick="clearFilter('${action}')" class="page-btn" style="padding:4px 12px;background:#666;border-color:#666;">Bersihkan</button>`;
+        html += `<div class="filter-bar">`;
+        html += `<label>Status:</label> <select id="filter-status-${action}" class="filter-input"><option value="">Semua</option></select>`;
+        html += `<label>Port:</label> <input type="text" id="filter-port-${action}" class="filter-input" placeholder="port">`;
+        html += `<button type="button" class="filter-btn" onclick="applyFilter('${action}')">Terapkan</button>`;
+        html += `<button type="button" class="filter-btn secondary" onclick="clearFilter('${action}')">Bersihkan</button>`;
         html += `</div>`;
     }
     html += `<div class="table-wrap"><table><thead><tr>`;
