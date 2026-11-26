@@ -1378,9 +1378,9 @@ def show_sniscan_history_detail(chat_id, message_id, filename, edit=True):
     show_scan_page(chat_id, message_id, edit=True, info_text=info_text, back_target=f"sniscan:history:{hist_page}")
 
 
-# ===================== D2IP (dari d2ip.sh) =====================
+# ===================== D2IP (dari d2ip.py) =====================
 def d2ip_resolve_multi(domain):
-    """Resolve domain menggunakan multiple resolver seperti d2ip.sh CLI.
+    """Resolve domain menggunakan multiple resolver seperti d2ip.py CLI.
     Return dict: {resolver: [ips]}
     """
     results = {}
@@ -1443,7 +1443,7 @@ def run_d2ip(chat_id, message_id, domain):
             lines.append(f"  <code>{esc(x)}</code>")
         lines.append("")
 
-    # Simpan ke file output (mirip d2ip.sh)
+    # Simpan ke file output (mirip d2ip.py)
     OUT_DIR = os.path.join(BASE_DIR, "output")
     os.makedirs(OUT_DIR, exist_ok=True)
     fname = f"{OUT_DIR}/{domain}.txt"

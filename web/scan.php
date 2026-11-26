@@ -163,7 +163,7 @@ if ($limit !== '' && ctype_digit((string)$limit)) {
 $target_escaped = escapeshellarg($target);
 
 if ($action === 'd2ip') {
-    $script = "bash d2ip.sh $target_escaped";
+    $script = "python3 d2ip.py $target_escaped";
 } else {
     $script_map = [
         'subfind' => 'subfind.py',

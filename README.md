@@ -32,7 +32,7 @@ Toolkit CLI dan Telegram Bot untuk pemetaan subdomain, deteksi layanan CDN, pemi
 │   ├── nsfw_blocklist_shallalist.txt  # Daftar blokir dari Shallalist (835 ribu domain)
 │   ├── http_status.py      # Utilitas pemeriksaan status HTTP
 │   └── progress.py         # Utilitas progres spinner dan ETA
-├── d2ip.sh                 # Resolver domain ke IP
+├── d2ip.py                 # Resolver domain ke IP
 ├── sniscan.py              # SNI Host Scanner + TLS Detector + Multi-Port Scan
 ├── subfind.py              # Subdomain Finder + IP + CDN
 ├── update_nsfw_blocklist.py# Skrip update daftar blokir dari Shallalist mirror
@@ -52,7 +52,7 @@ Toolkit CLI dan Telegram Bot untuk pemetaan subdomain, deteksi layanan CDN, pemi
 ```bash
 git clone https://github.com/valvatacea/subfind.git
 cd subfind
-chmod +x d2ip.sh
+chmod +x d2ip.py
 ```
 
 ## Penggunaan CLI
@@ -131,15 +131,15 @@ Fitur:
 
 **Output:** `output/sniscan_<domain>.txt` dan `.json`
 
-### 4. d2ip.sh — Resolver Domain ke IP
+### 4. d2ip.py — Resolver Domain ke IP
 
 ```bash
-./d2ip.sh <domain>
+./d2ip.py <domain>
 ```
 
 **Contoh:**
 ```bash
-./d2ip.sh example.com
+./d2ip.py example.com
 ```
 
 Mengubah nama domain menjadi alamat IP melalui socket dan multiple resolver.

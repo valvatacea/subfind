@@ -83,7 +83,7 @@ setup_dirs() {
 # Buat file skrip executable
 # -----------------------------------------------------------------------------
 make_executable() {
-    chmod +x "$INSTALL_DIR/d2ip.sh" 2>/dev/null || true
+    chmod +x "$INSTALL_DIR/d2ip.py" 2>/dev/null || true
     chmod +x "$INSTALL_DIR/cdnscan.py" 2>/dev/null || true
     chmod +x "$INSTALL_DIR/subfind.py" 2>/dev/null || true
     chmod +x "$INSTALL_DIR/sniscan.py" 2>/dev/null || true
@@ -102,7 +102,7 @@ create_symlinks() {
     local items=(
         "cdnscan.py:cdnscan"
         "subfind.py:subfind"
-        "d2ip.sh:d2ip"
+        "d2ip.py:d2ip"
         "sniscan.py:sniscan"
     )
 
@@ -196,7 +196,7 @@ check_path() {
         echo ""
         echo "Atau jalankan langsung dengan path lengkap:"
         echo "  $INSTALL_DIR/cdnscan.py 104.16.0.0/24"
-        echo "  $INSTALL_DIR/d2ip.sh example.com"
+        echo "  $INSTALL_DIR/d2ip.py example.com"
     else
         log_ok "$BIN_DIR sudah ada di PATH"
     fi
@@ -229,8 +229,8 @@ verify() {
         return 1
     fi
 
-    if bash "$INSTALL_DIR/d2ip.sh" 2>&1 | grep -qi "usage" || true; then
-        log_ok "d2ip.sh berfungsi"
+    if python3 "$INSTALL_DIR/d2ip.py" --help >/dev/null 2>&1; then
+        log_ok "d2ip.py berfungsi"
     fi
 
     # Cek modul common
