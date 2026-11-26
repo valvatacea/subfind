@@ -49,7 +49,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="style.css?v=20">
+    <link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
     <div class="container">
@@ -60,13 +60,27 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 <label>Username:</label><br>
                 <input type="text" name="user" required autofocus><br>
             </div>
-            <div class="login-field">
+            <div class="login-field password-input-wrapper">
                 <label>Password:</label><br>
-                <input type="password" name="pass" required><br>
+                <input type="password" name="pass" required id="admin-pass">
+                <button type="button" class="password-toggle" onclick="toggleAdminPassword()" id="admin-pass-toggle">👁️</button><br>
                 <button type="submit" class="btn-login">Login</button>
             </div>
         </form>
     </div>
+    <script>
+        function toggleAdminPassword() {
+            const input = document.getElementById('admin-pass');
+            const btn = document.getElementById('admin-pass-toggle');
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️';
+            }
+        }
+    </script>
 </body>
 </html>
     <?php
@@ -90,7 +104,7 @@ if (isset($_POST['delete'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="style.css?v=20">
+    <link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
     <div class="container">
