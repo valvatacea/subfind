@@ -81,7 +81,9 @@ if ($poll || isset($_GET['scan_id'])) {
         $cleanOutput = preg_split('/\r|\n/', $output);
         $cleanOutput = array_filter($cleanOutput, function($line) {
             $t = trim($line);
-            return !preg_match('/[█░]|\d+%|Elapsed|ETA/', $t) && !preg_match('/^═══/', $t);
+            return !preg_match('/[█░]|\d+%|Elapsed|ETA/', $t)
+                && !preg_match('/^═══/', $t)
+                && !preg_match('/^Scanning:/', $t);
         });
         $output = implode("\n", $cleanOutput);
 
