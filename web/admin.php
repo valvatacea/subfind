@@ -48,8 +48,8 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         <form method="post" style="max-width:400px;margin:20px auto;">
             <?php if ($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
             <label>Username:</label><br>
-            <input type="text" name="user" required autofocus style="width:100%;padding:10px;background:#0a0a0a;border:1px solid #333;border-radius:4px;color:#e0e0e0;font-size:14px;margin-bottom:14px;"><br>
-            <label style="margin-top:12px;">Password:</label><br>
+            <input type="text" name="user" required autofocus style="width:100%;padding:10px;padding-bottom:14px;background:#0a0a0a;border:1px solid #333;border-radius:4px;color:#e0e0e0;font-size:14px;"><br>
+            <label style="padding-top:12px;">Password:</label><br>
             <input type="password" name="pass" required style="width:100%;padding:10px;background:#0a0a0a;border:1px solid #333;border-radius:4px;color:#e0e0e0;font-size:14px;margin-bottom:18px;"><br>
             <button type="submit" style="background:#4CAF50;color:white;border:none;padding:10px 24px;border-radius:4px;cursor:pointer;font-size:14px;font-weight:600;width:100%;margin-top:10px;">Login</button>
         </form>
