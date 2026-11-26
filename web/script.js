@@ -203,6 +203,7 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
                 // Tampilkan hasil
                 const statusBadge = `<span class="status-badge status-completed">Selesai</span>`;
                 if (pollData.json) {
+                    resultArea.innerHTML = '';
                     // Ada tabel: tampilkan proses (badge) + tabel saja, tanpa output mentah
                     renderJsonResults(resultArea, pollData.json, action);
                     if (_tableData) {
