@@ -327,7 +327,7 @@ def main():
 
     # Output teks format opsi B: blok key-value per SNI host
     for r in results:
-        extra_str = ",".join(str(p) for p in r["extra_ports"]) if r["extra_ports"] else "-"
+        extra_str = ", ".join(str(p) for p in r["extra_ports"]) if r["extra_ports"] else "-"
         print(f"{pad_label('SNI Host', 12)}: {esc(r['sni_host'])}")
         print(f"{pad_label('Direct IP', 12)}: {esc(r['ip'])} ({r['response_time_ms']}ms)")
         print(f"{pad_label('TLS/ALPN', 12)}: {esc(r['tls_version'])} | ALPN: {esc(r['alpn'])}")
@@ -341,7 +341,7 @@ def main():
     with open(fname, 'w') as f:
         f.write(f"═══ SNISCAN (TLS HANDSHAKE & MULTI-PORT): {domain} ═══\n\n")
         for r in results:
-            extra_str = ",".join(str(p) for p in r["extra_ports"]) if r["extra_ports"] else "-"
+            extra_str = ", ".join(str(p) for p in r["extra_ports"]) if r["extra_ports"] else "-"
             f.write(f"{pad_label('SNI Host', 12)}: {r['sni_host']}\n")
             f.write(f"{pad_label('Direct IP', 12)}: {r['ip']} ({r['response_time_ms']}ms)\n")
             f.write(f"{pad_label('TLS/ALPN', 12)}: {r['tls_version']} | ALPN: {r['alpn']}\n")

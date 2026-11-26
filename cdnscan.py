@@ -118,7 +118,7 @@ def detect_cdn_and_status(ip):
 def scan_open_ports(ip, ports=SCAN_PORTS, timeout=1.5):
     """Scan port terbuka pada IP, return daftar angka port saja"""
     open_ports = scan_ports(ip, ports, timeout=timeout)
-    return ",".join(str(p) for p in open_ports) if open_ports else "-"
+    return ", ".join(str(p) for p in open_ports) if open_ports else "-"
 
 
 def format_ports(ports_str):
@@ -128,7 +128,7 @@ def format_ports(ports_str):
     ports = ports_str.split(",")
     if len(ports) <= 3:
         return ports_str
-    return f"{','.join(ports[:3])},... ({len(ports)} port)"
+    return f"{', '.join(ports[:3])}, ... ({len(ports)} port)"
 
 
 def parse_ip_range(input_str, offset=0, max_ips=None):

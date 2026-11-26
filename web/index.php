@@ -62,7 +62,7 @@
                 <div style="margin-bottom:10px;">
                     <label>Provider:</label>
                     <select id="cdnscan-provider" class="provider-select" onchange="loadCdnRanges(this.value)">
-                        <option value="">-- pilih provider --</option>
+                        <option value="">-- Pilih Provider --</option>
                         <option value="cloudflare">Cloudflare</option>
                         <option value="cloudfront">CloudFront</option>
                     </select>
