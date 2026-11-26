@@ -37,8 +37,14 @@ async function loadCdnRanges(provider) {
     }
 }
 
+let currentCdnTarget = null;
+
 function selectCdnTarget(target) {
-    const picker = document.getElementById('cdnscan-limit-picker');
+    currentCdnTarget = target;
+    const targetInput = document.querySelector('#form-cdnscan input[name="target"]');
+    if (targetInput) {
+        targetInput.value = target;
+    }
     if (!picker) return;
     picker.innerHTML = `
         <div class="limit-picker">
@@ -73,7 +79,7 @@ function setCdnLimit(limit) {
     }
     const picker = document.getElementById('cdnscan-limit-picker');
     if (picker) {
-        picker.innerHTML = `<div class="limit-picker" style="color:#4CAF50;"><b>Target disetel.</b><br>Limit IP: <b>${limit}</b><br>Klik tombol <b>Scan</b> di bawah untuk memulai.</div>`;
+        picker.innerHTML = `<div class="limit-picker" style="color:#4CAF50;"><b>Target disetel.</b><br>Target: <b>${escapeHtml(currentCdnTarget || target)}</b><br>Limit IP: <b>${limit}</b><br>Klik tombol <b>Scan</b> di bawah untuk memulai.<br><button type="button" class="limit-btn" onclick="selectCdnTarget('${escapeHtml(currentCdnTarget || target)}')">Ubah limit</button></div>`;
     }
 }
 
@@ -89,7 +95,7 @@ function setCustomLimit() {
     hidden.value = v;
     const picker = document.getElementById('cdnscan-limit-picker');
     if (picker) {
-        picker.innerHTML = `<div class="limit-picker" style="color:#4CAF50;"><b>Target disetel.</b><br>Limit IP: <b>${v}</b><br>Klik tombol <b>Scan</b> di bawah untuk memulai.</div>`;
+        picker.innerHTML = `<div class="limit-picker" style="color:#4CAF50;"><b>Target disetel.</b><br>Target: <b>${escapeHtml(currentCdnTarget || target)}</b><br>Limit IP: <b>${v}</b><br>Klik tombol <b>Scan</b> di bawah untuk memulai.<br><button type="button" class="limit-btn" onclick="selectCdnTarget('${escapeHtml(currentCdnTarget || target)}')">Ubah limit</button></div>`;
     }
 }
 
