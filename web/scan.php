@@ -77,6 +77,13 @@ if ($poll || isset($_GET['scan_id'])) {
             $jsonData = json_decode(file_get_contents($jsonFile), true);
         }
 
+        // Bersihkan baris progres mentah dari output akhir (agar tidak muncul sebagai teks)
+        $cleanOutput = preg_split('/\r|\n/', $output);
+        $cleanOutput = array_filter($cleanOutput, function($line) {
+            return !preg_match('/[█░]|\d+%|Elapsed|ETA/', trim($line));
+        });
+        $output = implode("\n", $cleanOutput);
+
         echo json_encode([
             'success' => true,
             'status' => 'completed',
