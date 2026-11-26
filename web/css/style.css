@@ -427,7 +427,6 @@ pre {
     flex: 1;
     min-width: 0;
     padding-right: 12px;
-    height: 40px;
     box-sizing: border-box;
 }
 
@@ -436,7 +435,6 @@ pre {
     right: auto;
     top: auto;
     transform: none;
-    height: 40px;
     background: transparent;
     border: none;
     padding: 0;
