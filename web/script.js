@@ -200,24 +200,26 @@ async function handleScan(event, action, targetOverride = null, limitOverride = 
                 btn.disabled = false;
                 btn.textContent = originalText;
 
-                // Tampilkan hasil
+                // Hapus spinner dan progress bar sebelum menampilkan hasil (seluruh action, termasuk d2ip)
+                resultArea.querySelectorAll('.spinner, .progress-bar, .progress-wrap, .scanning').forEach(el => el.remove());
+
                 const statusBadge = `<span class="status-badge status-completed">Selesai</span>`;
                 if (pollData.json) {
-                    resultArea.innerHTML = '';
-                    // Ada tabel: tampilkan proses (badge) + tabel saja, tanpa output mentah
+                    // Ada tabel: tampilkan badge + tabel, tanpa output mentah
                     renderJsonResults(resultArea, pollData.json, action);
                     if (_tableData) {
                         _tableData.prefixHtml = statusBadge + '<br><br>';
                         _tableData.suffixHtml = '';
                         renderTablePage(resultArea, 1);
+                    } else {
+                        resultArea.insertAdjacentHTML('afterbegin', statusBadge + '<br><br>');
                     }
                 } else {
-                    // Tidak ada tabel: tampilkan output mentah penuh
+                    // Tidak ada tabel: tampilkan output mentah penuh (d2ip, dst.)
                     resultArea.innerHTML = statusBadge + '<br><br>';
                     if (pollData.output) {
                         resultArea.innerHTML += `<h3>Hasil:</h3><pre>${escapeHtml(pollData.output)}</pre>`;
                     }
-                    resultArea.querySelector('.progress-bar')?.remove();
                 }
             }
         }, 2000);
