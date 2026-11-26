@@ -83,6 +83,7 @@ if ($poll || isset($_GET['scan_id'])) {
             $t = trim($line);
             return !preg_match('/[█░]|\d+%|Elapsed|ETA/', $t)
                 && !preg_match('/^═══/', $t)
+                && !preg_match('/═══ SNISCAN/', $t)
                 && !preg_match('/^Scanning:/', $t);
         });
         $output = implode("\n", $cleanOutput);
