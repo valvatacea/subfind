@@ -91,6 +91,14 @@ setup_dirs() {
         chmod 755 "$INSTALL_DIR" "$INSTALL_DIR/.venv" "$INSTALL_DIR/.venv/bin" 2>/dev/null || true
         chmod 755 "$INSTALL_DIR/.venv/bin/python"* 2>/dev/null || true
     fi
+    # Beri www-data akses baca/tulis .env (fitur Ubah Akun admin)
+    if [ -f "$INSTALL_DIR/.env" ]; then
+        if command -v setfacl >/dev/null 2>&1; then
+            setfacl -m u:www-data:rw "$INSTALL_DIR/.env" 2>/dev/null || true
+        fi
+        chown root:www-data "$INSTALL_DIR/.env" 2>/dev/null || true
+        chmod 660 "$INSTALL_DIR/.env" 2>/dev/null || true
+    fi
     log_ok "Direktori siap"
 }
 
@@ -113,6 +121,12 @@ env_set() {
     else
         echo "${key}=${val}" >> "$f"
     fi
+    # Beri www-data akses baca/tulis .env (fitur Ubah Akun admin)
+    if command -v setfacl >/dev/null 2>&1; then
+        setfacl -m u:www-data:rw "$f" 2>/dev/null || true
+    fi
+    chown root:www-data "$f" 2>/dev/null || true
+    chmod 660 "$f" 2>/dev/null || true
 }
 
 extract_root_domain() {
