@@ -363,7 +363,7 @@ pre {
     transition: width 0.25s ease;
 }
 .progress-bar.determinate {
-    background: linear-gradient(90deg, #22c55e 0%, #87ceeb 33%, #00bcd4 66%, #22c55e 100%);
+    background: linear-gradient(90deg, #22c55e 0%, #87ceeb 25%, #00bcd4 50%, #fffdd0 75%, #22c55e 100%);
     background-size: 200% 100%;
     animation: progress-wave 1.5s ease-in-out infinite;
 }
