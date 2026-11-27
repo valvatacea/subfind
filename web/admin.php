@@ -87,7 +87,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=64">
+    <link rel="stylesheet" href="./css/style.css?v=65">
 </head>
 <body>
     <div class="container">
@@ -139,7 +139,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=64">
+    <link rel="stylesheet" href="./css/style.css?v=65">
 </head>
 <body>
     <div class="container">
@@ -148,7 +148,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         <div class="admin-bar">
             <span class="admin-status" id="admin-datetime">Memuat waktu...</span>
             <div class="admin-actions">
-                <button type="button" class="btn-change" id="btn-change-creds">Ubah Akun</button>
+                <button type="button" class="btn-change" id="btn-change-creds">Akun</button>
                 <button type="button" class="btn-logout" id="btn-logout">Logout</button>
             </div>
         </div>

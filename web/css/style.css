@@ -493,8 +493,20 @@ pre {
 }
 
 .btn-login {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
     width: 100%;
     margin-top: 10px;
+}
+
+.btn-login:hover {
+    background: #45a049;
 }
 
 .btn-logout {
