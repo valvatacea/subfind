@@ -87,7 +87,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=72">
+    <link rel="stylesheet" href="./css/style.css?v=73">
 </head>
 <body>
     <div class="container">
@@ -139,7 +139,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=72">
+    <link rel="stylesheet" href="./css/style.css?v=73">
 </head>
 <body>
     <div class="container">
@@ -155,7 +155,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 
         <div id="creds-modal" class="hidden">
             <div class="admin-form">
-                <h3 style="margin-top:0;">Ubah Username & Password</h3>
+                <h3 style="margin-top:0;">Perubahan Akun</h3>
                 <div class="login-field">
                     <label class="login-label">Username baru:</label>
                     <input type="text" id="new-user" required>
