@@ -49,7 +49,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=52">
+    <link rel="stylesheet" href="./css/style.css?v=53">
 </head>
 <body>
     <div class="container">
@@ -111,14 +111,17 @@ if (isset($_POST['delete'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=52">
+    <link rel="stylesheet" href="./css/style.css?v=53">
 </head>
 <body>
     <div class="container">
         <h1>&#127983; Surfinder</h1>
-        <form method="post">
-            <button type="submit" name="logout" class="btn-logout">Logout</button>
-        </form>
+        <div class="admin-bar">
+            <span class="admin-status" id="admin-datetime">Memuat waktu...</span>
+            <form method="post">
+                <button type="submit" name="logout" class="btn-logout">Logout</button>
+            </form>
+        </div>
 
         <nav class="tabs">
             <div class="tab-row">
@@ -132,5 +135,14 @@ if (isset($_POST['delete'])) {
             </div>
         </nav>
     </div>
+    <script>
+        function updateAdminDateTime() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            document.getElementById('admin-datetime').textContent = now.toLocaleString('id-ID', options);
+        }
+        setInterval(updateAdminDateTime, 1000);
+        updateAdminDateTime();
+    </script>
 </body>
 </html>
