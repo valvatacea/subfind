@@ -78,6 +78,182 @@ if (isset($_POST['change_creds']) && isset($_SESSION['admin_logged_in']) && $_SE
     exit;
 }
 
+// --- Riwayat (upload/list/download/hapus) untuk cdnscan/subfind/sniscan ---
+$history_types = ['cdnscan', 'subfind', 'sniscan'];
+$action = $_POST['action'] ?? ($_GET['action'] ?? '');
+if (in_array($action, ['upload_history','list_uploads','delete_history','download_history','download_file'], true)) {
+    // download_file boleh tanpa login? tetap wajib login
+    if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+        if ($action === 'download_file') { http_response_code(403); exit; }
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Belum login.']);
+        exit;
+    }
+    $type = $_POST['type'] ?? ($_GET['type'] ?? '');
+    if ($action !== 'download_file' && !in_array($type, $history_types, true)) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Tipe tidak valid.']);
+        exit;
+    }
+    $OUTPUT_DIR = $BASE_DIR . '/../output';
+    $RIWAYAT_DIR = $OUTPUT_DIR . '/riwayat';
+    $UPLOAD_DIR = $RIWAYAT_DIR . '/upload';
+    if (!is_dir($OUTPUT_DIR)) @mkdir($OUTPUT_DIR, 0777, true);
+    if (!is_dir($RIWAYAT_DIR)) @mkdir($RIWAYAT_DIR, 0777, true);
+    if (!is_dir($UPLOAD_DIR)) @mkdir($UPLOAD_DIR, 0777, true);
+
+    if ($action === 'upload_history') {
+        header('Content-Type: application/json');
+        if (!isset($_FILES['upload_file']) || $_FILES['upload_file']['error'] !== UPLOAD_ERR_OK) {
+            echo json_encode(['success' => false, 'message' => 'File upload gagal.']);
+            exit;
+        }
+        $file = $_FILES['upload_file'];
+        if ($file['size'] > 10 * 1024 * 1024) {
+            echo json_encode(['success' => false, 'message' => 'File terlalu besar (maks 10MB).']);
+            exit;
+        }
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if ($ext !== 'json') {
+            echo json_encode(['success' => false, 'message' => 'Hanya file JSON yang diizinkan.']);
+            exit;
+        }
+        $raw = file_get_contents($file['tmp_name']);
+        $data = json_decode($raw, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            echo json_encode(['success' => false, 'message' => 'JSON tidak valid: ' . json_last_error_msg()]);
+            exit;
+        }
+        // validasi struktur minimal
+        $ok = false;
+        if ($type === 'sniscan') {
+            $ok = is_array($data) || (is_array($data) && isset($data['results']));
+            // terima list atau object dengan results
+            $ok = is_array($data);
+        } else {
+            $ok = is_array($data);
+        }
+        if (!$ok) {
+            echo json_encode(['success' => false, 'message' => 'Struktur JSON tidak sesuai.']);
+            exit;
+        }
+        $safe = preg_replace('/[^a-zA-Z0-9._-]/', '_', basename($file['name']));
+        $dest = $UPLOAD_DIR . '/' . $type . '_' . date('Ymd_His') . '_' . $safe;
+        if (!move_uploaded_file($file['tmp_name'], $dest)) {
+            echo json_encode(['success' => false, 'message' => 'Gagal menyimpan file.']);
+            exit;
+        }
+        echo json_encode(['success' => true, 'message' => 'Upload berhasil.', 'filename' => basename($dest)]);
+        exit;
+    }
+
+    if ($action === 'list_uploads') {
+        header('Content-Type: application/json');
+        $files = glob($UPLOAD_DIR . '/' . $type . '_*.json');
+        if ($files === false) $files = [];
+        usort($files, function($a, $b) { return filemtime($b) - filemtime($a); });
+        $out = [];
+        foreach ($files as $f) $out[] = basename($f);
+        echo json_encode(['success' => true, 'files' => $out]);
+        exit;
+    }
+
+    if ($action === 'delete_history') {
+        header('Content-Type: application/json');
+        $patterns = [];
+        if ($type === 'cdnscan') {
+            $patterns = [
+                $OUTPUT_DIR . '/cdnscan_*.json',
+                $OUTPUT_DIR . '/cdnscan_*.txt',
+                $OUTPUT_DIR . '/states/cdnscan_*.json',
+                $RIWAYAT_DIR . '/cdnscan_*',
+                $UPLOAD_DIR . '/cdnscan_*',
+            ];
+        } elseif ($type === 'subfind') {
+            $patterns = [
+                $OUTPUT_DIR . '/subfind_*.json',
+                $OUTPUT_DIR . '/subfind_*.txt',
+                $OUTPUT_DIR . '/states/subfind_*.json',
+                $RIWAYAT_DIR . '/subfind_*',
+                $UPLOAD_DIR . '/subfind_*',
+            ];
+        } elseif ($type === 'sniscan') {
+            $patterns = [
+                $OUTPUT_DIR . '/sniscan_*.json',
+                $OUTPUT_DIR . '/sniscan_*.txt',
+                $OUTPUT_DIR . '/states/sniscan_*.json',
+                $RIWAYAT_DIR . '/sniscan_*',
+                $UPLOAD_DIR . '/sniscan_*',
+            ];
+        }
+        $deleted = 0;
+        foreach ($patterns as $pat) {
+            foreach (glob($pat) as $f) {
+                if (is_file($f) && @unlink($f)) $deleted++;
+            }
+        }
+        echo json_encode(['success' => true, 'message' => "Riwayat $type dihapus ($deleted file).", 'deleted' => $deleted]);
+        exit;
+    }
+
+    if ($action === 'download_history') {
+        header('Content-Type: application/json');
+        $files = glob($OUTPUT_DIR . '/' . $type . '_*.json');
+        if ($files === false) $files = [];
+        $collected = [];
+        foreach ($files as $f) {
+            $data = json_decode(file_get_contents($f), true);
+            if (!is_array($data)) continue;
+            if ($type === 'sniscan') {
+                // data bisa object dengan results
+                $results = [];
+                if (isset($data['results']) && is_array($data['results'])) {
+                    $results = $data['results'];
+                    $domain = $data['domain'] ?? '';
+                } elseif (is_array($data)) {
+                    $results = $data;
+                    $domain = '';
+                }
+                foreach ($results as $r) {
+                    if (is_array($r) && ($r['status'] ?? '') === '200') {
+                        if ($domain !== '' && !isset($r['domain'])) $r['domain'] = $domain;
+                        $collected[] = $r;
+                    }
+                }
+            } else {
+                foreach ($data as $r) {
+                    if (is_array($r) && ($r['status'] ?? '') === '200') {
+                        $collected[] = $r;
+                    }
+                }
+            }
+        }
+        $dest = $RIWAYAT_DIR . '/' . $type . '_200_' . date('Ymd_His') . '.json';
+        file_put_contents($dest, json_encode($collected, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $fname = basename($dest);
+        echo json_encode(['success' => true, 'message' => count($collected) . ' entri status 200.', 'filename' => $fname, 'download_url' => 'admin.php?action=download_file&type=' . urlencode($type) . '&file=' . urlencode($fname)]);
+        exit;
+    }
+
+    if ($action === 'download_file') {
+        $fname = basename($_GET['file'] ?? '');
+        if ($fname === '' || !preg_match('/^[a-zA-Z0-9._-]+\.json$/', $fname)) {
+            http_response_code(400);
+            exit;
+        }
+        $path = $RIWAYAT_DIR . '/' . $fname;
+        if (!is_file($path)) {
+            http_response_code(404);
+            exit;
+        }
+        header('Content-Type: application/json');
+        header('Content-Disposition: attachment; filename="' . $fname . '"');
+        readfile($path);
+        exit;
+    }
+}
+
+
 // Jika belum login, tampilkan form login
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     ?>
