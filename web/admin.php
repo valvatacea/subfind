@@ -109,9 +109,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 
         <div class="admin-bar">
             <span class="admin-status" id="admin-datetime">Memuat waktu...</span>
-            <form method="post">
-                <button type="submit" name="logout" class="btn-logout">Logout</button>
-            </form>
+            <button type="button" name="logout" class="btn-logout" id="btn-logout">Logout</button>
         </div>
 
         <nav class="tabs">
@@ -134,6 +132,18 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         }
         setInterval(updateAdminDateTime, 1000);
         updateAdminDateTime();
+
+        document.getElementById('btn-logout').addEventListener('click', function() {
+            if(confirm('Yakin ingin logout?')) {
+                fetch('admin.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'logout=1'
+                }).then(function() {
+                    window.location.href = 'admin.php';
+                });
+            }
+        });
     </script>
 </body>
 </html>
