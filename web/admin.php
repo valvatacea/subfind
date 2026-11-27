@@ -43,6 +43,41 @@ if ($_POST['user'] !== ADMIN_USER) {
     }
 }
 
+// Ubah username/password via AJAX (khusus admin yang sudah login)
+if (isset($_POST['change_creds']) && isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
+    header('Content-Type: application/json');
+    $newUser = trim((string)($_POST['new_user'] ?? ''));
+    $newPass = (string)($_POST['new_pass'] ?? '');
+    if ($newUser === '' || $newPass === '') {
+        echo json_encode(['success' => false, 'message' => 'Username dan password tidak boleh kosong.']);
+        exit;
+    }
+    $envFile = $BASE_DIR . '/../.env';
+    $lines = is_file($envFile) ? file($envFile, FILE_IGNORE_NEW_LINES) : [];
+    if ($lines === false) $lines = [];
+    $foundUser = false;
+    $foundPass = false;
+    foreach ($lines as $i => $line) {
+        if (preg_match('/^\s*ADMIN_USER\s*=/', $line)) {
+            $lines[$i] = 'ADMIN_USER=' . $newUser;
+            $foundUser = true;
+        } elseif (preg_match('/^\s*ADMIN_PASS\s*=/', $line)) {
+            $lines[$i] = 'ADMIN_PASS=' . $newPass;
+            $foundPass = true;
+        }
+    }
+    if (!$foundUser) $lines[] = 'ADMIN_USER=' . $newUser;
+    if (!$foundPass) $lines[] = 'ADMIN_PASS=' . $newPass;
+    $written = file_put_contents($envFile, implode("\n", $lines) . "\n", LOCK_EX);
+    if ($written === false) {
+        echo json_encode(['success' => false, 'message' => 'Gagal menyimpan .env (izin file).']);
+        exit;
+    }
+    session_destroy();
+    echo json_encode(['success' => true, 'message' => 'Kredensial berhasil diubah. Silakan login ulang.']);
+    exit;
+}
+
 // Jika belum login, tampilkan form login
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     ?>
@@ -52,7 +87,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=63">
+    <link rel="stylesheet" href="./css/style.css?v=64">
 </head>
 <body>
     <div class="container">
@@ -104,7 +139,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=63">
+    <link rel="stylesheet" href="./css/style.css?v=64">
 </head>
 <body>
     <div class="container">
@@ -112,7 +147,32 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 
         <div class="admin-bar">
             <span class="admin-status" id="admin-datetime">Memuat waktu...</span>
-            <button type="button" name="logout" class="btn-logout" id="btn-logout">Logout</button>
+            <div class="admin-actions">
+                <button type="button" class="btn-change" id="btn-change-creds">Ubah Akun</button>
+                <button type="button" class="btn-logout" id="btn-logout">Logout</button>
+            </div>
+        </div>
+
+        <div id="creds-modal" class="hidden">
+            <div class="admin-form">
+                <h3 style="margin-top:0;">Ubah Username & Password</h3>
+                <div class="login-field">
+                    <label class="login-label">Username baru:</label>
+                    <input type="text" id="new-user" required>
+                </div>
+                <div class="login-field">
+                    <label class="login-label">Password baru:</label>
+                    <input type="password" id="new-pass" required>
+                </div>
+                <div class="login-field">
+                    <label class="login-label">Konfirmasi password:</label>
+                    <input type="password" id="new-pass-confirm" required>
+                </div>
+                <div id="creds-error" class="error hidden"></div>
+                <div id="creds-success" class="success hidden"></div>
+                <button type="button" class="btn-login" id="btn-save-creds">Simpan</button>
+                <button type="button" class="btn-logout" id="btn-cancel-creds">Batal</button>
+            </div>
         </div>
 
         <div class="spacer"></div>
@@ -189,6 +249,54 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 });
             }
         });
+
+        // Ubah akun (AJAX)
+        (function() {
+            const modal = document.getElementById('creds-modal');
+            const btnOpen = document.getElementById('btn-change-creds');
+            const btnCancel = document.getElementById('btn-cancel-creds');
+            const btnSave = document.getElementById('btn-save-creds');
+            const errBox = document.getElementById('creds-error');
+            const succBox = document.getElementById('creds-success');
+            function showBox(box, msg) { box.textContent = msg; box.classList.remove('hidden'); }
+            function hideBoxes() { errBox.classList.add('hidden'); succBox.classList.add('hidden'); errBox.textContent=''; succBox.textContent=''; }
+            btnOpen.addEventListener('click', function() {
+                hideBoxes();
+                document.getElementById('new-user').value = '';
+                document.getElementById('new-pass').value = '';
+                document.getElementById('new-pass-confirm').value = '';
+                modal.classList.remove('hidden');
+            });
+            btnCancel.addEventListener('click', function() {
+                modal.classList.add('hidden');
+                hideBoxes();
+            });
+            btnSave.addEventListener('click', async function() {
+                hideBoxes();
+                const u = document.getElementById('new-user').value.trim();
+                const p = document.getElementById('new-pass').value;
+                const c = document.getElementById('new-pass-confirm').value;
+                if (!u || !p) { showBox(errBox, 'Username dan password tidak boleh kosong.'); return; }
+                if (p !== c) { showBox(errBox, 'Konfirmasi password tidak cocok.'); return; }
+                const body = 'change_creds=1&new_user=' + encodeURIComponent(u) + '&new_pass=' + encodeURIComponent(p);
+                try {
+                    const resp = await fetch('admin.php', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: body
+                    });
+                    const data = await resp.json();
+                    if (data.success) {
+                        showBox(succBox, data.message || 'Berhasil.');
+                        setTimeout(function() { window.location.href = 'admin.php'; }, 1200);
+                    } else {
+                        showBox(errBox, data.message || 'Gagal.');
+                    }
+                } catch (e) {
+                    showBox(errBox, 'Error: ' + e.message);
+                }
+            });
+        })();
     </script>
 </body>
 </html>

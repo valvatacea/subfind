@@ -507,6 +507,26 @@ pre {
     font-size: 13px;
 }
 
+.admin-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.btn-change {
+    background: #2196F3;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.btn-change:hover {
+    background: #1976D2;
+}
+
 .btn-logout:hover {
     background: #d32f2f;
 }
