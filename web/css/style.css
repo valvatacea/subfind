@@ -426,7 +426,6 @@ pre {
 .password-input-wrapper input {
     flex: 1;
     min-width: 0;
-    padding-right: 12px;
     height: 40px;
     margin-bottom: 0;
     border-top-right-radius: 0;
