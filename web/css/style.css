@@ -531,6 +531,11 @@ pre {
     align-items: center;
 }
 
+.divider {
+    border-top: 1px solid #333;
+    height: 12px;
+}
+
 .creds-actions .btn-login,
 .creds-actions .btn-logout {
     width: auto;
