@@ -529,7 +529,6 @@ pre {
     display: flex;
     gap: 8px;
     align-items: center;
-    margin-top: 10px;
 }
 
 .creds-actions .btn-login,
