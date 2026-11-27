@@ -87,7 +87,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=65">
+    <link rel="stylesheet" href="./css/style.css?v=66">
 </head>
 <body>
     <div class="container">
@@ -139,7 +139,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=65">
+    <link rel="stylesheet" href="./css/style.css?v=66">
 </head>
 <body>
     <div class="container">
@@ -162,16 +162,28 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </div>
                 <div class="login-field">
                     <label class="login-label">Password baru:</label>
-                    <input type="password" id="new-pass" required>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="new-pass" required>
+                        <button type="button" class="password-toggle" onclick="togglePwd('new-pass','toggle-new-pass')" id="toggle-new-pass">
+                            <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        </button>
+                    </div>
                 </div>
                 <div class="login-field">
                     <label class="login-label">Konfirmasi password:</label>
-                    <input type="password" id="new-pass-confirm" required>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="new-pass-confirm" required>
+                        <button type="button" class="password-toggle" onclick="togglePwd('new-pass-confirm','toggle-new-pass-confirm')" id="toggle-new-pass-confirm">
+                            <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        </button>
+                    </div>
                 </div>
                 <div id="creds-error" class="error hidden"></div>
                 <div id="creds-success" class="success hidden"></div>
-                <button type="button" class="btn-login" id="btn-save-creds">Simpan</button>
-                <button type="button" class="btn-logout" id="btn-cancel-creds">Batal</button>
+                <div class="creds-actions">
+                    <button type="button" class="btn-login" id="btn-save-creds">Simpan</button>
+                    <button type="button" class="btn-logout" id="btn-cancel-creds">Batal</button>
+                </div>
             </div>
         </div>
 
@@ -249,6 +261,20 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 });
             }
         });
+
+        const eyeOpenCreds = '<svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
+        const eyeClosedCreds = '<svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+        function togglePwd(inputId, btnId) {
+            const input = document.getElementById(inputId);
+            const btn = document.getElementById(btnId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.innerHTML = eyeOpenCreds;
+            } else {
+                input.type = 'password';
+                btn.innerHTML = eyeClosedCreds;
+            }
+        }
 
         // Ubah akun (AJAX)
         (function() {

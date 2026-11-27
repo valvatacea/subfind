@@ -525,6 +525,19 @@ pre {
     align-items: center;
 }
 
+.creds-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.creds-actions .btn-login,
+.creds-actions .btn-logout {
+    width: auto;
+    flex: 1;
+    margin-top: 0;
+}
+
 .btn-change {
     background: #2196F3;
     color: white;
