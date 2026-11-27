@@ -56,7 +56,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <div class="container">
         <h1>&#127983; Surfinder</h1>
         <form method="post" class="admin-form">
-            <?php if ($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
             <div class="login-field">
                 <label class="login-label">Username:</label>
                 <input type="text" name="user" required autofocus>
@@ -70,6 +69,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                     </button>
                 </div>
             </div>
+            <?php if ($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
             <button type="submit" class="btn-login">Login</button>
         </form>
     </div>
