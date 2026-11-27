@@ -254,6 +254,183 @@ if (in_array($action, ['upload_history','list_uploads','delete_history','downloa
 }
 
 
+// --- Scan dari file upload (background) ---
+if (in_array($action, ['scan_uploaded','get_results'], true)) {
+    if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Belum login.']);
+        exit;
+    }
+    $type = $_POST['type'] ?? ($_GET['type'] ?? '');
+    if (!in_array($type, $history_types, true)) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Tipe tidak valid.']);
+        exit;
+    }
+    $OUTPUT_DIR = $BASE_DIR . '/../output';
+    $RIWAYAT_DIR = $OUTPUT_DIR . '/riwayat';
+    $UPLOAD_DIR = $RIWAYAT_DIR . '/upload';
+    $STATES_DIR = $OUTPUT_DIR . '/states';
+    if (!is_dir($STATES_DIR)) @mkdir($STATES_DIR, 0777, true);
+
+    if ($action === 'scan_uploaded') {
+        header('Content-Type: application/json');
+        $filename = basename($_POST['filename'] ?? '');
+        if ($filename === '' || !preg_match('/^[a-zA-Z0-9._-]+\.json$/', $filename)) {
+            echo json_encode(['success' => false, 'message' => 'Nama file tidak valid.']);
+            exit;
+        }
+        $filePath = $UPLOAD_DIR . '/' . $filename;
+        if (!is_file($filePath)) {
+            echo json_encode(['success' => false, 'message' => 'File upload tidak ditemukan.']);
+            exit;
+        }
+        $data = json_decode(file_get_contents($filePath), true);
+        if (!is_array($data)) {
+            echo json_encode(['success' => false, 'message' => 'JSON tidak valid.']);
+            exit;
+        }
+        // ekstrak target unik
+        $targets = [];
+        if ($type === 'sniscan') {
+            if (isset($data['domain']) && is_string($data['domain'])) {
+                $targets[] = $data['domain'];
+            } elseif (is_array($data)) {
+                foreach ($data as $r) {
+                    if (is_array($r) && isset($r['domain'])) $targets[] = $r['domain'];
+                    elseif (is_array($r) && isset($r['target'])) $targets[] = $r['target'];
+                }
+            }
+        } else {
+            if (is_array($data)) {
+                foreach ($data as $r) {
+                    if (is_array($r) && isset($r['target'])) $targets[] = $r['target'];
+                }
+            }
+        }
+        $targets = array_values(array_unique($targets));
+        if (empty($targets)) {
+            echo json_encode(['success' => false, 'message' => 'Tidak ada target ditemukan di file.']);
+            exit;
+        }
+        // resume: lewati target yang sudah selesai
+        $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename);
+        $doneFile = $STATES_DIR . '/uploadscan_' . $type . '_' . $safeName . '.done';
+        $done = [];
+        if (is_file($doneFile)) {
+            $done = array_filter(array_map('trim', file($doneFile)));
+        }
+        $remaining = array_values(array_diff($targets, $done));
+        if (empty($remaining)) {
+            echo json_encode(['success' => true, 'message' => 'Semua target sudah selesai discan.', 'scan_id' => null, 'pid' => 0, 'total' => 0, 'remaining' => 0]);
+            exit;
+        }
+        // limit
+        $limit = 0;
+        if (isset($_POST['limit']) && ctype_digit((string)$_POST['limit'])) {
+            $l = (int)$_POST['limit'];
+            if ($l >= 1 && $l <= 1000) $limit = $l;
+        }
+        if ($limit > 0 && count($remaining) > $limit) {
+            $remaining = array_slice($remaining, 0, $limit);
+        }
+        $scan_id = uniqid('scan', true);
+        $outFile = $OUTPUT_DIR . '/scan_' . $scan_id . '.txt';
+        $pidFile = $OUTPUT_DIR . '/scan_' . $scan_id . '.pid';
+        $metaFile = $STATES_DIR . '/scanmeta_' . $scan_id . '.json';
+        $python = file_exists($BASE_DIR . '/../.venv/bin/python') ? $BASE_DIR . '/../.venv/bin/python' : 'python3';
+        // build shell script
+        $scriptPath = '/tmp/scan_' . $scan_id . '.sh';
+        $lines = [];
+        $lines[] = '#!/bin/bash';
+        $lines[] = 'cd ' . escapeshellarg($BASE_DIR . '/..');
+        $lines[] = ': > ' . escapeshellarg($outFile);
+        $total = count($remaining);
+        $i = 0;
+        foreach ($remaining as $t) {
+            $i++;
+            $lines[] = 'echo "===== TARGET: ' . $t . ' =====" >> ' . escapeshellarg($outFile);
+            $lines[] = 'echo "PROGRESS: ' . $i . '/' . $total . '" >> ' . escapeshellarg($outFile);
+            if ($type === 'cdnscan') {
+                $cmd = $python . ' -u cdnscan.py ' . escapeshellarg($t);
+                if ($limit > 0) $cmd .= ' --limit ' . (int)$limit . ' --yes';
+                else $cmd .= ' --yes';
+            } elseif ($type === 'subfind') {
+                $cmd = $python . ' -u subfind.py ' . escapeshellarg($t);
+            } else {
+                $cmd = $python . ' -u sniscan.py ' . escapeshellarg($t);
+            }
+            $lines[] = $cmd . ' >> ' . escapeshellarg($outFile) . ' 2>&1';
+            $lines[] = 'echo ' . escapeshellarg($t) . ' >> ' . escapeshellarg($doneFile);
+        }
+        $lines[] = 'echo "DONE" >> ' . escapeshellarg($outFile);
+        file_put_contents($scriptPath, implode("\n", $lines) . "\n");
+        chmod($scriptPath, 0755);
+        $command = 'nohup bash ' . escapeshellarg($scriptPath) . ' > /dev/null 2>&1 & echo $! > ' . escapeshellarg($pidFile);
+        $descriptorSpec = [0 => ["pipe","r"], 1 => ["pipe","w"], 2 => ["pipe","w"]];
+        $process = proc_open($command, $descriptorSpec, $pipes, $BASE_DIR);
+        if (!is_resource($process)) {
+            echo json_encode(['success' => false, 'message' => 'Gagal memulai scan.']);
+            exit;
+        }
+        fclose($pipes[0]); fclose($pipes[1]); fclose($pipes[2]);
+        proc_close($process);
+        usleep(200000);
+        $pid = 0;
+        if (file_exists($pidFile)) $pid = (int)trim(file_get_contents($pidFile));
+        // meta
+        file_put_contents($metaFile, json_encode([
+            'scan_id' => $scan_id,
+            'type' => $type,
+            'filename' => $filename,
+            'start_time' => microtime(true),
+            'targets' => $remaining,
+        ]));
+        echo json_encode(['success' => true, 'scan_id' => $scan_id, 'pid' => $pid, 'total' => $total, 'remaining' => count($remaining), 'message' => 'Scan dimulai.']);
+        exit;
+    }
+
+    if ($action === 'get_results') {
+        header('Content-Type: application/json');
+        $scan_id = $_GET['scan_id'] ?? ($_POST['scan_id'] ?? '');
+        $metaFile = $STATES_DIR . '/scanmeta_' . $scan_id . '.json';
+        if (!is_file($metaFile)) {
+            echo json_encode(['success' => false, 'message' => 'Metadata scan tidak ditemukan.']);
+            exit;
+        }
+        $meta = json_decode(file_get_contents($metaFile), true);
+        $type = $meta['type'] ?? $type;
+        $since = $meta['start_time'] ?? 0;
+        $files = glob($OUTPUT_DIR . '/' . $type . '_*.json');
+        if ($files === false) $files = [];
+        $collected = [];
+        foreach ($files as $f) {
+            if (filemtime($f) < $since) continue;
+            $data = json_decode(file_get_contents($f), true);
+            if (!is_array($data)) continue;
+            if ($type === 'sniscan') {
+                $results = isset($data['results']) && is_array($data['results']) ? $data['results'] : (is_array($data) ? $data : []);
+                $domain = $data['domain'] ?? '';
+                foreach ($results as $r) {
+                    if (is_array($r) && ($r['status'] ?? '') === '200') {
+                        if ($domain !== '' && !isset($r['domain'])) $r['domain'] = $domain;
+                        $collected[] = $r;
+                    }
+                }
+            } else {
+                foreach ($data as $r) {
+                    if (is_array($r) && ($r['status'] ?? '') === '200') {
+                        $collected[] = $r;
+                    }
+                }
+            }
+        }
+        echo json_encode(['success' => true, 'data' => $collected, 'count' => count($collected)]);
+        exit;
+    }
+}
+
+
 // Jika belum login, tampilkan form login
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     ?>
@@ -263,7 +440,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=73">
+    <link rel="stylesheet" href="./css/style.css?v=74">
 </head>
 <body>
     <div class="container">
@@ -315,7 +492,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=73">
+    <link rel="stylesheet" href="./css/style.css?v=74">
 </head>
 <body>
     <div class="container">
@@ -399,6 +576,75 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 </form>
                 <div id="result-rdns" class="result-area"></div>
             </div>
+
+            <!-- CDNScan -->
+            <div class="tab-panel" id="panel-cdnscan">
+                <div class="history-actions">
+                    <button type="button" class="btn-change" id="btn-delete-cdnscan">Hapus riwayat</button>
+                    <button type="button" class="btn-change" id="btn-download-cdnscan">Download riwayat</button>
+                    <button type="button" class="btn-change" id="btn-upload-cdnscan">Upload</button>
+                </div>
+                <input type="file" id="file-cdnscan" accept=".json" class="hidden">
+                <div class="login-field" style="margin-top:10px;">
+                    <label class="login-label">File terupload:</label>
+                    <select id="select-cdnscan" class="provider-select"></select>
+                </div>
+                <div class="limit-picker" id="limit-picker-cdnscan">
+                    <b>Pilih limit:</b><br>
+                    <button type="button" class="limit-btn" onclick="setHistLimit('cdnscan',500)">500</button>
+                    <button type="button" class="limit-btn" onclick="setHistLimit('cdnscan',1000)">1000</button>
+                    <button type="button" class="limit-btn" onclick="showCustomHistLimit('cdnscan')">Custom</button>
+                    <span id="custom-wrap-cdnscan"></span>
+                </div>
+                <button type="button" class="btn-login" id="btn-scan-cdnscan" style="margin-top:10px;">Scan dari file</button>
+                <div id="result-cdnscan" class="result-area"></div>
+            </div>
+
+            <!-- SubFind -->
+            <div class="tab-panel" id="panel-subfind">
+                <div class="history-actions">
+                    <button type="button" class="btn-change" id="btn-delete-subfind">Hapus riwayat</button>
+                    <button type="button" class="btn-change" id="btn-download-subfind">Download riwayat</button>
+                    <button type="button" class="btn-change" id="btn-upload-subfind">Upload</button>
+                </div>
+                <input type="file" id="file-subfind" accept=".json" class="hidden">
+                <div class="login-field" style="margin-top:10px;">
+                    <label class="login-label">File terupload:</label>
+                    <select id="select-subfind" class="provider-select"></select>
+                </div>
+                <div class="limit-picker" id="limit-picker-subfind">
+                    <b>Pilih limit:</b><br>
+                    <button type="button" class="limit-btn" onclick="setHistLimit('subfind',500)">500</button>
+                    <button type="button" class="limit-btn" onclick="setHistLimit('subfind',1000)">1000</button>
+                    <button type="button" class="limit-btn" onclick="showCustomHistLimit('subfind')">Custom</button>
+                    <span id="custom-wrap-subfind"></span>
+                </div>
+                <button type="button" class="btn-login" id="btn-scan-subfind" style="margin-top:10px;">Scan dari file</button>
+                <div id="result-subfind" class="result-area"></div>
+            </div>
+
+            <!-- SNIScan -->
+            <div class="tab-panel" id="panel-sniscan">
+                <div class="history-actions">
+                    <button type="button" class="btn-change" id="btn-delete-sniscan">Hapus riwayat</button>
+                    <button type="button" class="btn-change" id="btn-download-sniscan">Download riwayat</button>
+                    <button type="button" class="btn-change" id="btn-upload-sniscan">Upload</button>
+                </div>
+                <input type="file" id="file-sniscan" accept=".json" class="hidden">
+                <div class="login-field" style="margin-top:10px;">
+                    <label class="login-label">File terupload:</label>
+                    <select id="select-sniscan" class="provider-select"></select>
+                </div>
+                <div class="limit-picker" id="limit-picker-sniscan">
+                    <b>Pilih limit:</b><br>
+                    <button type="button" class="limit-btn" onclick="setHistLimit('sniscan',500)">500</button>
+                    <button type="button" class="limit-btn" onclick="setHistLimit('sniscan',1000)">1000</button>
+                    <button type="button" class="limit-btn" onclick="showCustomHistLimit('sniscan')">Custom</button>
+                    <span id="custom-wrap-sniscan"></span>
+                </div>
+                <button type="button" class="btn-login" id="btn-scan-sniscan" style="margin-top:10px;">Scan dari file</button>
+                <div id="result-sniscan" class="result-area"></div>
+            </div>
         </div>
     </div>
     <script src="./js/script.js?v=34"></script>
@@ -409,6 +655,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             showTab = function(tabName, btn) {
                 if (!document.getElementById('panel-' + tabName)) return;
                 _orig(tabName, btn);
+                if (['cdnscan','subfind','sniscan'].indexOf(tabName) !== -1) {
+                    loadUploads(tabName);
+                }
             };
         })();
     </script>
@@ -499,6 +748,177 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 } catch (e) {
                     showBox(errBox, 'Error: ' + e.message);
                 }
+            });
+        })();
+
+        // Riwayat: hapus/download/upload + scan dari file
+        (function() {
+            const types = ['cdnscan','subfind','sniscan'];
+            const histLimit = { cdnscan: 0, subfind: 0, sniscan: 0 };
+            function setHistLimit(type, val) {
+                histLimit[type] = val;
+                const wrap = document.getElementById('custom-wrap-' + type);
+                if (wrap) wrap.innerHTML = `<span style="margin-left:8px;color:#4CAF50;">Limit: ${val}</span>`;
+            }
+            function showCustomHistLimit(type) {
+                const wrap = document.getElementById('custom-wrap-' + type);
+                if (!wrap) return;
+                wrap.innerHTML = `<input type="number" min="1" max="1000" value="500" style="width:80px;margin-left:8px;" id="custom-input-${type}"> <button type="button" class="limit-btn" onclick="applyCustomHistLimit('${type}')">Set</button>`;
+            }
+            window.applyCustomHistLimit = function(type) {
+                const inp = document.getElementById('custom-input-' + type);
+                const v = parseInt(inp.value, 10);
+                if (isNaN(v) || v < 1 || v > 1000) { alert('Limit 1-1000'); return; }
+                setHistLimit(type, v);
+            };
+            window.setHistLimit = setHistLimit;
+            window.showCustomHistLimit = showCustomHistLimit;
+
+            async function loadUploads(type) {
+                const sel = document.getElementById('select-' + type);
+                if (!sel) return;
+                try {
+                    const resp = await fetch('admin.php', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: 'action=list_uploads&type=' + encodeURIComponent(type)
+                    });
+                    const data = await resp.json();
+                    sel.innerHTML = '';
+                    if (data.success && data.files && data.files.length) {
+                        data.files.forEach(f => {
+                            const opt = document.createElement('option');
+                            opt.value = f; opt.textContent = f;
+                            sel.appendChild(opt);
+                        });
+                    } else {
+                        const opt = document.createElement('option');
+                        opt.value = ''; opt.textContent = '(belum ada file)';
+                        sel.appendChild(opt);
+                    }
+                } catch (e) { console.error(e); }
+            }
+
+            async function deleteHistory(type) {
+                if (!confirm('Hapus semua riwayat ' + type + '?')) return;
+                const resp = await fetch('admin.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'action=delete_history&type=' + encodeURIComponent(type)
+                });
+                const data = await resp.json();
+                alert(data.message || (data.success ? 'Selesai' : 'Gagal'));
+                if (data.success) loadUploads(type);
+            }
+
+            async function downloadHistory(type) {
+                const resp = await fetch('admin.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'action=download_history&type=' + encodeURIComponent(type)
+                });
+                const data = await resp.json();
+                const resArea = document.getElementById('result-' + type);
+                if (data.success) {
+                    resArea.innerHTML = `<div class="success">${data.message}</div><div><a href="${data.download_url}" target="_blank">Download JSON</a></div>`;
+                } else {
+                    resArea.innerHTML = `<div class="error">${data.message || 'Gagal'}</div>`;
+                }
+            }
+
+            async function uploadFile(type) {
+                const input = document.getElementById('file-' + type);
+                if (!input.files || !input.files.length) {
+                    input.click();
+                    return;
+                }
+                const fd = new FormData();
+                fd.append('action', 'upload_history');
+                fd.append('type', type);
+                fd.append('upload_file', input.files[0]);
+                const resp = await fetch('admin.php', { method: 'POST', body: fd });
+                const data = await resp.json();
+                const resArea = document.getElementById('result-' + type);
+                if (data.success) {
+                    resArea.innerHTML = `<div class="success">${data.message} (${data.filename})</div>`;
+                    input.value = '';
+                    await loadUploads(type);
+                } else {
+                    resArea.innerHTML = `<div class="error">${data.message || 'Gagal upload'}</div>`;
+                }
+            }
+
+            async function scanUploaded(type) {
+                const sel = document.getElementById('select-' + type);
+                const filename = sel ? sel.value : '';
+                if (!filename) { alert('Pilih file upload terlebih dahulu.'); return; }
+                const limit = histLimit[type] || 0;
+                const resArea = document.getElementById('result-' + type);
+                resArea.innerHTML = '<div class="scanning"><div class="spinner"></div><span class="status-text">Memulai scan...</span></div>';
+                const body = 'action=scan_uploaded&type=' + encodeURIComponent(type) +
+                    '&filename=' + encodeURIComponent(filename) +
+                    (limit ? '&limit=' + encodeURIComponent(limit) : '');
+                const startResp = await fetch('admin.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: body
+                });
+                const startData = await startResp.json();
+                if (!startData.success) {
+                    resArea.innerHTML = `<div class="error">${startData.message || 'Gagal'}</div>`;
+                    return;
+                }
+                if (!startData.scan_id) {
+                    resArea.innerHTML = `<div class="success">${startData.message || 'Selesai'}</div>`;
+                    return;
+                }
+                const scanId = startData.scan_id;
+                const pid = startData.pid;
+                const statusText = resArea.querySelector('.status-text');
+                const pollInterval = setInterval(async () => {
+                    const pollResp = await fetch(`scan.php?scan_id=${encodeURIComponent(scanId)}&action=${encodeURIComponent(type)}`);
+                    const pollData = await pollResp.json();
+                    if (!pollData.success) {
+                        clearInterval(pollInterval);
+                        resArea.innerHTML = `<div class="error">${pollData.error || 'Scan gagal'}</div>`;
+                        return;
+                    }
+                    if (pollData.status === 'running') {
+                        if (pollData.progress_text) {
+                            statusText.textContent = pollData.progress_text;
+                        } else {
+                            statusText.textContent = 'Memindai...';
+                        }
+                        return;
+                    }
+                    if (pollData.status === 'completed') {
+                        clearInterval(pollInterval);
+                        // ambil hasil
+                        const r = await fetch('admin.php?action=get_results&type=' + encodeURIComponent(type) + '&scan_id=' + encodeURIComponent(scanId));
+                        const rd = await r.json();
+                        resArea.innerHTML = '';
+                        if (rd.success && rd.data && rd.data.length) {
+                            renderJsonResults(resArea, rd.data, type);
+                            if (_tableData) { _tableData.prefixHtml = ''; _tableData.suffixHtml = ''; renderTablePage(resArea, 1); }
+                        } else {
+                            resArea.innerHTML = '<div class="error">Tidak ada hasil ditemukan</div>';
+                        }
+                    }
+                }, 2000);
+            }
+
+            types.forEach(type => {
+                const del = document.getElementById('btn-delete-' + type);
+                const dl = document.getElementById('btn-download-' + type);
+                const up = document.getElementById('btn-upload-' + type);
+                const scan = document.getElementById('btn-scan-' + type);
+                const fileInput = document.getElementById('file-' + type);
+                if (del) del.addEventListener('click', () => deleteHistory(type));
+                if (dl) dl.addEventListener('click', () => downloadHistory(type));
+                if (up) up.addEventListener('click', () => fileInput.click());
+                if (fileInput) fileInput.addEventListener('change', () => uploadFile(type));
+                if (scan) scan.addEventListener('click', () => scanUploaded(type));
+                loadUploads(type);
             });
         })();
     </script>
