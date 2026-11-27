@@ -50,7 +50,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=58">
+    <link rel="stylesheet" href="./css/style.css?v=59">
 </head>
 <body>
     <div class="container">
@@ -102,7 +102,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=58">
+    <link rel="stylesheet" href="./css/style.css?v=59">
 </head>
 <body>
     <div class="container">
@@ -115,7 +115,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 
         <nav class="tabs">
             <div class="tab-row">
-                <button class="tab active" onclick="showTab('d2ip', this)">D2IP</button>
+                <button class="tab" onclick="showTab('d2ip', this)">D2IP</button>
                 <button class="tab" onclick="showTab('rdns', this)">IP2D</button>
                 <button class="tab" onclick="showTab('cdnscan', this)">CDNScan</button>
             </div>
