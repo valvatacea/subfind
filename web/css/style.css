@@ -532,8 +532,8 @@ pre {
 }
 
 .divider {
-    border-top: 1px solid #333;
-    height: 12px;
+    border-top: 1px solid #555;
+    height: 16px;
 }
 
 .creds-actions .btn-login,
