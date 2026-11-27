@@ -49,7 +49,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=53">
+    <link rel="stylesheet" href="./css/style.css?v=54">
 </head>
 <body>
     <div class="container">
@@ -93,29 +93,20 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <?php
     exit;
 }
-
-// Hapus file output (hanya via POST, tanpa link)
-if (isset($_POST['delete'])) {
-    $f = basename($_POST['delete']);
-    $path = $OUT_DIR . '/' . $f;
-    if (file_exists($path) && is_file($path)) {
-        unlink($path);
-    }
-    header('Location: admin.php');
-    exit;
-}
 ?>
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=53">
+    <link rel="stylesheet" href="./css/style.css?v=54">
 </head>
 <body>
     <div class="container">
         <h1>&#127983; Surfinder</h1>
+
         <div class="admin-bar">
             <span class="admin-status" id="admin-datetime">Memuat waktu...</span>
             <form method="post">
