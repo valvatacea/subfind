@@ -385,16 +385,20 @@ pre {
 
 /* Admin bar */
 .admin-bar {
-    margin: 0 0 15px 0;
+    margin: 0;
     padding: 0;
     background: transparent;
     border: none;
+    border-bottom: 1px solid #333;
     border-radius: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
     font-size: 13px;
+}
+.spacer {
+    height: 12px;
 }
 .admin-status {
     color: #4CAF50;
