@@ -49,7 +49,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=51">
+    <link rel="stylesheet" href="./css/style.css?v=52">
 </head>
 <body>
     <div class="container">
@@ -111,7 +111,7 @@ if (isset($_POST['delete'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=51">
+    <link rel="stylesheet" href="./css/style.css?v=52">
 </head>
 <body>
     <div class="container">
@@ -120,16 +120,17 @@ if (isset($_POST['delete'])) {
             <button type="submit" name="logout" class="btn-logout">Logout</button>
         </form>
 
-        <div class="link-menu">
-            <h3>Menu</h3>
-            <ul>
-                <li><span class="menu-item">D2IP</span></li>
-                <li><span class="menu-item">IP2D</span></li>
-                <li><span class="menu-item">CDNScan</span></li>
-                <li><span class="menu-item">SubFind</span></li>
-                <li><span class="menu-item">SNIScan</span></li>
-            </ul>
-        </div>
+        <nav class="tabs">
+            <div class="tab-row">
+                <button class="tab" onclick="showTab('d2ip', this)">D2IP</button>
+                <button class="tab" onclick="showTab('rdns', this)">IP2D</button>
+                <button class="tab" onclick="showTab('cdnscan', this)">CDNScan</button>
+            </div>
+            <div class="tab-row">
+                <button class="tab" onclick="showTab('subfind', this)">SubFind</button>
+                <button class="tab" onclick="showTab('sniscan', this)">SNIScan</button>
+            </div>
+        </nav>
     </div>
 </body>
 </html>
