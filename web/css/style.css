@@ -363,13 +363,15 @@ pre {
     transition: width 0.25s ease;
 }
 .progress-bar.determinate {
-    background: linear-gradient(90deg, #22c55e, #16a34a);
-    animation: progress-bounce 0.8s ease-in-out infinite;
+    background: linear-gradient(90deg, #22c55e 0%, #16a34a 50%, #22c55e 100%);
+    background-size: 200% 100%;
+    animation: progress-wave 1.5s ease-in-out infinite;
 }
 
-@keyframes progress-bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-4px); }
+@keyframes progress-wave {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
 }
 .progress-bar.indeterminate {
     width: 100%;
