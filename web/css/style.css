@@ -486,6 +486,13 @@ pre {
     display: block;
 }
 
+.login-label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: #bbb;
+}
+
 .btn-login {
     width: 100%;
     margin-top: 10px;

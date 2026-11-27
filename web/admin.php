@@ -49,7 +49,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=41">
+    <link rel="stylesheet" href="./css/style.css?v=42">
 </head>
 <body>
     <div class="container">
@@ -57,12 +57,11 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         <form method="post" class="admin-form">
             <?php if ($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
             <div class="login-field">
-                <label>Username:</label><br>
+                <label class="login-label">Username:</label>
                 <input type="text" name="user" required autofocus>
             </div>
-            <br>
             <div class="login-field">
-                <label>Password:</label><br>
+                <label class="login-label">Password:</label>
                 <div class="password-input-wrapper">
                     <input type="password" name="pass" required id="admin-pass">
                     <button type="button" class="password-toggle" onclick="toggleAdminPassword()" id="admin-pass-toggle">
