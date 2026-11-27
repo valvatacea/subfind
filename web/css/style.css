@@ -393,12 +393,16 @@ pre {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 10px;
     font-size: 13px;
 }
 .admin-status {
-    color: #4CAF50;
-    font-weight: 600;
+    color: #aaa;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    white-space: nowrap;
 }
 .admin-login {
     color: #4CAF50;

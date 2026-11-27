@@ -9,6 +9,7 @@ session_start();
 
 $BASE_DIR = dirname(__FILE__);
 $OUT_DIR = $BASE_DIR . '/output';
+$SERVER_TIME_MS = round(microtime(true) * 1000);
 
 // Muat kredensial dari .env (satu level di atas web/)
 $env_file = $BASE_DIR . '/../.env';
@@ -49,7 +50,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=56">
+    <link rel="stylesheet" href="./css/style.css?v=57">
 </head>
 <body>
     <div class="container">
@@ -101,7 +102,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=56">
+    <link rel="stylesheet" href="./css/style.css?v=57">
 </head>
 <body>
     <div class="container">
@@ -125,10 +126,17 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
         </nav>
     </div>
     <script>
+        const serverTimeMs = <?php echo json_encode($SERVER_TIME_MS); ?>;
+        const timeOffsetMs = serverTimeMs - Date.now();
+
         function updateAdminDateTime() {
-            const now = new Date();
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
-            document.getElementById('admin-datetime').textContent = now.toLocaleString('id-ID', options);
+            const now = new Date(Date.now() + timeOffsetMs);
+            const formatted = now.toLocaleString('id-ID', {
+                weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                timeZone: 'Asia/Jakarta', hour12: false
+            }).replace(/\./g, ':');
+            document.getElementById('admin-datetime').textContent = formatted + ' WIB';
         }
         setInterval(updateAdminDateTime, 1000);
         updateAdminDateTime();
