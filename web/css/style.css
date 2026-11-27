@@ -465,8 +465,9 @@ pre {
 .eye-icon {
     display: block;
     color: #e0e0e0;
-    width: 25px;
-    height: 25px;
+    width: 22px;
+    height: 22px;
+    margin: 0 auto;
 }
 
 /* Admin page styles */
