@@ -385,10 +385,11 @@ pre {
 
 /* Admin bar */
 .admin-bar {
-    margin: 0;
-    padding: 0;
+    margin: 0 0 15px 0;
+    padding: 0 0 10px 0;
     background: transparent;
     border: none;
+    border-bottom: 1px solid #333;
     border-radius: 0;
     display: flex;
     align-items: center;
