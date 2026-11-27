@@ -49,7 +49,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=47">
+    <link rel="stylesheet" href="./css/style.css?v=48">
 </head>
 <body>
     <div class="container">
@@ -71,17 +71,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
             </div>
             <button type="submit" class="btn-login">Login</button>
         </form>
-
-        <div class="link-menu">
-            <h3>Menu</h3>
-            <ul>
-                <li><span class="menu-item">D2IP</span></li>
-                <li><span class="menu-item">IP2D</span></li>
-                <li><span class="menu-item">CDNScan</span></li>
-                <li><span class="menu-item">SubFind</span></li>
-                <li><span class="menu-item">SNIScan</span></li>
-            </ul>
-        </div>
     </div>
     <script>
         const eyeOpen = '<svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
@@ -122,7 +111,7 @@ if (isset($_POST['delete'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=27">
+    <link rel="stylesheet" href="./css/style.css?v=48">
 </head>
 <body>
     <div class="container">
@@ -130,6 +119,17 @@ if (isset($_POST['delete'])) {
         <form method="post">
             <button type="submit" name="logout" class="btn-logout">Logout</button>
         </form>
+
+        <div class="link-menu">
+            <h3>Menu</h3>
+            <ul>
+                <li><span class="menu-item">D2IP</span></li>
+                <li><span class="menu-item">IP2D</span></li>
+                <li><span class="menu-item">CDNScan</span></li>
+                <li><span class="menu-item">SubFind</span></li>
+                <li><span class="menu-item">SNIScan</span></li>
+            </ul>
+        </div>
     </div>
 </body>
 </html>
