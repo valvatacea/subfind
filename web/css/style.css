@@ -364,6 +364,8 @@ pre {
 }
 .progress-bar.determinate {
     background: linear-gradient(90deg, #22c55e, #16a34a);
+    background-size: 200% 100%;
+    animation: progress-shimmer 1.8s ease-in-out infinite;
 }
 .progress-bar.indeterminate {
     width: 100%;
