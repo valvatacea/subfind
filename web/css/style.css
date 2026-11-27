@@ -364,12 +364,12 @@ pre {
 }
 .progress-bar.determinate {
     background: linear-gradient(90deg, #22c55e, #16a34a);
-    animation: progress-glow 1.2s ease-in-out infinite;
+    animation: progress-bounce 0.8s ease-in-out infinite;
 }
 
-@keyframes progress-glow {
-    0%, 100% { box-shadow: 0 0 4px #22c55e; opacity: 1; }
-    50% { box-shadow: 0 0 16px #2ecc71; opacity: 0.75; }
+@keyframes progress-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
 }
 .progress-bar.indeterminate {
     width: 100%;

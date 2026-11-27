@@ -12,7 +12,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=39">
+    <link rel="stylesheet" href="./css/style.css?v=40">
 </head>
 <body>
     <div class="container">
@@ -93,6 +93,6 @@
         </div>
     </div>
 
-    <script src="./js/script.js?v=39"></script>
+    <script src="./js/script.js?v=40"></script>
 </body>
 </html>
