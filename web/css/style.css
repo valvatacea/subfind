@@ -459,6 +459,10 @@ pre {
     border-radius: 4px;
 }
 
+.password-input-wrapper:focus-within .password-toggle {
+    border-color: #4CAF50;
+}
+
 .eye-icon {
     display: block;
     color: #e0e0e0;
