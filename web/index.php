@@ -12,7 +12,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surfinder</title>
-    <link rel="stylesheet" href="./css/style.css?v=22">
+    <link rel="stylesheet" href="./css/style.css?v=23">
 </head>
 <body>
     <div class="container">
