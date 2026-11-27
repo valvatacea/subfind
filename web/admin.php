@@ -876,7 +876,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
                 const pid = startData.pid;
                 const statusText = resArea.querySelector('.status-text');
                 const pollInterval = setInterval(async () => {
-                    const pollResp = await fetch(`scan.php?scan_id=${encodeURIComponent(scanId)}&action=${encodeURIComponent(type)}`);
+                    const pollResp = await fetch(`scan.php?scan_id=${encodeURIComponent(scanId)}&action=${encodeURIComponent(type)}&target=.`);
                     const pollData = await pollResp.json();
                     if (!pollData.success) {
                         clearInterval(pollInterval);
