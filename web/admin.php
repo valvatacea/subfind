@@ -405,7 +405,7 @@ if (in_array($action, ['scan_uploaded','get_results'], true)) {
         if ($files === false) $files = [];
         $collected = [];
         foreach ($files as $f) {
-            if (filemtime($f) < $since) continue;
+            if (filemtime($f) < (int)$since) continue;
             $data = json_decode(file_get_contents($f), true);
             if (!is_array($data)) continue;
             if ($type === 'sniscan') {
