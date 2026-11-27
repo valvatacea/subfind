@@ -32,12 +32,14 @@ if (isset($_POST['logout'])) {
 // Login
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['logout'])) {
-    if ($_POST['user'] === ADMIN_USER && $_POST['pass'] === ADMIN_PASS) {
+if ($_POST['user'] !== ADMIN_USER) {
+        $error = 'Username salah.';
+    } elseif ($_POST['pass'] !== ADMIN_PASS) {
+        $error = 'Password salah.';
+    } else {
         $_SESSION['admin_logged_in'] = true;
         header('Location: admin.php');
         exit;
-    } else {
-        $error = 'Username atau password salah.';
     }
 }
 
